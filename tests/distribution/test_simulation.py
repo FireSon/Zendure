@@ -3,60 +3,81 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import random
 from collections import deque
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
+from custom_components.energymaster.binary_sensor import EmBinarySensor
+from custom_components.energymaster.device import DeviceConnection
 from custom_components.energymaster.distribution import Distribution, DistributionMode
-from custom_components.energymaster.device import DeviceConnection, PowerDevice, PowerProfileCharge, PowerProfileDischarge
+from custom_components.energymaster.number import EmNumber
+from custom_components.energymaster.select import EmSelect
+from custom_components.energymaster.sensor import EmSensor
+from custom_components.energymaster.switch import EmSwitch
+from custom_components.energymaster.zendure.device import ZendureDevice
+
+_DISCHARGE_MAX = {"SF2400AC": 2400, "SF2400AC_PLUS": 2400, "SF2400PRO": 2400, "SF1600AC": 1600, "SF1600AC_PLUS": 1600, "HYPER2000": 1200, "SF800": 800, "SF800PRO": 800}
 
 
-class _Val:
-    def __init__(self, v: float = 0.0) -> None:
-        self.value = float(v)
-
-    @property
-    def asNumber(self) -> float:
-        return self.value
-
-    def __float__(self) -> float:
-        return float(self.value)
-
-    def __format__(self, spec: str) -> str:
-        return format(self.value, spec)
+class _Driver:
+    @staticmethod
+    def on_update(device) -> None:
+        pass
 
 
-class _SimDevice(PowerDevice):
-    # PowerDevice with __init__ bypassed: instant-settle battery for the closed-loop sim.
-    def __init__(self, device_id: str, power: int, capacity_kwh: float) -> None:
-        self.device_id = device_id
-        self.name = device_id
-        self.profile = [PowerProfileDischarge(power=power), PowerProfileCharge(power=power)]
-        self.soc = _Val(0.0)
-        self.soc_min = _Val(0.0)
-        self.soc_max = _Val(100.0)
-        self.solar = _Val(0.0)
-        self.battery_output = _Val(0.0)
-        self.capacity_kwh = capacity_kwh
-        self.setpoint = 0
-        self.score = [0.0, 0.0]
-        self.inefficient_time = 0.0
-        self.connection = DeviceConnection.MQTT_CLOUD
-        self._offline = 0.0
+class SimZendureDevice(ZendureDevice):
+    # Echt ZendureDevice; alleen de MQTT-write is afgevangen. Fysica + 1s-reports gesimuleerd.
+    def __init__(self, prodkey: str, config: dict, start_soc: float) -> None:
+        super().__init__(None, prodkey, config, _Driver())
+        for e in self.entities.values():
+            e.hass = None  # geen HA-loop in de sim
+        self.connection.set_state(DeviceConnection.MQTT_LOCAL)
+        p = self.profile[0]
+        p.power = _DISCHARGE_MAX.get(self.zendure_model.name, 800)  # live vullen reports dit; sim zet de echte ontlaadmax
+        p.__post_init__()  # floor en band volgen het aangepaste vermogen
+        self.commands: list[dict] = []
+        self._pending: int | None = None
+        self._target = 0  # W uit laatste commando, +ontladen / -laden
+        self._actual = 0.0
+        self._soc_pct = start_soc
+        self._pending_at = 0.0  # moment waarop het openstaande commando effectief wordt
+        self._report_at = 0.0
+        if self.capacity_kwh:  # accu-loze devices rapporteren geen SoC-properties; span 0 filtert ze uit de dispatch
+            self.update_properties({"properties": {"minSoc": 100, "socSet": 950, "electricLevel": int(start_soc)}}, 0.0)
 
-    def output_power(self, now: float) -> int:
-        return self.setpoint
+    def mqtt_publish(self, topic: str, command: dict) -> None:
+        self.commands.append(command)
+        args = command["arguments"]
+        if command["function"] == "deviceAutomation":  # Hyper
+            v = args[0]["autoModelValue"]
+            self._pending = -v["chargingPower"] if args[0]["autoModelProgram"] == 1 else v["outPower"]
+        elif command["function"] == "hemsEP":  # SF-modellen
+            self._pending = -args["chargePower"] if args["chargeState"] else args["outputPower"]
 
-    async def on_setpoint(self, watts: int, p, now: float) -> int:
-        if abs(watts) > abs(p.power):
-            watts = p.power if watts > 0 else -p.power
-        if watts > 0 and self.soc.asNumber <= self.soc_min.asNumber:
-            watts = 0
-        elif watts < 0 and self.soc.asNumber >= self.soc_max.asNumber:
-            watts = 0
-        self.setpoint = watts
-        return watts
+    def tick(self, now: float, dt: float) -> None:
+        # pijplijn: een commando wordt ~lag na ontvangst effectief; nieuwere commando's overschrijven de waarde, niet de timer
+        if self._pending is not None and self._pending_at == 0.0:
+            p = self.profile[self._pending < 0]
+            self._pending_at = now + (p.lag_cold if self._actual == 0 else p.lag_warm)  # lag uit het profiel
+        if self._pending is not None and now >= self._pending_at:
+            self._target, self._pending, self._pending_at = self._pending, None, 0.0
+        p = self.profile[self._target < 0]
+        target = max(-abs(p.power), min(abs(p.power), self._target))
+        if self.capacity_kwh == 0 or target > 0 and self._soc_pct <= self.soc_min.asNumber or target < 0 and self._soc_pct >= self.soc_max.asNumber:
+            target = 0
+        self._actual = float(target) if p.ramp_rate == 0 else self._actual + max(-p.ramp_rate * dt, min(p.ramp_rate * dt, target - self._actual))
+        if self.capacity_kwh:
+            self._soc_pct = max(0.0, min(100.0, self._soc_pct - self._actual * dt / 3600.0 / (self.capacity_kwh * 10)))
+            aggr = self.battery_output_aggr if self._actual > 0 else self.battery_input_aggr  # kWh-tellers zoals live (wear-bron)
+            aggr._state = (aggr._state or 0.0) + abs(self._actual) * dt / 3600.0 / 1000.0
+        if now >= self._report_at:
+            self._report_at = now + 1.0
+            w = int(self._actual)
+            props = {"outputHomePower": max(0, w), "gridInputPower": max(0, -w), "packInputPower": max(0, w), "outputPackPower": max(0, -w), "electricLevel": int(self._soc_pct)}
+            self.update_properties({"properties": props}, now)
 
 
 @dataclass
@@ -94,12 +115,26 @@ class Appliance:
         return 0
 
 
+_REAL_PROFILES = json.loads((Path(__file__).parent / "real_profiles.json").read_text())
+
+
+class RealAppliance(Appliance):
+    # per-seconde profiel uit productie-data (real_profiles.json), geextraheerd 2026-07-10/11
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self._watts = _REAL_PROFILES[name]["watts"]
+        self._total_s = float(len(self._watts))
+
+    def watts_at(self, elapsed_s: float) -> int:
+        return self._watts[int(elapsed_s)] if 0 <= elapsed_s < self._total_s else 0
+
+
 def baseload() -> Appliance:
     return Appliance("baseload", [AppliancePhase(200, 7200)])
 
 
 def kettle() -> Appliance:
-    return Appliance("kettle", [AppliancePhase(2200, 210)])
+    return RealAppliance("koffie")
 
 
 def toaster() -> Appliance:
@@ -115,11 +150,11 @@ def microwave() -> Appliance:
 
 
 def oven() -> Appliance:
-    return Appliance("oven", [AppliancePhase(2400, 600), AppliancePhase(800, 3000, cycling=True, cycle_on_s=40, cycle_off_s=20)])
+    return RealAppliance("koken")
 
 
 def induction_hob_high() -> Appliance:
-    return Appliance("induction_high", [AppliancePhase(3200, 480), AppliancePhase(800, 720)])
+    return RealAppliance("inductie")
 
 
 def induction_hob_low() -> Appliance:
@@ -127,35 +162,11 @@ def induction_hob_low() -> Appliance:
 
 
 def dishwasher() -> Appliance:
-    return Appliance(
-        "dishwasher",
-        [
-            AppliancePhase(70, 300),
-            AppliancePhase(1800, 600),
-            AppliancePhase(70, 300),
-            AppliancePhase(1800, 600),
-            AppliancePhase(70, 300),
-            AppliancePhase(600, 1800),
-            AppliancePhase(70, 300),
-            AppliancePhase(0, 300),
-        ],
-    )
+    return RealAppliance("vaatwasser")
 
 
 def washing_machine() -> Appliance:
-    return Appliance(
-        "washing_machine",
-        [
-            AppliancePhase(200, 300),
-            AppliancePhase(2000, 600),
-            AppliancePhase(200, 600),
-            AppliancePhase(100, 300),
-            AppliancePhase(2000, 300),
-            AppliancePhase(100, 300),
-            AppliancePhase(500, 600),
-            AppliancePhase(50, 300),
-        ],
-    )
+    return RealAppliance("wasmachine")
 
 
 def tumble_dryer() -> Appliance:
@@ -163,7 +174,7 @@ def tumble_dryer() -> Appliance:
 
 
 def ev_charger() -> Appliance:
-    return Appliance("ev_charger", [AppliancePhase(3600, 7200)])
+    return RealAppliance("ev")
 
 
 def heat_pump() -> Appliance:
@@ -252,44 +263,36 @@ class Metrics:
 
 
 class SimHarness:
-    FLEET = [
-        ("bat0", 800, 1.0),
-        ("bat1", 1600, 2.0),
-        ("bat2", 1600, 5.0),
-        ("bat3", 2400, 8.0),
-        ("bat4", 2400, 12.0),
-    ]
-    FLEET_LEVELS = [95.0, 90.0, 85.0, 80.0, 75.0]
-    P1_INTERVAL = 1.5
+    START_SOC = {"p0S70q2x": 95.0, "MPEt6K1P": 90.0, "Cd3wbW9V": 85.0, "Vw6mE0cP": 80.0, "BVng8146": 75.0, "9RUB1mW7": 70.0}
+    P1_INTERVAL = 1.0  # live krijgt de distributie elke seconde een P1-waarde
     NOISE_W = 50
     SOLAR_AVG_S = 60.0
+    ORDER_INTERVAL_S = 900.0  # order per 15-min window vast
 
     def __init__(self, name: str) -> None:
-        self.dist = Distribution.__new__(Distribution)
-        self.dist.devices = []
+        for cls in (EmSensor, EmNumber, EmBinarySensor, EmSelect, EmSwitch):
+            cls.add = staticmethod(lambda *a, **k: None)
+        self.dist = Distribution(None, [])
+        for e in self.dist.entities.values():
+            e.hass = None  # geen HA-loop in de sim
         self.dist._mode = DistributionMode.MATCHING
-        self.dist.manual_setpoint = 0
-        self.dist.max_grid = 0
-        self.dist.setpoint = 0
-        self.dist.solar = []
-        self.dist._power_reselect = 0.0
-        self.dist.charge_order = []
-        self.dist.discharge_order = []
-        class _Stat:
-            asNumber = 0.0
-            def update_value(self, value) -> bool:
-                return True
-        for a in ("capacity_kwh", "available_kwh", "grid_import", "grid_export", "solar_power", "discharge_power", "charge_power", "house_load", "soc", "autarky"):
-            setattr(self.dist, a, _Stat())
-        self.devs: list[_SimDevice] = []
-        for (dname, power, kwh), soc in zip(self.FLEET, self.FLEET_LEVELS):
-            d = _SimDevice(dname, power, kwh)
-            d.soc.value = soc
+        cfg = json.loads((Path(__file__).resolve().parents[2] / "config" / ".storage" / "energymaster").read_text())
+        self.devs: list[SimZendureDevice] = []
+        for dev_id, dev_cfg in cfg["data"]["zendure"]["devices"].items():
+            d = SimZendureDevice(dev_cfg["prodkey"], {**dev_cfg, "deviceid": dev_id}, self.START_SOC.get(dev_id, 0.0))
             self.devs.append(d)
             self.dist.devices.append(d)
-        self.metrics = Metrics(name=name, _dev_names=[n for n, _, _ in self.FLEET], _dev_kwh=[k for _, _, k in self.FLEET])
+        self.metrics = Metrics(name=name, _dev_names=[d.name for d in self.devs], _dev_kwh=[d.capacity_kwh for d in self.devs])
+        self._order_at = 0.0
 
-    async def run(self, schedule: list[ScheduledAppliance], duration_s: Optional[float] = None, seed: int = 42) -> Metrics:
+    def _window_tick(self, sim_time: float) -> None:
+        # wat entry_postrun live doet: de 15-min orderbouw (wear-snapshots doen de devices zelf via on_telemetry)
+        if sim_time >= self._order_at:
+            self._order_at = sim_time + self.ORDER_INTERVAL_S
+            self.dist._build_orders(sim_time)
+
+    async def run(self, schedule: list[ScheduledAppliance], duration_s: Optional[float] = None, seed: int = 42, p1_filter=None) -> Metrics:
+        # p1_filter: optionele bewerking (bijv. middeling) op de P1 die de REGELAAR ziet; metrics rekenen op de rauwe P1
         if duration_s is None:
             duration_s = max(sa.start_offset_s + sa.appliance.total_duration_s for sa in schedule)
         m = self.metrics
@@ -307,6 +310,8 @@ class SimHarness:
             sim_time += self.P1_INTERVAL
             elapsed += self.P1_INTERVAL
 
+            self._window_tick(sim_time)
+
             loads_w = 0
             solar_instant = 0
             for sa in schedule:
@@ -320,16 +325,14 @@ class SimHarness:
             solar_w = sum(solar_buf) // len(solar_buf)
             noise = rng.randint(-self.NOISE_W, self.NOISE_W)
 
+            for d in self.devs:
+                d.tick(sim_time, self.P1_INTERVAL)  # fysica + telemetrie-report door de echte verwerkingsketen
+
             fleet_output = sum(d.output_power(sim_time) for d in self.devs)  # discharge positive
             p1 = loads_w - solar_instant - fleet_output + noise
 
             self.dist.solar = [solar_w]
-            await self.dist._process_p1(p1, now=sim_time)
-
-            for d in self.devs:
-                if d.setpoint != 0 and d.capacity_kwh > 0:
-                    d.soc.value -= d.setpoint * self.P1_INTERVAL / 3600.0 / (d.capacity_kwh * 10)
-                    d.soc.value = max(0.0, min(100.0, d.soc.value))
+            await self.dist._process_p1(p1 if p1_filter is None else int(p1_filter(p1)), now=sim_time)
 
             m.total_ticks += 1
             if p1 > 0:

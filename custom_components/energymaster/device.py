@@ -19,6 +19,11 @@ from .sensor import EmSensor
 _LOGGER = logging.getLogger(__name__)
 
 FLOOR_PCT = 0.10  # device floor as a fraction of rated power
+BAND_LOW_PCT = 0.30  # inverter-band ondergrens (laatste/enige actieve device mag eronder)
+BAND_HIGH_PCT = 0.95  # inverter-band bovengrens
+DEADBAND_W = 20  # kleinste vermogensverschil dat een nieuw commando waard is
+SNAPSHOT_INTERVAL_S = 3600.0  # wear: uurlijkse snapshot van de eigen doorzet-tellers
+WEAR_WINDOW_S = 7 * 86400.0  # wear = delta van de doorzet-tellers over 7 dagen
 
 
 class DeviceConnection(IntEnum):
@@ -46,25 +51,16 @@ class PowerProfile:
 
     def __post_init__(self):
         self.floor = int(self.power * FLOOR_PCT)
-
-    def power_range(self, r: list[int]) -> None:
-        pass
+        self.band_low = int(abs(self.power) * BAND_LOW_PCT)
+        self.band_high = int(abs(self.power) * BAND_HIGH_PCT)
 
 
 class PowerProfileDischarge(PowerProfile):
     """Discharge direction profile."""
 
-    def power_range(self, r: list[int]) -> None:
-        r[0] += self.floor
-        r[1] += self.power
-
 
 class PowerProfileCharge(PowerProfile):
     """Charge direction profile."""
-
-    def power_range(self, r: list[int]) -> None:
-        r[0] += self.power
-        r[1] += self.floor
 
 
 class PowerDevice(EmDevice):
@@ -90,7 +86,6 @@ class PowerDevice(EmDevice):
         self.profile = [discharge, charge]  # [False]=discharge, [True]=charge
 
         self.setpoint: int = 0
-        self.inefficient_time: float = 0.0
         self.score: list[float] = [0.0, 0.0]  # [discharge, charge] selection score, set in Distribution
         self._prev_output: int = 0
         self._arrival: float = 0.0
@@ -99,6 +94,9 @@ class PowerDevice(EmDevice):
         self._ramp_rate: float = discharge.ramp_rate
         self._stable_until: float = 0.0
         self._recover_task: asyncio.Task | None = None
+        self._wear_snapshots: list = []  # [timestamp, doorzet-kWh] per uur, 7 dagen; restored via de device-Store
+        self._wear_snapshot_at: float = 0.0
+        self._restore.append("_wear_snapshots")
 
     def device_entities(self):
         """Default every entity slot to the shared Empty sentinel.
@@ -167,10 +165,13 @@ class PowerDevice(EmDevice):
             self._stable_until = now + 60
         self._prev_output = actual
         self._arrival = now
-        if actual == 0 or abs(actual) > abs(self.profile[actual < 0].floor) * 1.5:
-            self.inefficient_time = 0
-        elif self.inefficient_time == 0:
-            self.inefficient_time = now
+        if now >= self._wear_snapshot_at:
+            self._wear_snapshot_at = now + SNAPSHOT_INTERVAL_S
+            self._wear_snapshots.append([now, getattr(self, "battery_input_aggr", EmEntity.Empty).asNumber + getattr(self, "battery_output_aggr", EmEntity.Empty).asNumber])
+            while self._wear_snapshots and self._wear_snapshots[0][0] < now - WEAR_WINDOW_S:
+                self._wear_snapshots.pop(0)
+            if self.hass and self.hass.loop.is_running():
+                self.hass.async_create_task(self.save_state())
 
     async def on_setpoint(self, watts: int, p: PowerProfile, now: float) -> int:
         """Apply setpoint. Override in hardware subclasses to send commands."""
@@ -192,10 +193,23 @@ class PowerDevice(EmDevice):
         self._ramp_rate = p.ramp_rate
         if self.setpoint != 0:
             self._active_time = now
-        else:
-            self.inefficient_time = 0
         self.setpoint = watts
         return self.setpoint
+
+    async def ramp_to(self, watts: float, charging: bool, now: float) -> int:
+        """Geleidelijk naar het doelvermogen: gap maal f_up/f_down uit het eigen profiel, deadband-gegate."""
+        p = self.profile[charging]
+        signed = -int(watts) if charging else int(watts)
+        gap = signed - self.setpoint
+        if abs(gap) > DEADBAND_W:
+            signed = self.setpoint + int(gap * (p.f_up if abs(signed) > abs(self.setpoint) else p.f_down))
+        return await self.on_setpoint(signed, p, now)
+
+    def wear_cycles(self) -> float:
+        """Equivalente volle cycli over de wear-window: delta van de eigen doorzet-tellers; teller-reset -> 0."""
+        current = getattr(self, "battery_input_aggr", EmEntity.Empty).asNumber + getattr(self, "battery_output_aggr", EmEntity.Empty).asNumber
+        baseline = min(self._wear_snapshots[0][1], current) if self._wear_snapshots else current
+        return (current - baseline) / self.capacity_kwh if self.capacity_kwh else 0.0
 
     async def _recover_fallback(self) -> None:
         """Override in subclass to implement recovery logic."""

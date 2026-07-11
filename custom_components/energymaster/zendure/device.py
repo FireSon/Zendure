@@ -196,6 +196,7 @@ class ZendureDevice(PowerDevice):
                 setattr(self, key, value)
             elif key == "inverseMaxPower":
                 self.profile[1].power = value
+                self.profile[1].__post_init__()  # floor en band volgen het live max-vermogen
 
         if "gridInputPower" in payload.get("properties", {}) or "outputHomePower" in payload.get("properties", {}):
             if hasattr(self, "home_output") and hasattr(self, "home_input"):

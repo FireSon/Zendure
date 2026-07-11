@@ -141,6 +141,8 @@ class EmDevice:
             entity = getattr(self, key, None)
             if isinstance(entity, EmEntity):
                 entity.restore_state(value)
+            elif key in self._restore:
+                setattr(self, key, value)  # plain restorable attribuut (bijv. _wear_snapshots)
 
     async def save_state(self) -> None:
         """Persist restorable entity states to Store."""
@@ -149,6 +151,8 @@ class EmDevice:
             entity = getattr(self, key, None)
             if isinstance(entity, EmEntity):
                 data[key] = entity._state
+            elif entity is not None:
+                data[key] = entity  # plain restorable attribuut (bijv. _wear_snapshots)
         if data:
             await self._store.async_save(data)
 

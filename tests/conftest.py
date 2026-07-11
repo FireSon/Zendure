@@ -18,6 +18,16 @@ class _AnyMeta(type):
             raise AttributeError(name)
         return _AnyMeta(name, (), {})
 
+    def __call__(cls, *args, **kwargs):
+        # dummies accept any constructor args (Store, DeviceInfo, ...); kwargs become attrs
+        try:
+            return super().__call__(*args, **kwargs)
+        except TypeError:
+            obj = cls.__new__(cls)
+            for k, v in kwargs.items():
+                setattr(obj, k, v)
+            return obj
+
 
 class _FakeModule(types.ModuleType):
     def __getattr__(self, name):

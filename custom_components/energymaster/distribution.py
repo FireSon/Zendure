@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant
 
 import numpy as np
 
-from .device import PowerDevice
+from .device import DEADBAND_W, PowerDevice
 from .entity import EmDevice
 from .number import EmNumber
 from .solver.solver import LpSolver, SolverData, SolverEntry
@@ -25,14 +25,15 @@ from .switch import EmSwitch
 
 _LOGGER = logging.getLogger(__name__)
 
-START_W = 50
-DEADBAND_W = 20
-FLOOR_PCT = 0.10
-REDIRECT_WINDOW = 3.0
 STORAGE_COST_PER_KWH = 0.03
-WEAR_BIAS = 0.6  # wear-balance: scales each unit's cycle cost by its prior usage vs the fleet mean
-INERTIA_KEEP = 0.7  # anti-flap: relative score kept for units not currently running
+WEAR_BIAS = 0.6  # window-order: 7-dagen-cyclusdelta weegt mee in de rangorde
 EPS_KW = 0.01  # below this an LP charge/discharge/grid flow counts as zero
+ADD_WS = 2000.0  # bijschakelen: integraal van tekort boven de 95%-band (sweep-optimum 2026-07-11)
+DROP_WS = 12000.0  # afschakelen: integraal van overschot onder de 30%-band
+DIRECTION_WS = 3000.0  # richtingwissel-integraal laden<->ontladen
+DROP_COOLDOWN_S = 600.0  # na bijschakelen 10 min geen drop (cyclende lasten)
+START_W = 60  # make-before-break instapvermogen
+ACTIVE_W = 40  # inkomend device telt mee zodra het dit levert
 
 
 class DistributionMode(Enum):
@@ -69,11 +70,18 @@ class Distribution(SolverEntry, EmDevice):
         self.auto: bool = False  # master: True = EnergyMaster drives the mode per slice, False = manual (mode select / HA)
         self.max_grid: int = 0
 
-        self._power_reselect: float = 0.0  # next time the device selection may be re-scored (120s throttle)
         self._commanded: dict[str, float] = {}
         self._bat_charge = self._bat_discharge = self._bat_soc = None  # aggregate SolverData, set in init_run
-        self.charge_order: list = []  # postrun: participating devices sorted for charging
-        self.discharge_order: list = []  # postrun: participating devices sorted for discharging
+        self.charge_order: list = []  # postrun: volledige ranking per richting, 15 min vast
+        self.discharge_order: list = []
+        self._weights: dict[bool, dict[str, float]] = {False: {}, True: {}}  # bevroren kWh-gewichten per window
+        self._active: list[PowerDevice] = []  # actieve set, in order-volgorde
+        self._incoming: PowerDevice | None = None  # make-before-break instapper
+        self._swap_out: PowerDevice | None = None  # valt af zodra de instapper levert (window-rotatie)
+        self._charging = False
+        self._add_ws = self._drop_ws = self._direction_ws = 0.0
+        self._last_add = 0.0
+        self._last_tick = 0.0
 
     def device_entities(self):
         self.optimize = EmSwitch("optimize", on_changed=self._set_auto, restore=True, default=False)  # master auto/manual switch (UI + HA)
@@ -113,6 +121,7 @@ class Distribution(SolverEntry, EmDevice):
         else:
             self._mode = DistributionMode.OFF
             self.mode.update_value(DistributionMode.OFF.value)
+            self._reset_dispatch()
             for d in self.devices:
                 await d.power_off()
 
@@ -126,6 +135,35 @@ class Distribution(SolverEntry, EmDevice):
         if net < -EPS_KW:
             return DistributionMode.MATCHING_DISCHARGE
         return DistributionMode.OFF
+
+    def _build_orders(self, now: float) -> None:
+        cycles = [d.wear_cycles() for d in self.devices if d.capacity_kwh]
+        mean = (sum(cycles) / len(cycles) or 1.0) if cycles else 1.0
+        for charging in (False, True):
+            weights = {}
+            for d in self.devices:
+                span = d.soc_max.asNumber - d.soc_min.asNumber
+                head = ((d.soc_max.asNumber - d.soc.asNumber) if charging else (d.soc.asNumber - d.soc_min.asNumber)) / span if span else 0.0
+                wear = d.wear_cycles() / mean
+                d.score[charging] = max(0.0, head) ** 2 / (1.0 + WEAR_BIAS * wear)
+                weights[d.device_id] = max(0.0, head) * d.capacity_kwh  # ontladen: beschikbare kWh, laden: vrije kWh
+            order = sorted((d for d in self.devices if d.score[charging] > 0), key=lambda d: d.score[charging], reverse=True)
+            self._weights[charging] = weights
+            if charging:
+                self.charge_order = order
+            else:
+                self.discharge_order = order
+        # rotatie op de windowgrens: nieuwe kop wisselt in via make-before-break
+        order = self.charge_order if self._charging else self.discharge_order
+        if self._active and order and order[0] not in self._active and self._incoming is None:
+            self._incoming = order[0]
+            ranked = sorted(self._active, key=lambda d: order.index(d) if d in order else 99)
+            self._swap_out = ranked[-1]
+
+    def _reset_dispatch(self) -> None:
+        self._active = []
+        self._incoming = self._swap_out = None
+        self._add_ws = self._drop_ws = self._direction_ws = 0.0
 
     def _apply_plan_mode(self) -> None:
         m = self._plan_direction()
@@ -193,6 +231,8 @@ class Distribution(SolverEntry, EmDevice):
         if not self.devices:
             return
 
+        self._build_orders(time.time())
+
         charge = self._bat_charge.dest.data
         discharge = self._bat_discharge.dest.data
         grid_import = self.grid_buy.dest.data
@@ -207,8 +247,6 @@ class Distribution(SolverEntry, EmDevice):
             return DistributionMode.IDLE
 
         mode = planned_mode(12)
-        self.charge_order = []
-        self.discharge_order = []
         if mode in (DistributionMode.GRID_CHARGE, DistributionMode.GRID_DISCHARGE):
             # Find the next mode change
             cnt = 12
@@ -219,20 +257,18 @@ class Distribution(SolverEntry, EmDevice):
             price = lp.price_buy.data[12:cnt] if charging else lp.price_sell.data[12:cnt]
             better = sum(t < price[0] for t in price) if charging else sum(t > price[0] for t in price)
 
-            order = []
-            for d in self.devices:
-                d.score = [0.0, 0.0]
+            participants = []
+            for d in (self.charge_order if charging else self.discharge_order):  # GRID: order beperken tot prijsvenster-deelnemers
                 kwh15m = 0.25 * abs(d.profile[charging].power) / 1000
                 if kwh15m <= 0:
                     continue
                 slots = ceil(d.available_kwh.asNumber / kwh15m if not charging else (d.total_kwh.asNumber - d.available_kwh.asNumber) / kwh15m)
                 if better < slots:
-                    d.score[charging] = 100.0
-                    order.append(d)
-            self.charge_order = order if charging else []
-            self.discharge_order = [] if charging else order
-        # matching / idle: leave the orders empty, _process_p1 builds the live order on demand
-        self._power_reselect = 0.0  # next P1 tick reselects against the fresh order
+                    participants.append(d)
+            if charging:
+                self.charge_order = participants
+            else:
+                self.discharge_order = participants
 
     async def _process_p1(self, p1: int, now: float) -> None:
         now = now or time.time()
@@ -240,14 +276,9 @@ class Distribution(SolverEntry, EmDevice):
         # get all solar from solar panels
         solar: int = sum(self.solar)
 
-        active = 0
         output = 0
-        pwr_range = [0, 0]
         for d in self.devices:
-            if (power := d.output_power(now)) != 0 and (p := d.profile[power < 0]):
-                active += 1
-                output += power
-                p.power_range(pwr_range)
+            output += d.output_power(now)
             solar += d.solar.asNumber
         setpoint = p1 + output
 
@@ -280,51 +311,89 @@ class Distribution(SolverEntry, EmDevice):
         if self._mode == DistributionMode.OFF or abs(output - setpoint) < DEADBAND_W:
             return
         self.setpoint = setpoint
-        charging = setpoint < 0
-        order = self.charge_order if charging else self.discharge_order
-        if not order:  # no solver plan yet -> build the live matching order for this direction
-            cycles = [d.battery_output.asNumber / d.capacity_kwh for d in self.devices if d.capacity_kwh]
-            mean = (sum(cycles) / len(cycles) or 1.0) if cycles else 1.0
-            for d in self.devices:
-                span = d.soc_max.asNumber - d.soc_min.asNumber
-                head = (d.soc_max.asNumber - d.soc.asNumber if charging else d.soc.asNumber - d.soc_min.asNumber) / span if span else 0.0
-                fit = 1.0 if abs(setpoint) >= d.profile[charging].floor else abs(setpoint) / d.profile[charging].floor
-                inertia = 1.0 if d.setpoint != 0 else INERTIA_KEEP
-                wear = (d.battery_output.asNumber / d.capacity_kwh) / mean if d.capacity_kwh else 1.0
-                d.score[charging] = max(0.0, head) ** 2 * fit * inertia / (1.0 + WEAR_BIAS * wear)
-            order = sorted((d for d in self.devices if d.score[charging] > 0), key=lambda d: d.score[charging], reverse=True)
+        dt = min(5.0, now - self._last_tick) if self._last_tick else 1.0
+        self._last_tick = now
+        charging_wanted = setpoint < 0
+        sp = abs(setpoint)
 
-        # Pick how many of the order to engage when the running set can't cover the setpoint or the throttle expired.
-        if not pwr_range[0] <= setpoint <= pwr_range[1] or now >= self._power_reselect:
-            active = 0
-            pwr_range = [0, 0]
-            while active < len(order) and abs(0.92 * pwr_range[not charging]) < abs(setpoint):
-                order[active].profile[charging].power_range(pwr_range)
-                active += 1
-            self._power_reselect = now + 120
+        # richtingwissel pas na de integraal; tot die tijd afbouwen naar 0
+        if self._active and charging_wanted != self._charging:
+            self._direction_ws += sp * dt
+            if self._direction_ws < DIRECTION_WS:
+                for d in self._active:
+                    await d.ramp_to(0.0, self._charging, now)
+                return
+            for d in self._active:
+                await d.on_setpoint(0, d.profile[self._charging], now)
+            self._active = []
+            self._incoming = self._swap_out = None
+            self._add_ws = self._drop_ws = 0.0
+        self._direction_ws = 0.0
+        self._charging = charging_wanted
+        order = self.charge_order if charging_wanted else self.discharge_order
+        if not order:  # nog geen solve gedraaid
+            self._build_orders(now)
+            order = self.charge_order if charging_wanted else self.discharge_order
 
-        total_score = sum(d.score[charging] for d in order[:active])
-        low_demand = abs(setpoint) < abs(pwr_range[charging])
-        for i, d in enumerate(order):
-            if i < active and (d.inefficient_time == 0 or now - d.inefficient_time < 300):
-                p = d.profile[charging]
-                if low_demand and active > i + 1 and pwr_range[not charging] > 0:
-                    share = int(setpoint * p.power / pwr_range[not charging])
-                elif active == i + 1 or total_score == 0 or p.floor >= setpoint:
-                    share = setpoint
-                else:
-                    share = p.floor + int((setpoint - pwr_range[charging]) * d.score[charging] / total_score)
-                gap = share - d.setpoint
-                if abs(gap) > DEADBAND_W:
-                    share = d.setpoint + int(gap * (p.f_up if abs(share) > abs(d.setpoint) else p.f_down))
-                setpoint -= await d.on_setpoint(share, p, now)
-                pwr_range[charging] -= p.floor
-                total_score -= d.score[charging]
+        # make-before-break: inkomend device wordt volwaardig lid zodra het echt levert
+        if self._incoming is not None and abs(self._incoming.output_power(now)) >= ACTIVE_W:
+            self._active.append(self._incoming)
+            self._active.sort(key=lambda d: order.index(d) if d in order else 99)
+            self._incoming = None
+            if self._swap_out is not None:
+                if self._swap_out in self._active:
+                    self._active.remove(self._swap_out)
+                    await self._swap_out.on_setpoint(0, self._swap_out.profile[self._charging], now)
+                self._swap_out = None
+
+        # bijschakelen: integraal van het tekort boven de 95%-band; lege set schakelt direct
+        cap_high = sum(d.profile[self._charging].band_high for d in self._active)
+        if sp > cap_high:
+            self._add_ws += (sp - cap_high) * dt
+            if (self._add_ws >= ADD_WS or not self._active) and self._incoming is None:
+                candidates = [d for d in order if d not in self._active]
+                if candidates:
+                    if self._active:
+                        self._incoming = candidates[0]
+                    else:
+                        self._active.append(candidates[0])
+                    self._last_add = now
+                self._add_ws = 0.0
+        else:
+            self._add_ws = 0.0
+
+        # afschakelen: integraal van het overschot onder de 30%-band, met cooldown en haalbaarheids-gate
+        if len(self._active) > 1:
+            cap_low = sum(d.profile[self._charging].band_low for d in self._active)
+            remaining_high = cap_high - self._active[-1].profile[self._charging].band_high
+            if sp < cap_low and remaining_high >= sp:
+                self._drop_ws += (cap_low - sp) * dt
+                if self._drop_ws >= DROP_WS and now - self._last_add > DROP_COOLDOWN_S:
+                    dropped = self._active.pop()
+                    await dropped.on_setpoint(0, dropped.profile[self._charging], now)
+                    self._drop_ws = 0.0
             else:
-                await d.on_setpoint(0, d.profile[charging], now)
+                self._drop_ws = 0.0
+
+        # verdeling: naar rato van de bevroren window-gewichten, geclampt op de band; laatste neemt het restant
+        weights = self._weights[self._charging]
+        total_weight = sum(weights.get(d.device_id, 0.0) for d in self._active) or 1.0
+        remainder = float(sp)
+        for i, d in enumerate(self._active):
+            p = d.profile[self._charging]
+            if i == len(self._active) - 1:
+                share = remainder  # laatste/enige device mag onder de 30%-band
+            else:
+                share = min(sp * weights.get(d.device_id, 0.0) / total_weight, p.band_high)
+                share = max(share, abs(p.floor))  # harde 10%-vloer overrult naar-rato
+            share = max(0.0, min(share, p.band_high, remainder))
+            remainder -= share
+            await d.ramp_to(share, self._charging, now)
+        if self._incoming is not None:
+            await self._incoming.on_setpoint(-START_W if self._charging else START_W, self._incoming.profile[self._charging], now)  # vaste instap-probe, geen ramp
         for d in self.devices:
-            if d not in order:
-                await d.on_setpoint(0, d.profile[charging], now)
+            if d not in self._active and d is not self._incoming and d.setpoint != 0:
+                await d.on_setpoint(0, d.profile[self._charging], now)
 
     async def update_mode(self, entity: EmSelect, _operation: Any) -> None:
         mode = DistributionMode(entity.value)
@@ -338,6 +407,7 @@ class Distribution(SolverEntry, EmDevice):
 
         match self._mode:
             case DistributionMode.OFF:
+                self._reset_dispatch()
                 if len(self.devices) > 0:
                     for d in self.devices:
                         await d.power_off()
