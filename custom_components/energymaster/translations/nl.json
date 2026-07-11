@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "EnergyMaster",
+        "description": "EnergyMaster instellen. Alle configuratie (drivers, zonnepanelen, verbruikers, P1-meter) doe je daarna in het EnergyMaster-paneel."
+      }
+    },
+    "abort": {
+      "already_configured": "EnergyMaster is al geconfigureerd"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "state": {
+          "0": "Ontdekt",
+          "1": "Offline",
+          "2": "MQTT (cloud)",
+          "3": "MQTT (lokaal)",
+          "4": "Modbus",
+          "5": "HTTP",
+          "6": "Bluetooth"
+        }
+      }
+    }
+  }
+}

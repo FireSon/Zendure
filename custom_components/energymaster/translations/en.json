@@ -1,0 +1,28 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "EnergyMaster",
+        "description": "Set up EnergyMaster. All configuration (drivers, solar panels, consumers, P1 meter) is done afterwards in the EnergyMaster panel."
+      }
+    },
+    "abort": {
+      "already_configured": "EnergyMaster is already configured"
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "state": {
+          "0": "Discovered",
+          "1": "Offline",
+          "2": "MQTT (cloud)",
+          "3": "MQTT (local)",
+          "4": "Modbus",
+          "5": "HTTP",
+          "6": "Bluetooth"
+        }
+      }
+    }
+  }
+}

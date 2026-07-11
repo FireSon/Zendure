@@ -1,0 +1,11 @@
+{
+  "domain": "energymaster",
+  "name": "EnergyMaster",
+  "version": "0.1.0",
+  "documentation": "https://github.com/FireSon/EnergyMaster",
+  "codeowners": ["@FireSon"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "dependencies": ["http", "frontend", "panel_custom", "websocket_api", "recorder"],
+  "requirements": ["highspy", "paho-mqtt", "bleak", "pandas"]
+}

@@ -1,0 +1,60 @@
+{
+  "NL": {
+    "energy_tax": 0.09161,
+    "vat": 21.0,
+    "wholesale_zone": "NL",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {"type": "wholesale", "import_markup": 0.0, "fixed_cost_per_day": 0.0, "export_price": 0.07},
+      "anwb": {"type": "wholesale", "import_markup": 0.018, "fixed_cost_per_day": 0.28, "export_price": 0.07},
+      "vandebron": {"type": "wholesale", "import_markup": 0.026, "fixed_cost_per_day": 0.23, "export_price": 0.07},
+      "eneco": {"type": "wholesale", "import_markup": 0.02416, "fixed_cost_per_day": 0.23, "export_price": 0.07},
+      "frank": {"type": "api", "module": "frank"},
+      "tibber": {"type": "api", "module": "tibber"},
+      "zonneplan": {"type": "api", "module": "zonneplan"},
+      "nextenergy": {"type": "api", "module": "nextenergy"}
+    }
+  },
+  "DE": {
+    "energy_tax": 0.0205,
+    "vat": 19.0,
+    "wholesale_zone": "DE-LU",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {"type": "wholesale", "import_markup": 0.0, "fixed_cost_per_day": 0.0, "export_price": 0.0},
+      "enbw": {"type": "wholesale", "import_markup": 0.0, "fixed_cost_per_day": 0.56, "export_price": 0.0},
+      "eon": {"type": "wholesale", "import_markup": 0.0899, "fixed_cost_per_day": 1.0, "export_price": 0.0}
+    }
+  },
+  "BE": {
+    "energy_tax": 0.05033,
+    "vat": 21.0,
+    "wholesale_zone": "BE",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {"type": "wholesale", "import_markup": 0.0, "fixed_cost_per_day": 0.0, "export_price": 0.0},
+      "ebem": {"type": "wholesale", "import_markup": 0.02, "fixed_cost_per_day": 0.23, "export_price": 0.0},
+      "octaplus": {"type": "wholesale", "import_markup": 0.00417, "fixed_cost_per_day": 0.23, "export_price": 0.0},
+      "eneco_be": {"type": "wholesale", "import_markup": 0.02416, "fixed_cost_per_day": 0.23, "export_price": 0.0}
+    }
+  },
+  "FR": {
+    "energy_tax": 0.03085,
+    "vat": 20.0,
+    "wholesale_zone": "FR",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {"type": "wholesale", "import_markup": 0.0, "fixed_cost_per_day": 0.0, "export_price": 0.0},
+      "ekwateur": {"type": "wholesale", "import_markup": 0.02, "fixed_cost_per_day": 0.27, "export_price": 0.0}
+    }
+  },
+  "AT": {
+    "energy_tax": 0.001,
+    "vat": 20.0,
+    "wholesale_zone": "AT",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {"type": "wholesale", "import_markup": 0.0, "fixed_cost_per_day": 0.0, "export_price": 0.0}
+    }
+  }
+}

@@ -1,0 +1,4268 @@
+
+===== PAGE 1 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    CONTENTS 
+PSZ000Z308 
+ 
+ 
+1/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+ Contents 
+ 
+1. 
+Specifications .................................................................................................................................................................................................................................................. 2 
+2. 
+System configuration ...................................................................................................................................................................................................................................... 3 
+3. 
+Function .......................................................................................................................................................................................................................................................... 6 
+4. 
+Rotary switch function ..................................................................................................................................................................................................................................... 8 
+5. 
+DIP switch function ......................................................................................................................................................................................................................................... 9 
+6. 
+Short PIN function ......................................................................................................................................................................................................................................... 10 
+7. 
+Input/output circuit ......................................................................................................................................................................................................................................... 11 
+7.1 
+Input circuit ............................................................................................................................................................................................................................................... 12 
+7.2 
+Output circuit ............................................................................................................................................................................................................................................ 16 
+7.3 
+Input/output circuit .................................................................................................................................................................................................................................... 16 
+8. 
+Cascade control ............................................................................................................................................................................................................................................ 17 
+9. 
+Rotation control ............................................................................................................................................................................................................................................. 18 
+10. 
+Fault backup control ...................................................................................................................................................................................................................................... 19 
+11. 
+Modbus communication ................................................................................................................................................................................................................................ 20 
+12. 
+Protection control .......................................................................................................................................................................................................................................... 32 
+13. 
+Error display .................................................................................................................................................................................................................................................. 34 
+14. 
+Installation work ............................................................................................................................................................................................................................................ 35 
+15. 
+Wiring procedure ........................................................................................................................................................................................................................................... 37 
+16. 
+External dimensions ...................................................................................................................................................................................................................................... 38 
+ 
+
+===== PAGE 2 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+2/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+1. Specifications 
+AHU-KIT-SP (AHU interface) is the controller dedicated to making the AHU system by using a split type outdoor unit. 
+AHU interface equips 0–10V and 4–20mA analog input as a basic capacity control method of the connected outdoor unit. 
+As an alternative control method, the setting temperature control can be used from the remote controller as well. 
+In addition, AHU interface can communicate over the Modbus protocol and it enables the capacity control (0–100%) or setting temperature control according to requirements. 
+For more details, please see the relevant sections. 
+ 
+Model
+AHU-KIT-SP
+Outdoor unit compatibility
+See below (*1)
+Usage environment
+Temperature：-20～60 ℃
+Relative humidity：less than 85% RH (without condensation)
+Storage environment
+Temperature：-20～70 ℃
+Relative humidity：40%～90% RH (without condensation)
+Power supply
+Single phase 220–240V　+10%，-15%　50Hz
+Single phase 220V　+10%，-15%　60Hz
+Power consumption
+5W
+Product dimensions
+(height×width×depth)
+109.5 mm × 290 mm × 57 mm
+Weight
+0.55 kg
+Installation
+DIN rail TS 35 mm × 7.5 mm (separate DIN rail required)
+Cascade connection
+Max 16 outdoor units can be combined by cascade control
+(16 interfaces are required)
+Power blackout compensation
+This interface does not have a battery circuit for power blackout recovery.
+Operation can continue：The power blackout duration is 30 msec or less.
+Heat exchanger sensor (Thi-R1，Thi-R2，Thi-R3)×1
+Return air sensor (Thi-A)×1
+Reserve sensor×1
+Spring leaf for heat exchanger sensor ×3
+Ferrite core for functional ground wire ×1
+Installation manual
+Caution label
+Accessories
+ 
+ 
+(* 1) Connectable outdoor unit 
+    
+R410A
+R32
+40/50/60
+SRC40/50/60ZSX-S, SA
+SRC40/50/60ZSX-W1, W2, WA
+71
+FDC71VNX
+FDC71VNX-W
+FDC100/125/140VN(S)A
+FDC100/125/140VN(S)A-W
+FDC100/125/140VN(S)X
+FDC100/125/140VN(S)X-W
+200/250
+FDC200/250VSA
+FDC200/250VSA-W
+280
+FDC280VSA-W
+Model
+capacity
+Outdoor unit
+100/125/140
+ 
+ 
+
+===== PAGE 3 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+3/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+2. System configuration 
+ 
+ 
+ 
+Note 1: Only one outdoor unit can be connected to the AHU interface. 
+    However, it is possible to connect up to 15 slave interfaces to the master by setting the AHU interface to the master setting. 
+    Up to 16 AHU interface × outdoor units can be connected in 1 system including the master. 
+Note 2: Remote control and Modbus communication are valid only for the master unit. 
+Note 3: Be sure to connect a leakage breaker in leakage category III. 
+ 
+●AHU interface configuration 
+ 
+Model 
+Contents 
+Applications 
+AHU-KIT-SP 
+Interface controller 
+(master/slave) 
+Single refrigerant system. 
+Multiple refrigerant system (cascade control). 
+Heat exchanger sensor 
+Obtain the heat exchanger temperature information. 
+Those sensors must be connected each interfaces. 
+Return air sensor 
+Obtain the return air temperature information. 
+This sensor must be connected with master interface. 
+Reserve sensor 
+Reserve. 
+ 
+AHU equipment (heat exchanger, fan, total heat exchanger, etc.) be should be procured on site. 
+ 
+ 
+●Remote control 
+ The remote controller shown in the table below can be connected. 
+ 
+ 
+Model
+Contents
+Applications
+RC-EX3A
+Remote control
+Connection is optional.
+RC-E5
+Necessary when Temperature Control is used as a control method.
+ 
+ 
+ 
+※　　　：Leakage breaker
+Fan
+AHU
+AHU
+Controller
+AHU interface
+Master
+Remote 
+controller
+Modbus
+Master
+AHU interface
+Slave➀
+Slave➀
+Slave⑮
+Heat exchanger
+…
+Heat exchanger sensor
+Return air  
+sensor
+Single 
+outdoor 
+unit
+Single 
+outdoor 
+unit
+Single 
+outdoor 
+unit
+Analog input
+Digital input
+Digital output
+E
+X0
+E
+X0
+E
+E
+X5
+X1
+CNH
+X2 X3 X4
+CNN
+CNN
+AHU interface
+Slave⑮
+CNN
+X0
+Heat exchanger sensor
+Heat 
+exchanger 
+sensor
+X7
+X7
+X7
+
+===== PAGE 4 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+4/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+◇Temperature Control SW7-4：ON  (Set temp. control:18℃⁻30℃)
+System diagram
+The following control system can be used for Temperature Control.
+★：Main Controller for Temperature Control
+○：Optional Controller
+×：Not available
+(*4) Last received operation command has priority.
+(*5) Select one of the following ways to Run/Stop the AHU system:
+   　- Digital input (ON/OFF)
+       - Modbus command (Run/Stop)
+       - Remote controller command (Run/Stop)
+Table 1-2
+AHU
+Controller
+AHU Interface
+Master
+AHU Interface
+Slave1
+AHU Interface
+Slave15
+Comp. speed
+Comp. speed
+Comp. speed
+Set temperature
+Modbus
+Controller
+Digital 
+Input/Output
+Analog input
+Master
+Slave15
+Slave1
+No.
+Analog input
+(0-10V/4-20mA)
+Modbus
+Remote Control
+(Include SL Adaptor)
+AHU System
+How to Run/Stop
+3
+×
+★(*4)
+○(*4)
+Digital input, RC or Modbus(*5)
+4
+×
+○(*4)
+★(*4)
+Digital input, RC or Modbus(*5)
+●Select control method and settings
+The outdoor units can be controlled by one of two methods (Capacity Control or Temperature Control).
+Select the suitable control combination (No.1-No.4) based on the equipment to be installed.
+Correct Master/Slave settings are required when using cascading control.
+Check each setting by referring to table 1-1, 1-2 in this section.
+ ◇Capacity Control SW7-4：OFF  (External input:0-10V / 4-20mA / 0-100%)
+System diagram
+The following control combinations are to be used for Capacity Control.
+★：Main Controller for Capacity Control
+△：Optional Controller
+×：Not available
+(*1) Analog input will be invalidated once 0-100% command is sent from the Modbus controller.
+       Power reset is required to restore analog input function.
+(*2) Monitoring purpose only. Operation from remote controller is not possible.
+(*3) Select either of the following ways to Run/Stop the AHU system:
+   　- Digital input (ON/OFF)
+       - Modbus command (Run/Stop)
+Table 1-1
+AHU
+Controller
+AHU Interface
+Master
+AHU Interface
+Slave1
+AHU Interface
+Slave15
+Analog Input
+0～10V or 4-20mA
+Comp. speed
+Comp. speed
+Comp. speed
+Modbus
+Controller
+Modbus
+0-100%
+Digital 
+Input/Output
+Master
+Slave15
+Slave1
+No.
+Analog input
+(0-10V/4-20mA)
+Modbus
+(0-100%)
+Remote Control
+(Include SL Adaptor)
+AHU System
+How to Run/Stop
+1
+★
+△(*1)
+Monitoring only(*2)
+Digital input or Modbus(*3)
+2
+×
+★
+Monitoring only(*2)
+Digital input or Modbus(*3)
+   
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 5 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+5/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+   ●Heat exchanger, minimum airflow and recommended circuits 
+    ・Be sure to select and set the capacity of the heat exchanger connected to each outdoor unit and the minimum air volume according to the following table. 
+    ・The table below is for both R 32 and R 410 A refrigerants. 
+    ・The range of use for air conditions conforms to the specifications of the outdoor unit.  
+     Refer to the technical manual for the outdoor unit. 
+ 
+ 
+       
+Min
+Max
+m3/h
+m3/min
+SRC40
+0.3
+0.8
+420
+7
+SRC50
+0.3
+0.9
+420
+7
+SRC60
+0.5
+1.1
+480
+8
+FDC71
+0.7
+1.6
+600
+10
+FDC100
+0.7
+2.1
+840
+14
+FDC125
+1.0
+2.2
+960
+16
+FDC140
+1.0
+2.8
+1080
+18
+FDC200
+1.2
+4.2
+1680
+28
+FDC250
+2.0
+4.4
+1920
+32
+FDC280
+2.0
+4.4
+2160
+36
+Outdoor unit
+model capacity
+Allowable heat exchanger
+volume
+L
+Minimum air volume
+ 
+ 
+・Recommended circuit number for D9.52 tube 
+      
+Outdoor unit model capacity
+40
+50
+60
+71
+100
+125
+140
+200
+250
+280
+Recommended circuit
+2〜4
+4〜6
+6〜10
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 6 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+6/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+3. Function 
+AHU interface outputs outdoor unit information to the outside. It also controls the compressor speed of the outdoor unit in response to external input. 
+ 
+Some settings can be changed by Modbus communication. 
+ 
+   ●Input/output list #1 of AHU interface 
+ 
+    
+Item
+Remarks
+Yellow Interface address
+0-F
+Yellow
+Always 0
+Red
+Always 0
+Red
+Always 0
+Yellow Modbus address (ones)
+0–9
+Yellow Modbus address (tens)
+0–9
+   -1
+Analogue input switching
+ON: 4–20ｍA
+OFF: 0–10V
+   -2
+Modbus baudrate (bps)
+ON: 9600bps
+OFF: 19200bps
+   -3
+Modbus parity
+ON: non parity + 2 stop bit
+OFF: even parity + 1 stop bit
+   -4
+Compressor control
+ON: Temperature Control
+OFF: Capacity Control
+   -1
+ON: cooling/heating
+OFF: run/stop
+   -2
+Always OFF
+   -3
+Always OFF
+   -4
+Always OFF
+3P
+1–2 short: not available
+2–3 short: available 100Ω
+3P
+1–2 short: 0–10V
+2–3 short: 4–20mA
+3P
+Always 2–3: short
+Reserve
+Reserve
+Reserve
+DipSW
+Black
+Black
+Reserve
+Reserve
+Reserve
+SW5
+ShortPIN
+SW Settings
+RotarySW
+Contents
+Digital output: X4d switching
+Modbus termination switching
+Analogue input switching
+SW
+SW1
+SW2
+SW3
+SW4
+SW6
+SW7
+SW8
+JX1
+Reserve
+JX2
+JX3
+ 
+ 
+ 
+ 
+Note 1: Use the “Reserve” switch with OFF or 0 setting. 
+       
+Note 2: The SW setting follows the setting at power-on. 
+Be sure to set SW at installation. 
+To change the SW setting after turning on the power, the power must be turned off once. 
+ 
+ 
+
+===== PAGE 7 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+7/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+    ●Input/output list #2 of AHU interface 
+ 
+ 
+Item
+Connector
+LED
+Housing
+Color
+Remarks
+CNH
+2P
+Return air temperature
+Black
+Thi-A
+CNF
+2P
+Reserve
+Yellow The CNF connector can not be used.
+Heat exchanger (U-bend)
+Thi-R1
+Heat exchanger (capillary)
+Thi-R2
+Heat exchanger (header)
+Thi-R3
+X3
+2P
+Capacity control
+Green Depending on the JX2 setting,
+ 0-10V/4-20mA can be switching.
+X2-1: run/stop
+Power supply: AC24-240V/DC20-130V 0.5A
+X2-2: cooling/heating
+Power supply: AC24-240V/DC20-130V 0.5A
+X2-3: emergency stop
+Power supply: AC24-240V/DC20-130V 0.5A
+X2-4: reserve
+Power supply: AC24-240V/DC20-130V 0.5A
+X2-5: common
+Common terminal
+X4a
+2P
+Outdoor unit, interface error
+Voltage free at contact output
+X4b
+2P
+Compressor ON
+Voltage free at contact output
+X4c
+2P
+Defrost ON
+Voltage free at contact output
+X4d
+2P
+Voltage free at contact output
+X4d is selectable by Modbus communication
+LED1
+Normal
+Green
+LED2
+Error
+Red
+X1
+2P
+Remote control
+Green Remote control and SC-ADNA-E can be connected
+X5
+3P
+Modbus
+Green RS-485 communication circuit
+2P
+2P
+X0-2 is an empty port due to reinforced insulation
+AC220–240V
+AC220–240V
+Connector/LED
+Cascade reserve
+X0-1: functional ground
+Digital
+Output
+Function
+Analog
+Input
+Digital
+Input
+Input/
+Output
+Yellow
+X2
+5P
+Green
+CNN
+6P
+Green
+Selection:
+①Run/stop【initial】
+②Cooling/heating
+X7
+Cascade
+Green
+Green
+X0
+5P
+X0-2: empty port
+X0-3: power L phase
+X0-4: power N phase
+X0-5: communication terminal
+ 
+ 
+  
+   
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 8 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+8/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+4. Rotary switch function 
+ 
+     
+Item
+Remarks
+Yellow
+Interface address
+0-F
+Yellow
+Always 0
+Red
+Always 0
+Red
+Always 0
+Yellow
+Modbus address (ones)
+0-9
+Yellow
+Modbus address (tens)
+0-9
+SW6
+SW
+SW1
+SW2
+SW3
+SW4
+Reserve
+Reserve
+Reserve
+SW5
+RotarySW
+Contents
+ 
+  
+ ・Set master and slave by SW1. 
+ ・For a single refrigerant system, always set the address of AHU interface to 0. 
+ ・For cascade control, set the master address to 0 and the slave address to a value other than 0 (1 to F). 
+・Rotary SW5 and SW6 are address settings for Modbus communication. 
+SW5 is Modbus address ones place and SW6 is Modbus address tens place. 
+In Modbus communication, AHU interface is a slave. 
+Set the Modbus address in 01 – 99 (Initial address setting: 01). 
+The Modbus address cannot be set to 0. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+RotarySW 
+<Modbus address example> 
+ Modbus address: 38 
+  SW6: 3 SW5: 8 
+
+===== PAGE 9 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 
+9/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+5. DIP switch function 
+ 
+Item
+Remarks
+   -1
+Analogue input switching
+ON: 4–20ｍA
+OFF: 0–10V
+   -2
+Modbus baudrate (bps)
+ON: 9600bps
+OFF: 19200bps
+   -3
+Modbus parity
+ON: non parity + 2 stop bits
+OFF: even parity + 1 stop bit
+   -4
+Compressor control
+ON: Temperature Control
+OFF: Capacity Control
+   -1
+ON: cooling/heating
+OFF: run/stop
+   -2
+Always OFF
+   -3
+Always OFF
+   -4
+Always OFF
+SW7
+SW8
+Contents
+SW
+DipSW
+Digital output: X4d switching
+Reserve
+Reserve
+Reserve
+Black
+Black
+ 
+ 
+・SW8-2, SW8-3, SW8-4 are reserve. 
+Be sure to set OFF. 
+ 
+【SW7-4】 OFF: Capacity Control, ON: Temperature Control 
+・The compressor control can be selected in 2 patterns by SW7-4. 
+ 
+(1) SW7-4 OFF: Capacity Control 
+・When capacity control is set (default setting), the required capacity is directly commanded to the compressor. 
+・In the following way, 0% to 100% of the outdoor unit (compressor capacity) can be specified as the required capacity. 
+① Depending on the input voltage (0–10 V) or input current (4–20 mA) from the analog input, the corresponding required capacity is sent to the outdoor unit. 
+② With Modbus communication, the required capacity is commanded to the outdoor unit at 0–100%. 
+③ In analog input and Modbus communication above, directives from Modbus commnunication take precedence. 
+Once Modbus sends 0–100% command, the analog input will be disabled thereafter. 
+ 
+(2) SW7-4 ON: Temperature Control 
+・When temperature control is set, the compressor is controlled by the difference between the return air sensor value of the AHU interface and the set temperature. 
+・Controls the outdoor unit so that the return air sensor value approaches the set temperature. 
+ 
+ 
+ 
+ 
+ 
+ 
+DIP SW 
+
+===== PAGE 10 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 10/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+6. Short PIN function 
+ 
+Item
+Remarks
+3P
+1–2 short: not available
+2–3 short: available 100Ω
+3P
+1–2 short: 0–10V
+2–3 short: 4–20mA
+3P
+Always 2–3 short
+Contents
+SW
+ShortPIN
+Modbus termination switching
+Analog input switching
+Reserve
+JX1
+JX2
+JX3
+ 
+ 
+ 
+・By switching the short PIN on the interface, the function on the circuit can be switched. 
+・JX1: switches the terminal resistor of the Modbus communication circuit. 
+・JX2: switches the function of the analog input circuit.  
+・The JX3 is a reserve. Do not change from initial setting (2–3 short). 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+PWB of AHU interface 
+JX1
+(Termination available/ not available)
+1–2 Short : not available
+2–3 Short : available 100Ω
+1
+3
+JX2
+(Analog input switching)
+1–2 Short : 0-10 V
+2–3 Short : 4-20 mA
+1
+3
+
+===== PAGE 11 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 11/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+Remote control
+communication
+Analog input
+Thi-A
+Return air 
+sensor
+Cascade
+Digital input
+Common
+Digital output
+Outdoor unit
+AC220–240V 50 Hz
+AC220V 60 Hz
+Thi-R1
+Thi-R3
+Thi-R2
+Heat exchange 
+sensor
+Functional 
+ground wire
+Modbus
+GND
+B A
+Cascade
+spare
+JX1 
+(Termination  available/ not available)
+1–2 Short: not available
+2–3 Short: available 100 Ω
+3
+1
+Enclosure
+plate
+2 N 1
+3
+1
+N
+-X1 (remote control), X5 (Modus) can be used for 
+ only master unit.
+-CNN (Thi-R1/2/3) and CNH (Thi-A) must be 
+ connected.
+See the 21 -AHU-T-393 manual for details
++
+-
+X0
+5  4 3 2 1
+ 
+7. Input/output circuit 
+ 
+Refer to the diagram below for wiring. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+X0-1 is the functional ground. 
+Wrap the ferrite core included around 6 turns (5 loops). 
+Connect to the plate of the enclosure. 
+Wire diameter: 0.75 mm2 Greater than or equal to. 
+Line length: 40 cm or more (recommended). 
+ 
+Connect the X0-3 to the L-phase of the outdoor unit. 
+Connect the X0-4 to the N-phase of the outdoor unit. 
+Connect the X0-5 to the communication terminal of the outdoor unit. 
+X0-2 is a free port. Do not connect anything. 
+
+===== PAGE 12 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 12/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+Cooling
+Heating
+Thi-R1
+U-bend
+Evaporating temperature
+Condensing temperature
+Anti-freezing protection
+Thi-R2
+Capillary
+Evaporating temperature
+Outlet temperature
+Anti-freezing protection
+Thi-R3
+Header
+Outlet temperature
+Inlet gas temperature
+EEV-control
+Detected temperature
+Mounting
+position
+Purpose
+ 
+ 
+Input circuit 
+ ●Mounting guidelines for sensors 
+     Mounting position of the sensor (example) 
+ 
+ 
+   Installing temperature sensors 
+     Correctly securing temperature sensors (Example) 
+    
+ When installing the temperature sensors, make sure that they have optimum contact  
+with the surface to be measured. 
+   
+ Secure with a wide-band hose clamp. 
+  
+  [Important] 
+   
+  Using cable ties will lead to faulty and squashed temperature sensors.  
+Use wide-band hose clamps for fastening. 
+ 
+ 
+ 
+ 
+ 
+  
+   Installation locations of the heat exchanger sensor 
+     Mounting position of temperature sensors (example) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+No. Designation 
+ 1 
+Temperature sensor cable 
+ 2 
+Temperature sensor 
+ 3 
+Fastener 
+Function of each heat exchanger sensor 
+
+===== PAGE 13 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 13/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 14 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 14/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 15 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 15/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+100
+Required capacity
+ contol command [%]
+Analog input current [mA]
+20
+0
+0
+4
+19.5
+100
+Required capacity
+ contol command [%]
+Analog input voltage [V]
+10
+0
+0
+9.0
+1
+ 
+●Analog input circuit 
+      ・Compressor speed can be controlled by the analog input signal (0–10V / 4–20mA). 
+       AHU interface converts 0–10V/4–20mA signal into the 0–100% range to understand how much capacity are required as a AHU. 
+       Outdoor unit operates with the maximum compressor speed when 100% required capacity is used. 
+       To use analog input function, make sure you enable the capacity control by configuring DIP SW7-4 as "OFF" (see 5 for more details). 
+ 
+① 0–10V Capacity Control (SW7-1: OFF and JX2 1-2 short) 
+           0–10V signal is regarded as a required capacity of 0–100%. 
+           Please note that there is a dead band in certain ranges. 
+           (ex) When 0.5V is input, it would be regarded as 0% required capacity. 
+ 
+      ② 4–20mA Capacity Control (SW7-1: ON and JX2 2–3 short) 
+           4–20mA signal is regarded as a required capacity of 0–100%. 
+           Please note that there is a dead band in certain ranges. 
+           (ex) When 0.9V is input, it would be regarded as 0% required capacity. 
+ 
+・The analog input signal: 0–10[V]/4–20[mA] controls the required capacity of the outdoor unit in the following range. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+                     
+ 
+●Digital input circuit 
+・ON/OFF can be recognised by the changing edge of the voltage to the digital input terminal.  
+・X2-5 is a common terminal. 
+   When using X2-1 to X2-4, wire them together with X2-5. 
+・The functions of the digital input terminals are as follows. 
+ 
+     
+ 
+ 
+Terminal
+Function
+ON
+OFF
+X2-1
+Run/Stop
+Run
+Stop
+X2-2
+Cooling/Heating
+Heating
+Cooling
+X2-3
+Emergency stop
+Emergency stop
+Emergency stop release
+X2-4
+Reserve
+-
+-
+X2-5
+Common
+X2
+Digital input：Example X2-2
+Power supply
+     AC24V-240V
+AC
+DC
+X2
+Power supply
+　   DC20V-130V
+1
+2
+3
+4
+5
+1
+2
+3
+4
+5
+
+===== PAGE 16 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 16/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+Terminal
+Function
+ON
+OFF
+X4a
+Outdoor unit/interface error
+Error
+Normal
+X4b
+Compressor ON
+Compressor ON
+Compressor OFF
+X4c
+Defrost ON
+Defrost ON
+Defrost OFF
+X4d
+Function selectable*
+Run
+Stop
+Function
+ON
+OFF
+ON
+Operation mode output
+Heating
+Cooling
+Run/stop
+Run
+Stop
+(Fan ON/OFF)
+(Fan ON)
+(Fan OFF)
+OFF
+Digital Output:X4d
+DipSW8-1
+ 
+ Output circuit 
+●Digital output circuit 
+     ・The digital output terminal output ON/OFF status. 
+     ・The functions of the digital output are as follows. 
+                     
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   ●LED output circuit 
+・The LED output shows the normal/abnormal status of the system. 
+・LED 1 (green): blinks at 0.5 sec intervals during normal operation. 
+・LED 2 (red): flashes when abnormal (lights out when normal). 
+        The number of flashes changes depending on the error status. For details, refer to (13) error display. 
+ 
+ 
+ Input/output circuit 
+ 
+・Input/output functions are as follows. 
+    
+Item
+Connector Housing
+X1
+2P
+Remote control
+X5
+3P
+Modbus
+2P
+2P
+X0
+5P
+Cascade control (reserve)
+Power (X0-2 is an empty port)
+Function
+Input/output X7
+Cascade control
+ 
+    
+    
+    ・X5 : Modbus communication circuit terminal. 
+X5-1
+A polor
+X5-2
+B polor
+X5-3
+GND
+JX1
+1–2: not available
+(termination)
+2–3: available 100Ω
+ 
+ 
+    ・X7 : Cascade connection terminal. 
+However, X7-3 and X7-4 are reserve circuits. 
+      
+ 
+ 
+ 
+(*) Setting of Xd4 can be changed by SW8 -1. 
+Digital output 
+Voltage free a contact output 
+X4a
+X4b
+X4c
+X4d
+
+===== PAGE 17 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 17/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+The master commands each slave. 
+ 
+8. Cascade control 
+●Multiple refrigerant system 
+ ・By connecting the AHU interface with the X7 connector, up to 16 units can be connected. 
+ ・The interface address of master is fixed to 0. Slave address can be set from 1 to F. 
+ ・Connect one outdoor unit per AHU interface. 
+ ・Run/stop, operation mode, and thermo ON/OFF are all judged by master. 
+ ・Slave only receives commands from master. 
+ ・In cascade control, rotation control and fault backup control are automatically enabled. 
+ 
+●Capacity distribution of cascade control 
+ ・The master commands the capacity to each slave.  
+ ・The image is shown below. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Each slave operates according to the master command. 
+The master calculates X_all from the following: 
+ ・Analog input or Modbus or remote control  
+(0–10V/4-20mA, 0–100%, set temperature) 
+ ・Number of outdoor units 
+25
+100
+Capacity command [%]
+Required capacity of the system X_all[%]
+100
+200
+0
+25
+125
+225
+X1
+X2
+X3
+
+===== PAGE 18 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 18/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+9. Rotation control 
+・In cascade control, rotation control is automatically enabled. 
+・This control averages the compressor accumulated time of all outdoor units. 
+・When the outdoor unit starts operating, the outdoor unit with the lowest compressor accumulated time is preferentially operated. 
+・When 12 hours have elapsed since the outdoor unit started operating, the outdoor unit will be switched.  
+*Operation switching time: 12 hours is fixed. 
+ 
+・This is an example of rotation control. 
+ 
+ 
+ 
+ 
+Rotation control example 
+
+===== PAGE 19 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 19/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+10.  Fault backup control 
+・In cascade control, fault backup control is automatically enabled. 
+・When an abnormality occurs in an outdoor unit during operation, another outdoor unit automatically starts operating. 
+・Even if the outdoor unit that stopped abnormally is restored, the operation of the outdoor unit does not change. 
+ 
+・An example of fault backup control is shown below. 
+ 
+ 
+ 
+
+===== PAGE 20 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 20/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+11.  Modbus communication 
+・X5 is Modbus communication connector.  
+・Modbus communication specifications are as follows. 
+ 
+Item
+Specification
+Note
+Transmission mode
+RTU (remote terminal unit)
+(1) 9600bps
+DipSW7-2　ON
+(2) 19200bps
+DipSW7-2　OFF
+Data bit
+8
+(1) Non parity + 2 stop bits
+DipSW7-3　ON
+(2) Even parity + 1 stop bit
+DipSW7-3　OFF
+Node number
+RotarySW5: ones place
+(slave address)
+RotarySW6: tens place
+X5-1: A polar
+X5-2: B polar
+X5-3: GND
+Modbus master:
+External controller : 1pcs
+Modbus slave:
+AHU interface :1pcs
+01～99 (initial：01)
+Combinations
+Transmission speed
+Parity/stop bit
+Connection
+RS-485 communication
+ 
+ 
+・Modbus can monitor the status of the AHU interface and outdoor units. 
+ Modbus can also change some settings. 
+ 
+ 
+   ●Modbus function 
+・The function codes are as follows: 
+     
+Function name
+Remarks
+3 (0x03)
+Read holding register
+Read the contents of the holding register
+4 (0x04)
+Read input register
+Read the contents of the input register
+6 (0x06)
+Preset single register
+Change the contents of the holding register
+16 (0x10)
+Preset multiple registers
+Change the contents of multiple consecutive holding registers
+Function code
+ 
+ 
+   ●Modbus data information 
+・Modbus data type, data length and address allocation range are as follows. 
+     
+Target register
+Data length
+Type of access
+Register address range
+Input register
+2 byte
+Monitoring only
+30001～39999
+Holding register
+2 byte
+Monitoring / control
+40001～49999
+ 
+ 
+ 
+
+===== PAGE 21 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 21/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+Field
+Detail
+Data length
+Address
+Slave address
+8 bit
+Function
+Function code
+8 bit
+Data
+Request data
+Variable
+Error check
+CRC error check
+16 bit
+Field
+Detail
+Data length
+Address
+Slave address
+8 bit
+Function
+Function code
+8 bit
+Data
+Respons data
+Variable
+Error check
+CRC error check
+16 bit
+ 
+   ●Overview of Modbus communication 
+・The time from the completion of the request to the start of the response and the time from the completion of the response to the start of the next request are as shown in the figure below. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+・The following table shows the data length of the request frame. 
+      
+ 
+ 
+ 
+ 
+ 
+ 
+・The data length of the response frame is shown in the table below. 
+      
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+External controller 
+(Modbus-master) 
+AHU Interface 
+(Modbus-slave) 
+Request 
+Request 
+Response 
+
+===== PAGE 22 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 22/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+   ●Input register 
+・The following table shows the input registers (read only, 2-byte data). 
+      
+   
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+    
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+0：Stop
+1：Run
+0：Cooling
+1：Heating
+30003
+Set temperature display
+46(23℃) 0～65535
+0.5℃/count
+18～30℃
+0：Remote
+1：Center/Remote
+2：Center
+0：Emergency stop release
+1：Emergency stop
+30007
+Return air temperature (Master)
+0
+-32768～32767
+0.1℃/count
+30008
+External temperature (Master)
+-640
+-32768～32767
+0.1℃/count
+30009
+Request capacity
+0
+0～65535
+1 %/count
+X_all
+0
+0
+1
+0
+30006
+Emergency stop display
+0～65535
+－
+30004
+Center/Remote display
+0～65535
+－
+30001
+System Run/Stop display
+0～65535
+－
+30002
+Operation mode display
+0～65535
+－
+[Data address 30003 set temperature display example] 
+<0.5℃/count> 
+18=9℃ 
+36=18℃ 
+  50=25℃ 
+  60=30℃ 
+[Data address 30007 return air temperature display example] 
+<0.1℃/count> 
+10=1℃ 
+30=3℃ 
+  500=50℃ 
+  600=60℃ 
+
+===== PAGE 23 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 23/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+     
+Data address
+Item
+Range
+Units
+Notes
+30010
+Analogue input voltage [V]
+0～65535
+0.1 V/count
+0～10V
+30011
+Analogue input current [mA]
+0～65535
+0.1 mA/count 0～20mA
+30012
+Digital input X2-1
+0～65535
+－
+0：OFF 1：ON
+30013
+Digital input X2-2
+0～65535
+－
+0：OFF 1：ON
+30014
+Digital input X2-3
+0～65535
+－
+0：OFF 1：ON
+30015
+Digital input X2-4
+0～65535
+－
+0：OFF 1：ON
+30016
+Digital output X4a
+0～65535
+－
+0：OFF 1：ON
+30017
+Digital output X4b
+0～65535
+－
+0：OFF 1：ON
+30018
+Digital output X4c
+0～65535
+－
+0：OFF 1：ON
+30019
+Digital output X4d
+0～65535
+－
+0：OFF 1：ON
+0：0～10V
+1：4～20mA
+0：19200bps
+1：9600bps
+0：Even parity
+      +1Stop bit
+1：Non parity
+      +2Stop bit
+0：Capacity control
+1：Temperature control
+30024
+SW8-1 Setting display
+0～65535
+－
+0：Run/Stop
+1：Cooling/Heating
+30025
+SW8-2 Setting display
+0～65535
+－
+0
+30026
+SW8-3 Setting display
+0～65535
+－
+0
+30027
+Reserve
+0～65535
+－
+Reserve
+30028
+SW7-1 Reading value
+0～65535
+－
+0：OFF 1：ON
+30029
+SW7-2 Reading value
+0～65535
+－
+0：OFF 1：ON
+30030
+SW7-3 Reading value
+0～65535
+－
+0：OFF 1：ON
+30031
+SW7-4 Reading value
+0～65535
+－
+0：OFF 1：ON
+30032
+SW8-1 Reading value
+0～65535
+－
+0：OFF 1：ON
+30033
+SW8-2 Reading value
+0～65535
+－
+0：OFF 1：ON
+30034
+SW8-3 Reading value
+0～65535
+－
+0：OFF 1：ON
+30035
+SW8-4 Reading value
+0～65535
+－
+0：OFF 1：ON
+30036
+Modbus capacity control command display
+0～65535
+－
+0：No command 1：Command
+30037
+Modbus capacity control value display
+0～65535
+0.01% count
+0-100%
+30020
+Analogue input switching
+0～65535
+－
+30023
+Compressor control
+0～65535
+－
+30021
+Modbus baudrate setting
+0～65535
+－
+30022
+Modbus
+Parity/Stop bit setting
+0～65535
+－
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 24 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 24/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+     
+ 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+ 
+      
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+31001
+Connection status:Slave1
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31002
+Connection status:Slave2
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31003
+Connection status:Slave3
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31004
+Connection status:Slave4
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31005
+Connection status:Slave5
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31006
+Connection status:Slave6
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31007
+Connection status:Slave7
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31008
+Connection status:Slave8
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31009
+Connection status:Slave9
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31010
+Connection status:Slave10
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31011
+Connection status:Slave11
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31012
+Connection status:Slave12
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31013
+Connection status:Slave13
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31014
+Connection status:Slave14
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31015
+Connection status:Slave15
+0
+0～65535
+－
+0:Unconnected 1:Connection
+31016
+Capacity command(Master)
+0
+0～65535
+1 %/count
+0～100%
+31017
+Capacity command(Slave1)
+0
+0～65535
+1 %/count
+0～100%
+31018
+Capacity command(Slave2)
+0
+0～65535
+1 %/count
+0～100%
+31019
+Capacity command(Slave3)
+0
+0～65535
+1 %/count
+0～100%
+31020
+Capacity command(Slave4)
+0
+0～65535
+1 %/count
+0～100%
+31021
+Capacity command(Slave5)
+0
+0～65535
+1 %/count
+0～100%
+31022
+Capacity command(Slave6)
+0
+0～65535
+1 %/count
+0～100%
+31023
+Capacity command(Slave7)
+0
+0～65535
+1 %/count
+0～100%
+31024
+Capacity command(Slave8)
+0
+0～65535
+1 %/count
+0～100%
+31025
+Capacity command(Slave9)
+0
+0～65535
+1 %/count
+0～100%
+31026
+Capacity command(Slave10)
+0
+0～65535
+1 %/count
+0～100%
+31027
+Capacity command(Slave11)
+0
+0～65535
+1 %/count
+0～100%
+31028
+Capacity command(Slave12)
+0
+0～65535
+1 %/count
+0～100%
+31029
+Capacity command(Slave13)
+0
+0～65535
+1 %/count
+0～100%
+31030
+Capacity command(Slave14)
+0
+0～65535
+1 %/count
+0～100%
+31031
+Capacity command(Slave15)
+0
+0～65535
+1 %/count
+0～100%
+[Master/slave1~15] 
+<SW1 AHU interface address> 
+SW1:0=master 
+SW1:1=AHU interface No.1 (slave 1) 
+SW1:2=AHU interface No.2 (slave 2) 
+SW1:3=AHU interface No.3 (slave 3) 
+SW1:4=AHU interface No.4 (slave 4) 
+SW1:5=AHU interface No.5 (slave 5) 
+SW1:6=AHU interface No.6 (slave 6) 
+SW1:7=AHU interface No.7 (slave 7) 
+SW1:8=AHU interface No.8 (slave 8) 
+SW1:9=AHU interface No.9 (slave 9) 
+SW1:A=AHU interface No.10 (slave 10) 
+SW1:B=AHU interface No.11 (slave 11) 
+SW1:C=AHU interface No.12 (slave 12) 
+SW1:D=AHU interface No.13 (slave 13) 
+SW1:E=AHU interface No.14 (slave 14) 
+SW1:F=AHU interface No.15 (slave 15) 
+
+===== PAGE 25 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 25/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+     
+ 
+ 
+ 
+      
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+31032
+Compressor accumulated time(Master)
+0
+0～65535
+1 H/count
+31033
+Compressor accumulated time(Slave1)
+0
+0～65535
+1 H/count
+31034
+Compressor accumulated time(Slave2)
+0
+0～65535
+1 H/count
+31035
+Compressor accumulated time(Slave3)
+0
+0～65535
+1 H/count
+31036
+Compressor accumulated time(Slave4)
+0
+0～65535
+1 H/count
+31037
+Compressor accumulated time(Slave5)
+0
+0～65535
+1 H/count
+31038
+Compressor accumulated time(Slave6)
+0
+0～65535
+1 H/count
+31039
+Compressor accumulated time(Slave7)
+0
+0～65535
+1 H/count
+31040
+Compressor accumulated time(Slave8)
+0
+0～65535
+1 H/count
+31041
+Compressor accumulated time(Slave9)
+0
+0～65535
+1 H/count
+31042
+Compressor accumulated time(Slave10)
+0
+0～65535
+1 H/count
+31043
+Compressor accumulated time(Slave11)
+0
+0～65535
+1 H/count
+31044
+Compressor accumulated time(Slave12)
+0
+0～65535
+1 H/count
+31045
+Compressor accumulated time(Slave13)
+0
+0～65535
+1 H/count
+31046
+Compressor accumulated time(Slave14)
+0
+0～65535
+1 H/count
+31047
+Compressor accumulated time(Slave15)
+0
+0～65535
+1 H/count
+31048
+Error code display(Master)
+0
+0～65535
+－
+0～99
+31049
+Error code display(Slave1)
+0
+0～65535
+－
+0～99
+31050
+Error code display(Slave2)
+0
+0～65535
+－
+0～99
+31051
+Error code display(Slave3)
+0
+0～65535
+－
+0～99
+31052
+Error code display(Slave4)
+0
+0～65535
+－
+0～99
+31053
+Error code display(Slave5)
+0
+0～65535
+－
+0～99
+31054
+Error code display(Slave6)
+0
+0～65535
+－
+0～99
+31055
+Error code display(Slave7)
+0
+0～65535
+－
+0～99
+31056
+Error code display(Slave8)
+0
+0～65535
+－
+0～99
+31057
+Error code display(Slave9)
+0
+0～65535
+－
+0～99
+31058
+Error code display(Slave10)
+0
+0～65535
+－
+0～99
+31059
+Error code display(Slave11)
+0
+0～65535
+－
+0～99
+31060
+Error code display(Slave12)
+0
+0～65535
+－
+0～99
+31061
+Error code display(Slave13)
+0
+0～65535
+－
+0～99
+31062
+Error code display(Slave14)
+0
+0～65535
+－
+0～99
+31063
+Error code display(Slave15)
+0
+0～65535
+－
+0～99
+[Error code display example] 
+ 0 ：Normal 
+ 1 ：E1 
+ 7 ：E7 
+99：E99 
+
+===== PAGE 26 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 26/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+    
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+31064
+Heat exchanger temperature:Thi-R1(Master)
+-3276
+-32768～32767
+0.1℃/count
+31065
+Heat exchanger temperature:Thi-R2(Master)
+-3276
+-32768～32767
+0.1℃/count
+31066
+Heat exchanger temperature:Thi-R3(Master)
+-3276
+-32768～32767
+0.1℃/count
+31067
+Heat exchanger temperature:Thi-R1(Slave1)
+-3276
+-32768～32767
+0.1℃/count
+31068
+Heat exchanger temperature:Thi-R2(Slave1)
+-3276
+-32768～32767
+0.1℃/count
+31069
+Heat exchanger temperature:Thi-R3(Slave1)
+-3276
+-32768～32767
+0.1℃/count
+31070
+Heat exchanger temperature:Thi-R1(Slave2)
+-3276
+-32768～32767
+0.1℃/count
+31071
+Heat exchanger temperature:Thi-R2(Slave2)
+-3276
+-32768～32767
+0.1℃/count
+31072
+Heat exchanger temperature:Thi-R3(Slave2)
+-3276
+-32768～32767
+0.1℃/count
+31073
+Heat exchanger temperature:Thi-R1(Slave3)
+-3276
+-32768～32767
+0.1℃/count
+31074
+Heat exchanger temperature:Thi-R2(Slave3)
+-3276
+-32768～32767
+0.1℃/count
+31075
+Heat exchanger temperature:Thi-R3(Slave3)
+-3276
+-32768～32767
+0.1℃/count
+31076
+Heat exchanger temperature:Thi-R1(Slave4)
+-3276
+-32768～32767
+0.1℃/count
+31077
+Heat exchanger temperature:Thi-R2(Slave4)
+-3276
+-32768～32767
+0.1℃/count
+31078
+Heat exchanger temperature:Thi-R3(Slave4)
+-3276
+-32768～32767
+0.1℃/count
+31079
+Heat exchanger temperature:Thi-R1(Slave5)
+-3276
+-32768～32767
+0.1℃/count
+31080
+Heat exchanger temperature:Thi-R2(Slave5)
+-3276
+-32768～32767
+0.1℃/count
+31081
+Heat exchanger temperature:Thi-R3(Slave5)
+-3276
+-32768～32767
+0.1℃/count
+31082
+Heat exchanger temperature:Thi-R1(Slave6)
+-3276
+-32768～32767
+0.1℃/count
+31083
+Heat exchanger temperature:Thi-R2(Slave6)
+-3276
+-32768～32767
+0.1℃/count
+31084
+Heat exchanger temperature:Thi-R3(Slave6)
+-3276
+-32768～32767
+0.1℃/count
+31085
+Heat exchanger temperature:Thi-R1(Slave7)
+-3276
+-32768～32767
+0.1℃/count
+31086
+Heat exchanger temperature:Thi-R2(Slave7)
+-3276
+-32768～32767
+0.1℃/count
+31087
+Heat exchanger temperature:Thi-R3(Slave7)
+-3276
+-32768～32767
+0.1℃/count
+31088
+Heat exchanger temperature:Thi-R1(Slave8)
+-3276
+-32768～32767
+0.1℃/count
+31089
+Heat exchanger temperature:Thi-R2(Slave8)
+-3276
+-32768～32767
+0.1℃/count
+31090
+Heat exchanger temperature:Thi-R3(Slave8)
+-3276
+-32768～32767
+0.1℃/count
+31091
+Heat exchanger temperature:Thi-R1(Slave9)
+-3276
+-32768～32767
+0.1℃/count
+31092
+Heat exchanger temperature:Thi-R2(Slave9)
+-3276
+-32768～32767
+0.1℃/count
+31093
+Heat exchanger temperature:Thi-R3(Slave9)
+-3276
+-32768～32767
+0.1℃/count
+31094
+Heat exchanger temperature:Thi-R1(Slave10)
+-3276
+-32768～32767
+0.1℃/count
+31095
+Heat exchanger temperature:Thi-R2(Slave10)
+-3276
+-32768～32767
+0.1℃/count
+31096
+Heat exchanger temperature:Thi-R3(Slave10)
+-3276
+-32768～32767
+0.1℃/count
+
+===== PAGE 27 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 27/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+    
+ 
+      
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+31097
+Heat exchanger temperature:Thi-R1(Slave11)
+-3276
+-32768～32767
+0.1℃/count
+31098
+Heat exchanger temperature:Thi-R2(Slave11)
+-3276
+-32768～32767
+0.1℃/count
+31099
+Heat exchanger temperature:Thi-R3(Slave11)
+-3276
+-32768～32767
+0.1℃/count
+31100
+Heat exchanger temperature:Thi-R1(Slave12)
+-3276
+-32768～32767
+0.1℃/count
+31101
+Heat exchanger temperature:Thi-R2(Slave12)
+-3276
+-32768～32767
+0.1℃/count
+31102
+Heat exchanger temperature:Thi-R3(Slave12)
+-3276
+-32768～32767
+0.1℃/count
+31103
+Heat exchanger temperature:Thi-R1(Slave13)
+-3276
+-32768～32767
+0.1℃/count
+31104
+Heat exchanger temperature:Thi-R2(Slave13)
+-3276
+-32768～32767
+0.1℃/count
+31105
+Heat exchanger temperature:Thi-R3(Slave13)
+-3276
+-32768～32767
+0.1℃/count
+31106
+Heat exchanger temperature:Thi-R1(Slave14)
+-3276
+-32768～32767
+0.1℃/count
+31107
+Heat exchanger temperature:Thi-R2(Slave14)
+-3276
+-32768～32767
+0.1℃/count
+31108
+Heat exchanger temperature:Thi-R3(Slave14)
+-3276
+-32768～32767
+0.1℃/count
+31109
+Heat exchanger temperature:Thi-R1(Slave15)
+-3276
+-32768～32767
+0.1℃/count
+31110
+Heat exchanger temperature:Thi-R2(Slave15)
+-3276
+-32768～32767
+0.1℃/count
+31111
+Heat exchanger temperature:Thi-R3(Slave15)
+-3276
+-32768～32767
+0.1℃/count
+31112
+Compressor Hz display(Master)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31113
+Compressor Hz display(Slave1)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31114
+Compressor Hz display(Slave2)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31115
+Compressor Hz display(Slave3)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31116
+Compressor Hz display(Slave4)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31117
+Compressor Hz display(Slave5)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31118
+Compressor Hz display(Slave6)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31119
+Compressor Hz display(Slave7)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31120
+Compressor Hz display(Slave8)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31121
+Compressor Hz display(Slave9)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31122
+Compressor Hz display(Slave10)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31123
+Compressor Hz display(Slave11)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31124
+Compressor Hz display(Slave12)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31125
+Compressor Hz display(Slave13)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31126
+Compressor Hz display(Slave14)
+0
+0～65535
+1 Hz/count
+0～120Hz
+31127
+Compressor Hz display(Slave15)
+0
+0～65535
+1 Hz/count
+0～120Hz
+
+===== PAGE 28 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 28/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+     
+ 
+ 
+      
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+31128
+Defrost display(Master)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31129
+Defrost display(Slave1)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31130
+Defrost display(Slave2)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31131
+Defrost display(Slave3)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31132
+Defrost display(Slave4)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31133
+Defrost display(Slave5)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31134
+Defrost display(Slave6)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31135
+Defrost display(Slave7)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31136
+Defrost display(Slave8)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31137
+Defrost display(Slave9)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31138
+Defrost display(Slave10)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31139
+Defrost display(Slave11)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31140
+Defrost display(Slave12)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31141
+Defrost display(Slave13)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31142
+Defrost display(Slave14)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31143
+Defrost display(Slave15)
+0
+0～65535
+－
+0:Normal　1:Defrost
+31144
+Oil return display(Master)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31145
+Oil return display(Slave1)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31146
+Oil return display(Slave2)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31147
+Oil return display(Slave3)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31148
+Oil return display(Slave4)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31149
+Oil return display(Slave5)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31150
+Oil return display(Slave6)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31151
+Oil return display(Slave7)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31152
+Oil return display(Slave8)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31153
+Oil return display(Slave9)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31154
+Oil return display(Slave10)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31155
+Oil return display(Slave11)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31156
+Oil return display(Slave12)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31157
+Oil return display(Slave13)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31158
+Oil return display(Slave14)
+0
+0～65535
+－
+0:Normal　1:Oil return
+31159
+Oil return display(Slave15)
+0
+0～65535
+－
+0:Normal　1:Oil return
+
+===== PAGE 29 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 29/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+     
+     
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+    
+ 
+ 
+Data address
+Item
+Initial
+Range
+Units
+Notes
+31160
+Abnormal stop status display(Master)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31161
+Abnormal stop status display(Slave1)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31162
+Abnormal stop status display(Slave2)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31163
+Abnormal stop status display(Slave3)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31164
+Abnormal stop status display(Slave4)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31165
+Abnormal stop status display(Slave5)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31166
+Abnormal stop status display(Slave6)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31167
+Abnormal stop status display(Slave7)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31168
+Abnormal stop status display(Slave8)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31169
+Abnormal stop status display(Slave9)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31170
+Abnormal stop status display(Slave10)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31171
+Abnormal stop status display(Slave11)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31172
+Abnormal stop status display(Slave12)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31173
+Abnormal stop status display(Slave13)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31174
+Abnormal stop status display(Slave14)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+31175
+Abnormal stop status display(Slave15)
+0
+0～65535
+－
+0:Normal　1:Abnormal stop
+
+===== PAGE 30 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 30/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+●Holding register 
+・The holding registers (readable, changeable, 2-byte data) are as follows. 
+      
+     
+Data address
+Item
+Initial
+Range
+Units
+Notes
+0: stop
+1: run
+0: cooling
+1: heating
+40003
+Set temperature command
+46
+(23 ℃)
+36～60
+0.5℃/count
+36=18 ℃
+60=30 ℃
+0： emergency stop release
+1： emergency stop
+40006
+CPU reset command
+0
+0～1
+－
+0: NOP　1: reset
+Compressor accumulated
+time　all reset command
+0–100%
+40005
+0
+0～1
+－
+40007
+0
+0～1
+－
+40001
+Emergency stop　command
+Capacity Control　command
+Run/stop　command
+0
+0～1
+－
+40002
+Operation mode command
+0
+0～1
+－
+0: NOP　1: reset
+40008
+0
+0～10000
+0.01 /count
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+If data outside the range is received, the data is not accepted and an error is returned. 
+
+===== PAGE 31 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 31/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+    
+     
+Data address
+Item
+Initial
+Range
+Units
+Notes
+Compressor
+accumulated time
+reset command (master)
+Compressor
+accumulated time
+reset command (slave 1)
+Compressor
+accumulated time
+reset command (slave 2)
+Compressor
+accumulated time
+reset command (slave 3)
+Compressor
+accumulated time
+reset command (slave 4)
+Compressor
+accumulated time
+reset command (slave 5)
+Compressor
+accumulated time
+reset command (slave 6)
+Compressor
+accumulated time
+reset command (slave 7)
+Compressor
+accumulated time
+reset command (slave 8)
+Compressor
+accumulated time
+reset command (slave 9)
+Compressor
+accumulated time
+reset command (slave 10)
+Compressor
+accumulated time
+reset command (slave 11)
+Compressor
+accumulated time
+reset command (slave 12)
+Compressor
+accumulated time
+reset command (slave 13)
+Compressor
+accumulated time
+reset command (slave 14)
+Compressor
+accumulated time
+reset command (slave 15)
+41016
+0
+0～1
+－
+0: NOP　1: reset
+41014
+0
+0～1
+－
+0: NOP　1: reset
+41015
+0
+0～1
+－
+0: NOP　1: reset
+41012
+0
+0～1
+－
+0: NOP　1: reset
+41013
+0
+0～1
+－
+0: NOP　1: reset
+41010
+0
+0～1
+－
+0: NOP　1: reset
+41011
+0
+0～1
+－
+0: NOP　1: reset
+41008
+0
+0～1
+－
+0: NOP　1: reset
+41009
+0
+0～1
+－
+0: NOP　1: reset
+41006
+0
+0～1
+－
+0: NOP　1: reset
+41007
+0
+0～1
+－
+0: NOP　1: reset
+41004
+0
+0～1
+－
+0: NOP　1: reset
+41005
+0
+0～1
+－
+0: NOP　1: reset
+41002
+0
+0～1
+－
+0: NOP　1: reset
+41003
+0
+0～1
+－
+0: NOP　1: reset
+41001
+0
+0～1
+－
+0: NOP　1: reset
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 32 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 32/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+Compressor-OFF
+5 minutes timer
+Compressor-ON capable
+1.0
+10
+AHU heat exchanger temperature (℃)
+Compressor ON
+Compressor OFF
+56
+63
+AHU heat exchanger temperature (℃)
+ 
+12.  Protection control 
+ Protective control is implemented to protect the compressor of the outdoor unit. 
+ If the conditions of the protection control are satisfied, the outdoor unit is temporarily placed in the protection stop state. 
+ When the protection control condition is released, the compressor will run automatically again. 
+ 
+●Compressor inching prevention control 
+  (a) 3-minute timer 
+ 
+   When the compressor has been stopped by the thermostat, remote control operation switch or anomalous condition, its restart will be inhibited for 3 minutes. 
+     However, the 3-minute timer is invalidated at the power on the electric power source for the unit. 
+ 
+  (b) 3-minute forced operation timer 
+ 
+   Compressor will not stop for 3 minutes after the compressor ON. However, it stops immediately when the unit is stopped by means of the ON/OFF switch or  
+    when the thermostat is turned OFF by the change of operation mode. 
+ 
+ 
+●Cooling frost protection 
+  To prevent frosting during cooling mode operation, the compressor-OFF if the AHU heat exchanger temperature (detected with Thi-R) drops to 1.0℃ 
+  or lower at 4 minutes after the compressor-ON.  
+If the AHU heat exchanger temperature is 1.0℃ or lower after 5 minutes, the AHU interface is controlled compressor-OFF. 
+If it becomes 10℃ or higher, the control teminates. 
+ 
+ 
+● Heating overload protection 
+ 
+If the AHU heat exchanger temperature (detected with Thi-R) at 63℃ or higher is detected for 2 seconds continuously, 
+  the compressor stops. When the compressor is restarted after 3-minute delay, if a temperature at 63℃ or higher is detected for 2 seconds  
+  continuously within 60 minutes after initial detection and if this is detected 5 times consecutively, the compressor stops with the anomalous stop (E8). 
+  Anomalous stop occurs also when the AHU heat exchanger temperature at 63℃ or higher is detected for 6 minutes continuously. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 33 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 33/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+● Abnormal temperature sensor (return air/ heat exchanger) broken wire/ short-circuit detection 
+ 
+(a) Broken wire detection 
+ 
+   When the return air temperature sensor detects -50℃ or lower or the heat exchanger temperature sensor detect -50℃ or lower for 5seconds continuously, the compressor stops. 
+ 
+   After 3-minute delay, the compressor restarts but, if it is detected again within 60 minutes after the initial detection for 6 minutes continuously, stops again ( the return air temperature sensor: E7,  
+the heat exhanger temperature sensor: E6) 
+ 
+ 
+(b) Short-circuit detection 
+ 
+   If the heat exchanger temperature sensor detects short-circuit for 5 seconds continuously within 2 minutes to 2 minutes 20 seconds after the compressor-ON during cooling operation,  
+the compressor stops (E6). 
+ 
+●Fan control during defrost control and oil return control 
+・During defrost control (defrosting control) and oil return control, it is necessary to stop the fan motor on the AHU side. 
+・However, if the fan motor cannot be stopped under the conditions of use of the air handling unit, 
+  fan operation can be continued during defrosting and oil return only if the following conditions are met. 
+  If the following conditions are not met, stop the AHU fan motor during defrosting and oil return signal output. 
+ 
+< Condition > 
+・Only when the difference in height between the outdoor unit and the AHU heat exchanger is 20[m] or less. 
+ 
+ 
+●Forced OFF control of compressor by return air temperature 
+ If used beyond the range of use for air conditions, it will stop the compressor for protection. 
+  ・During cooling mode operation, the compressor-OFF if the AHU interface return-air temperature (detected with Thi-A) 
+    is detected for 4 minutes continuously less to 12.0℃, or overs to 33.0℃. 
+ 
+<Cooling> 
+ 
+ 
+ 
+ 
+ 
+  ・During heating mode operation, the compressor-OFF if the AHU interface return-air temperature (detected with Thi-A) 
+    is detected for 4 minutes continuously less to 0.0℃, or overs to 30.0℃. 
+ 
+    <Heating> 
+ 
+ 
+ 
+ 
+ 
+ 
+4 minutes 
+compressor-ON 
+compressor-OFF 
+Return air temperature:Thi-A 
+Temperature drop 
+Temperature rise 
+12℃ 
+13℃ 
+32℃ 
+33℃ 
+4 minutes 
+4 minutes 
+compressor-ON 
+compressor-OFF 
+Return air temperature:Thi-A 
+Temperature drop 
+Temperature rise 
+0℃ 
+1℃ 
+29℃ 
+30℃ 
+4 minutes 
+
+===== PAGE 34 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    SPECIFICATION 
+PSZ000Z308 
+ 
+ 34/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+Error code
+Error contents
+Recovery condition
+LED2 display (red) *
+E1
+AHU interface - remote control communication error
+Normal reception of remote control signal
+Indeterminate
+E2
+AHU interface address overlap
+Resolution of address overlap
+Once
+E3
+AHU interface - outdoor unit address pairing error
+Resolution of address paring
+Twice
+E5
+AHU interface - outdoor unit communication error
+Normal reception of outdoor unit signal
+Twice
+E6
+Heat exchanger sensor disconnection
+Resolution of disconnection
+Once
+E7
+Return air sensor disconnection
+Resolution of disconnection
+Once
+E8
+Heating overload error
+Normalisation of heat exchanger temperature
+Once
+E14
+Master - slave communication error
+Normal reception of slave signal
+Three times
+E63
+Emergency stop
+Emergency stop release
+Continuous
+ 
+13.  Error display 
+AHU interface detects the following errors. 
+To check the error code, remote control or Modbus device is required. 
+To detect abnormalities in the AHU interface (including the outdoor unit), either the digital output, remote control or Modbus device must be connected. 
+  Be sure to connect either the digital output, remote control or Modbus for safe system use. 
+ 
+  Note: in cascade control, Modbus communication is required to check the individual abnormal state of slave. 
+ 
+When an error occurs, LED 2 (red) on the interface blinks as shown in the table below. 
+    
+     
+    
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+* The cycle is 5 seconds (blinking 0.5 seconds). 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 35 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    INSTALLATION 
+PSZ000Z308 
+ 
+ 35/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+14.  Installation work 
+●Installation procedure 
+Install AHU interface in the direction shown in the figure below so that letters can be read correctly. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+●Installation clearances 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+1. Slide the fixed part down (2 places). 
+2. Hang the box on the DIN rail. 
+3. Push the fixed part (2 places) up and fix onto the DIN rail. 
+Make sure it is securely fastened. 
+
+===== PAGE 36 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    INSTALLATION 
+PSZ000Z308 
+ 
+ 36/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+●Remove the cover 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 37 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    INSTALLATION 
+PSZ000Z308 
+ 
+ 37/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+15.  Wiring procedure 
+AHU interface incorporates an earth connection for functional purposes only. 
+Be sure to connect the functional ground wire to the sheet metal of the enclosure when connecting wires to the power supply terminal block. 
+Be sure to ground the sheet-metal part of the enclosure. 
+When removing wires from the enclosure, secure or cover the wires with conduit to prevent tension from being applied to the terminals.  
+Do not turn ON the power supply (power switch) until all the work is completed. 
+Except for the accessories, obtain other components locally. 
+If the supply cord is damaged, it must be replaced by the manufacturer, the service agent or similarly qualified persons to avoid any hazards. 
+Use only copper wires.  
+Do not use any supply cord lighter than the one specified in parentheses for each type below 
+- ordinary tough rubber sheathed cord (code designation 60245 IEC 53). 
+Do not use anything lighter than polychloroprene sheathed flexible cord (code designation 60245 IEC57) for supply cords of appliances parts for outdoor use. 
+ 
+    Cascade connection (X7) signal lines 
+Wire diameter: 0.75mm2 – 1.25mm2 
+The line length between Master and Slave must be less than 2 m. 
+When using a cable longer than 2 m, use a shielded cable for the cascade signal line. 
+Wire the grounding of the body to the sheet metal of the enclosure. 
+Total wiring length of cascade connection can be up to 10 m. 
+ 
+    Wiring to each connector (X1-X5) 
+Wire diameter: 0.3mm2 or more 
+It is possible to enter into the superlink system by connecting the remote control communication line of SC-ADNA-E to X1. 
+Use a shielded cable when operating a cable longer than 2 m. 
+ 
+Power supply wire & functional ground wire (X0) 
+       Wind the ferrite core supplied with the ground wire for 6 turns (5 loops) and connect it to the sheet metal of the enclosure. 
+     Wire diameter: 0.75mm2 or more 
+   Line length: 40 cm or more (recommendation) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+===== PAGE 38 =====
+   Air Handling Unit Interface 
+   AHU-KIT-SP 
+ 
+MORIKAWA    EXTERNAL DIMENSIONS 
+PSZ000Z308 
+ 
+ 38/38 
+MODEL NAME 
+MODEL TYPE 
+ISSUE 
+CLASSIFICATION 
+DWG NO. 
+REV.MARK PAGE 
+ 
+21.09.17 
+    
+ 
+ 
+16.  External dimensions 
+ 
+ 

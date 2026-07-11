@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.venv/
+/config/
+/secrets.json
+ui/node_modules/
+ui/dist/
