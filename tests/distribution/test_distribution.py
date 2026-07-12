@@ -46,10 +46,20 @@ def tick(dist: Distribution, p1: int, now: float) -> None:
     asyncio.run(run())
 
 
+class _ModeStub:
+    # stand-in for the mode EmSelect: _process_p1 only reads .asInt
+    def __init__(self, value: int) -> None:
+        self._state = int(value)
+
+    @property
+    def asInt(self) -> int:
+        return self._state
+
+
 def _dist(devices: list[StubDevice], mode: DistributionMode, max_grid: int = 0) -> Distribution:
     d = Distribution.__new__(Distribution)
     d.devices = list(devices)
-    d._mode = mode
+    d.mode = _ModeStub(mode.value)
     d.manual_setpoint = 0
     d.max_grid = max_grid
     d.setpoint = 0

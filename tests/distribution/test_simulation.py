@@ -283,7 +283,7 @@ class SimHarness:
         self.dist = Distribution(None, [])
         for e in self.dist.entities.values():
             e.hass = None  # no HA loop in the sim
-        self.dist._mode = DistributionMode.MATCHING
+        self.dist.mode.set_state(DistributionMode.MATCHING.value)  # "smart": both charge and discharge allowed
         cfg = json.loads((Path(__file__).resolve().parents[2] / "config" / ".storage" / "energymaster").read_text())
         self.devs: list[SimZendureDevice] = []
         for dev_id, dev_cfg in cfg["data"]["zendure"]["devices"].items():

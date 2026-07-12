@@ -66,7 +66,6 @@ class Distribution(SolverEntry, EmDevice):
         self.devices = all_devices
         self.setpoint: int = 0
         self.manual_setpoint: int = 0
-        self._mode = DistributionMode.OFF
         self.auto: bool = False  # master: True = EnergyMaster drives the mode per slice, False = manual (mode select / HA)
         self.max_grid: int = 0
 
@@ -119,7 +118,6 @@ class Distribution(SolverEntry, EmDevice):
         if self.auto:
             self._apply_plan_mode()
         else:
-            self._mode = DistributionMode.OFF
             self.mode.update_value(DistributionMode.OFF.value)
             self._reset_dispatch()
             for d in self.devices:
@@ -167,15 +165,12 @@ class Distribution(SolverEntry, EmDevice):
 
     def _apply_plan_mode(self) -> None:
         m = self._plan_direction()
-        self._mode = m
         self.mode.update_value(m.value)  # reflect the plan-chosen mode in the UI select
         if self.auto:  # auto on: park the select on off; the plan drives the mode per slice
-            self._mode = DistributionMode.OFF
             self.mode.update_value(DistributionMode.OFF.value)
 
     async def load_state(self) -> None:
         await super().load_state()
-        self._mode = DistributionMode(self.mode.value or 0)
         self.manual_setpoint = int(self.manualpower.asNumber)  # restore-persisted manual power
         self.auto = bool(self.optimize.asNumber)  # restore-persisted master switch
 
@@ -258,7 +253,7 @@ class Distribution(SolverEntry, EmDevice):
             better = sum(t < price[0] for t in price) if charging else sum(t > price[0] for t in price)
 
             participants = []
-            for d in (self.charge_order if charging else self.discharge_order):  # GRID: order beperken tot prijsvenster-deelnemers
+            for d in self.charge_order if charging else self.discharge_order:  # GRID: order beperken tot prijsvenster-deelnemers
                 kwh15m = 0.25 * abs(d.profile[charging].power) / 1000
                 if kwh15m <= 0:
                     continue
@@ -294,21 +289,22 @@ class Distribution(SolverEntry, EmDevice):
         self.soc.update_value(self.available_kwh.asNumber / cap * 100.0 if cap else 0.0)
         self.autarky.update_value(max(0.0, min(100.0, (house - max(0, p1)) / house * 100.0)) if house > 0 else 0.0)
 
-        if self._mode == DistributionMode.MANUAL:
+        mode = DistributionMode(self.mode.asInt)
+        if mode == DistributionMode.MANUAL:
             setpoint = self.manual_setpoint
-        elif self._mode == DistributionMode.MATCHING_DISCHARGE:
+        elif mode == DistributionMode.MATCHING_DISCHARGE:
             setpoint = max(setpoint, 0)
-        elif self._mode == DistributionMode.MATCHING_CHARGE:
+        elif mode == DistributionMode.MATCHING_CHARGE:
             setpoint = min(setpoint, 0)
-        elif self._mode == DistributionMode.STORE_SOLAR:
+        elif mode == DistributionMode.STORE_SOLAR:
             setpoint = min(setpoint, 0) if solar > 0 else 0
-        elif self._mode == DistributionMode.PEAK_SHAVING:
+        elif mode == DistributionMode.PEAK_SHAVING:
             setpoint = max(0, setpoint - self.max_grid)
 
         if self.max_grid > 0:
             setpoint = max(setpoint, p1 + output - self.max_grid)
 
-        if self._mode == DistributionMode.OFF or abs(output - setpoint) < DEADBAND_W:
+        if mode == DistributionMode.OFF or abs(output - setpoint) < DEADBAND_W:
             return
         self.setpoint = setpoint
         dt = min(5.0, now - self._last_tick) if self._last_tick else 1.0
@@ -397,15 +393,14 @@ class Distribution(SolverEntry, EmDevice):
 
     async def update_mode(self, entity: EmSelect, _operation: Any) -> None:
         mode = DistributionMode(entity.value)
-        _LOGGER.info("Update operation: %s from: %s", mode, self._mode)
+        _LOGGER.info("Update operation: %s", mode)
 
-        self._mode = mode
         if mode != DistributionMode.OFF and (len(self.devices) == 0 or all(not d.online for d in self.devices)):
             _LOGGER.warning("No devices online, not possible to start the operation")
             persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", "EnergyMaster", "EnergyMaster")
             return
 
-        match self._mode:
+        match mode:
             case DistributionMode.OFF:
                 self._reset_dispatch()
                 for d in self.devices:
