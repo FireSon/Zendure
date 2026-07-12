@@ -78,7 +78,7 @@ async def main() -> None:
 
     p1_real = resample(series[P1_ENTITY], start.timestamp(), seconds)
     zendure_real = resample(series[ZENDURE_ENTITY], start.timestamp(), seconds)
-    house = [p1_real[s] + zendure_real[s] for s in range(seconds)]  # huislast: P1 ontdaan van de huidige batterij-regeling
+    house = [p1_real[s] + zendure_real[s] for s in range(seconds)]  # house load: P1 stripped of the current battery control
     print(f"house: min={min(house):.0f} max={max(house):.0f} mean={sum(house) / len(house):.0f} W")
 
     harness = SimHarness("replay")

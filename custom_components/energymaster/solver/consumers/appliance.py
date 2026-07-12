@@ -8,7 +8,7 @@ import numpy as np
 from ..solver import EntryStatus, LpSolver, SolverEntry
 from ...const import Phase
 
-_ON_THRESHOLD_W = 10.0  # verbruik hierboven = apparaat draait
+_ON_THRESHOLD_W = 10.0  # consumption above this = the appliance is running
 _INTERRUPT_WINDOW_S = 120.0  # only interrupt within this many seconds of a witnessed start
 
 

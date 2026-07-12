@@ -79,7 +79,7 @@ def _attach_stats(d: Distribution) -> None:
         setattr(d, a, _Stat())
 
 
-# --- dispatch (no solver run: _process_p1 builds order + gewichten lazily) ---
+# --- dispatch (no solver run: _process_p1 builds order + weights lazily) ---
 
 def test_discharge_prefers_fuller() -> None:
     full = StubDevice("full", soc=90.0)
@@ -87,7 +87,7 @@ def test_discharge_prefers_fuller() -> None:
     dist = _dist([empty, full], DistributionMode.MATCHING_DISCHARGE)
     tick(dist, 2000, 1000.0)
     assert full.commanded is not None and full.commanded > 0  # fuller unit discharges
-    assert empty.commanded is None  # idle en nooit gecommandeerd -> geen 0-spam
+    assert empty.commanded is None  # idle and never commanded -> no 0-spam
 
 
 def test_charge_prefers_emptier() -> None:
@@ -137,7 +137,7 @@ def test_deadband_does_not_dispatch() -> None:
     assert dev.commanded is None
 
 
-# --- order en gewichten per window ---
+# --- order and weights per window ---
 
 def test_discharge_order_ranks_by_soc() -> None:
     a = StubDevice("a", soc=30.0)
@@ -162,9 +162,9 @@ def test_second_unit_joins_via_make_before_break() -> None:
     b = StubDevice("b", soc=60.0)
     c = StubDevice("c", soc=95.0)
     dist = _dist([a, b, c], DistributionMode.MATCHING_DISCHARGE)
-    tick(dist, 4000, 1000.0)  # koude start: c direct actief
-    tick(dist, 4000, 1001.0)  # tekort 1815 W -> add-integraal 1815 Ws
-    tick(dist, 4000, 1002.0)  # integraal 3630 Ws >= 2000 -> b stapt in op START_W
+    tick(dist, 4000, 1000.0)  # cold start: c active immediately
+    tick(dist, 4000, 1001.0)  # shortfall 1815 W -> add integral 1815 Ws
+    tick(dist, 4000, 1002.0)  # integral 3630 Ws >= 2000 -> b enters at START_W
     assert c.commanded is not None and c.commanded > START_W  # fullest carries the load
     assert b.commanded == START_W  # make-before-break instap
     assert a.commanded is None  # emptiest stays off
@@ -190,12 +190,12 @@ def test_drop_needs_integral_and_cooldown() -> None:
     dist = _dist([a, b], DistributionMode.MATCHING_DISCHARGE)
     dist.discharge_order = [a, b]
     dist._active = [a, b]
-    # fase 1: integraal loopt vol (12 ticks x 1080 Ws tekort onder cap_low 1380) maar de cooldown blokkeert de drop
+    # phase 1: the integral fills (12 ticks x 1080 Ws below cap_low 1380) but the cooldown blocks the drop
     dist._last_add = 999.0
     for i in range(12):
         tick(dist, 300, 1000.0 + i)
     assert len(dist._active) == 2
-    # fase 2: cooldown verlopen -> zelfde onderschrijding dropt de laagst gerankte
+    # phase 2: cooldown expired -> the same shortfall drops the lowest-ranked device
     dist._last_add = 0.0
     dist._drop_ws = 0.0
     for i in range(12):
@@ -211,10 +211,10 @@ def test_direction_change_needs_integral() -> None:
     dist.charge_order = [a]
     dist._active = [a]
     a.setpoint = 800  # ontlaadt
-    tick(dist, -2000, 1000.0)  # richtingwissel-integraal 2000 < 3000: alleen afbouwen
-    assert a.commanded == 560  # ramp naar 0 met f_down (800 - 800*0.3)
+    tick(dist, -2000, 1000.0)  # direction integral 2000 < 3000: only ramp down
+    assert a.commanded == 560  # ramp toward 0 with f_down (800 - 800*0.3)
     assert dist._active == [a] and dist._charging is False
-    tick(dist, -2000, 1001.0)  # integraal 4000 >= 3000: wissel naar laden
+    tick(dist, -2000, 1001.0)  # integral 4000 >= 3000: switch to charging
     assert dist._charging is True
     assert a.commanded is not None and a.commanded < 0  # zelfde device laadt nu op
 
@@ -227,9 +227,9 @@ def test_shares_follow_weights_within_band() -> None:
     dist._active = [a, b]
     dist._weights[False] = {"a": 6.0, "b": 2.0}
     tick(dist, 2000, 1000.0)
-    assert a.commanded == 1050  # naar rato 6/8 van 2000 = 1500, geramp't met f_up 0.7
+    assert a.commanded == 1050  # pro rata 6/8 of 2000 = 1500, ramped with f_up 0.7
     assert b.commanded == 350  # restant 500, geramp't
-    # zware weging: a wordt geclampt op band_high (2185), b vangt het restant
+    # heavy weight: a is clamped at band_high (2185), b catches the remainder
     dist2 = _dist([a, b], DistributionMode.MATCHING_DISCHARGE)
     a.setpoint = b.setpoint = 0
     dist2.discharge_order = [a, b]
@@ -237,7 +237,7 @@ def test_shares_follow_weights_within_band() -> None:
     dist2._weights[False] = {"a": 100.0, "b": 1.0}
     tick(dist2, 3000, 1000.0)
     assert a.commanded == 1529  # band_high 2185 geramp't
-    # kleine weging: eerste device wordt opgetild naar de harde 10%-vloer (230)
+    # tiny weight: the first device is lifted to the hard 10% floor (230)
     dist3 = _dist([b, a], DistributionMode.MATCHING_DISCHARGE)
     a.setpoint = b.setpoint = 0
     dist3.discharge_order = [b, a]
@@ -252,12 +252,12 @@ def test_window_rotation_swaps_via_make_before_break() -> None:
     b = StubDevice("b", soc=60.0)
     dist = _dist([a, b], DistributionMode.MATCHING_DISCHARGE)
     dist._active = [b]
-    b.setpoint = 500  # b draagt de last van het vorige window
+    b.setpoint = 500  # b carries the load from the previous window
     dist._build_orders(1000.0)  # nieuwe kop is a -> rotatie via make-before-break
     assert dist._incoming is a and dist._swap_out is b
     tick(dist, 500, 1000.0)
-    assert a.commanded == START_W  # instap-probe
-    a.output = START_W  # de instapper levert echt
+    assert a.commanded == START_W  # entry probe
+    a.output = START_W  # the entrant actually delivers
     tick(dist, 500, 1001.0)
     assert dist._active == [a] and dist._incoming is None and dist._swap_out is None
     assert b.commanded == 0

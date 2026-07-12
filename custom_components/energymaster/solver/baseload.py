@@ -22,7 +22,7 @@ class BaseLoad(SolverEntry):
             lp.data("load_l2", "kW", 2, source="ha"),
             lp.data("load_l3", "kW", 2, source="ha"),
         ]
-        self.load = lp.data("load", "kW", 2, source="ha")  # aggregaat huislast (som l1/l2/l3) voor UI/plan
+        self.load = lp.data("load", "kW", 2, source="ha")  # aggregate house load (sum l1/l2/l3) for UI/plan
         self._loaded = None  # local date load_history last ran (None = not yet)
 
     async def entry_prerun(self, lp: LpSolver, now: datetime):

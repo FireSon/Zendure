@@ -31,23 +31,23 @@ class _Driver:
 
 
 class SimZendureDevice(ZendureDevice):
-    # Echt ZendureDevice; alleen de MQTT-write is afgevangen. Fysica + 1s-reports gesimuleerd.
+    # Real ZendureDevice; only the MQTT write is intercepted. Physics + 1s reports are simulated.
     def __init__(self, prodkey: str, config: dict, start_soc: float) -> None:
         super().__init__(None, prodkey, config, _Driver())
         for e in self.entities.values():
-            e.hass = None  # geen HA-loop in de sim
+            e.hass = None  # no HA loop in the sim
         self.connection.set_state(DeviceConnection.MQTT_LOCAL)
         p = self.profile[0]
-        p.power = _DISCHARGE_MAX.get(self.zendure_model.name, 800)  # live vullen reports dit; sim zet de echte ontlaadmax
-        p.__post_init__()  # floor en band volgen het aangepaste vermogen
+        p.power = _DISCHARGE_MAX.get(self.zendure_model.name, 800)  # live reports fill this; the sim sets the real discharge max
+        p.__post_init__()  # floor and band follow the adjusted power
         self.commands: list[dict] = []
         self._pending: int | None = None
         self._target = 0  # W uit laatste commando, +ontladen / -laden
         self._actual = 0.0
         self._soc_pct = start_soc
-        self._pending_at = 0.0  # moment waarop het openstaande commando effectief wordt
+        self._pending_at = 0.0  # moment the outstanding command takes effect
         self._report_at = 0.0
-        if self.capacity_kwh:  # accu-loze devices rapporteren geen SoC-properties; span 0 filtert ze uit de dispatch
+        if self.capacity_kwh:  # devices without packs report no SoC properties; span 0 filters them out of the dispatch
             self.update_properties({"properties": {"minSoc": 100, "socSet": 950, "electricLevel": int(start_soc)}}, 0.0)
 
     async def recover_connection(self) -> None:
@@ -56,7 +56,7 @@ class SimZendureDevice(ZendureDevice):
     def mqtt_publish(self, topic: str, command: dict) -> None:
         self.commands.append(command)
         if "function" not in command:
-            return  # properties/read etc. is no power command
+            return  # properties/read etc. is not a power command
         args = command["arguments"]
         if command["function"] == "deviceAutomation":  # Hyper
             v = args[0]["autoModelValue"]
@@ -66,7 +66,7 @@ class SimZendureDevice(ZendureDevice):
         self.command_reply()  # the real device acks receipt of a function invoke
 
     def tick(self, now: float, dt: float) -> None:
-        # pijplijn: een commando wordt ~lag na ontvangst effectief; nieuwere commando's overschrijven de waarde, niet de timer
+        # pipeline: a command takes effect ~lag after receipt; newer commands overwrite the value, not the timer
         lag_cold, lag_warm, ramp = _SIM_PHYSICS.get(self.zendure_model.name, (10.0, 4.0, 0.0))
         if self._pending is not None and self._pending_at == 0.0:
             self._pending_at = now + (lag_cold if self._actual == 0 else lag_warm)
@@ -272,17 +272,17 @@ class Metrics:
 
 class SimHarness:
     START_SOC = {"p0S70q2x": 95.0, "MPEt6K1P": 90.0, "Cd3wbW9V": 85.0, "Vw6mE0cP": 80.0, "BVng8146": 75.0, "9RUB1mW7": 70.0}
-    P1_INTERVAL = 1.0  # live krijgt de distributie elke seconde een P1-waarde
+    P1_INTERVAL = 1.0  # live, the distribution receives a P1 value every second
     NOISE_W = 50
     SOLAR_AVG_S = 60.0
-    ORDER_INTERVAL_S = 900.0  # order per 15-min window vast
+    ORDER_INTERVAL_S = 900.0  # the order is fixed per 15-min window
 
     def __init__(self, name: str) -> None:
         for cls in (EmSensor, EmNumber, EmBinarySensor, EmSelect, EmSwitch):
             cls.add = staticmethod(lambda *a, **k: None)
         self.dist = Distribution(None, [])
         for e in self.dist.entities.values():
-            e.hass = None  # geen HA-loop in de sim
+            e.hass = None  # no HA loop in the sim
         self.dist._mode = DistributionMode.MATCHING
         cfg = json.loads((Path(__file__).resolve().parents[2] / "config" / ".storage" / "energymaster").read_text())
         self.devs: list[SimZendureDevice] = []
@@ -294,13 +294,13 @@ class SimHarness:
         self._order_at = 0.0
 
     def _window_tick(self, sim_time: float) -> None:
-        # wat entry_postrun live doet: de 15-min orderbouw (wear-snapshots doen de devices zelf via on_telemetry)
+        # what entry_postrun does live: the 15-min order build (the devices keep their own wear snapshots via on_telemetry)
         if sim_time >= self._order_at:
             self._order_at = sim_time + self.ORDER_INTERVAL_S
             self.dist._build_orders(sim_time)
 
     async def run(self, schedule: list[ScheduledAppliance], duration_s: Optional[float] = None, seed: int = 42, p1_filter=None) -> Metrics:
-        # p1_filter: optionele bewerking (bijv. middeling) op de P1 die de REGELAAR ziet; metrics rekenen op de rauwe P1
+        # p1_filter: optional transform (e.g. averaging) on the P1 the CONTROLLER sees; metrics use the raw P1
         if duration_s is None:
             duration_s = max(sa.start_offset_s + sa.appliance.total_duration_s for sa in schedule)
         m = self.metrics
@@ -334,7 +334,7 @@ class SimHarness:
             noise = rng.randint(-self.NOISE_W, self.NOISE_W)
 
             for d in self.devs:
-                d.tick(sim_time, self.P1_INTERVAL)  # fysica + telemetrie-report door de echte verwerkingsketen
+                d.tick(sim_time, self.P1_INTERVAL)  # physics + telemetry report through the real processing chain
 
             fleet_output = sum(d.output_power() for d in self.devs)  # discharge positive
             p1 = loads_w - solar_instant - fleet_output + noise

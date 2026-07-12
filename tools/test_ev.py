@@ -75,7 +75,7 @@ async def main() -> None:
     lp.price_buy = SolverData("price_buy", "eur/kWh", data_size=204)
     lp.price_buy.data[12:108] = price96
     lp.price_sell = SolverData("price_sell", "eur/kWh", data_size=204)
-    lp.price_sell.data[12:108] = [p * 0.9 for p in price96]   # ruwe terugleverprijs voor de preview
+    lp.price_sell.data[12:108] = [p * 0.9 for p in price96]   # raw feed-in price for the preview
     lp.solar = SolverData("solar", "kW", data_size=204)
 
     ev = ElectricVehicle()

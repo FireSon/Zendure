@@ -43,7 +43,7 @@ async def main() -> None:
             pass
 
     await client.start_notify(CHAR_READ, on_notify)
-    await asyncio.sleep(2.0)  # ruimte voor de BLESPP-handshake
+    await asyncio.sleep(2.0)  # room for the BLESPP handshake
     await send({"messageId": 1001, "method": "WiFi.get"})
     await asyncio.sleep(15.0)  # antwoorden verzamelen
     await client.disconnect()

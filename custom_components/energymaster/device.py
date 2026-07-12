@@ -18,11 +18,11 @@ from .sensor import EmSensor
 _LOGGER = logging.getLogger(__name__)
 
 FLOOR_PCT = 0.10  # device floor as a fraction of rated power
-BAND_LOW_PCT = 0.30  # inverter-band ondergrens (laatste/enige actieve device mag eronder)
-BAND_HIGH_PCT = 0.95  # inverter-band bovengrens
-DEADBAND_W = 20  # kleinste vermogensverschil dat een nieuw commando waard is
-SNAPSHOT_INTERVAL_S = 3600.0  # wear: uurlijkse snapshot van de eigen doorzet-tellers
-WEAR_WINDOW_S = 7 * 86400.0  # wear = delta van de doorzet-tellers over 7 dagen
+BAND_LOW_PCT = 0.30  # inverter band lower edge (the last/only active device may run below it)
+BAND_HIGH_PCT = 0.95  # inverter band upper edge
+DEADBAND_W = 20  # smallest power change worth a new command
+SNAPSHOT_INTERVAL_S = 3600.0  # wear: hourly snapshot of the device's own throughput counters
+WEAR_WINDOW_S = 7 * 86400.0  # wear = delta of the throughput counters over 7 days
 SLEEP_AFTER_S = 60.0  # device task: after 1 minute of nothing to do, enter power-save (if the driver supports it)
 TIMEOUT_FACTOR = 2.0  # busy timeout = expected processing time x this factor
 STALE_AFTER_S = 90.0  # no telemetry or activity for this long (while awake) -> OFFLINE
@@ -63,10 +63,12 @@ class PowerProfile:
     f_up: float = 0.7
     f_down: float = 0.3
 
-    def __post_init__(self):
-        self.floor = int(self.power * FLOOR_PCT)
-        self.band_low = int(abs(self.power) * BAND_LOW_PCT)
-        self.band_high = int(abs(self.power) * BAND_HIGH_PCT)
+    def __post_init__(self, max_watts: int | None = None):
+        # floor and band follow the deliverable max (thermal derating); power itself stays the hardware max
+        limit = min(abs(self.power), max_watts) if max_watts is not None else abs(self.power)
+        self.floor = int(limit * FLOOR_PCT) * (1 if self.power >= 0 else -1)
+        self.band_low = int(limit * BAND_LOW_PCT)
+        self.band_high = int(limit * BAND_HIGH_PCT)
 
 
 class PowerProfileDischarge(PowerProfile):
@@ -102,7 +104,7 @@ class PowerDevice(EmDevice):
         self.setpoint: int = 0
         self.score: list[float] = [0.0, 0.0]  # [discharge, charge] selection score, set in Distribution
         self._prev_output: int = 0
-        self._wear_snapshots: list = []  # [timestamp, doorzet-kWh] per uur, 7 dagen; restored via de device-Store
+        self._wear_snapshots: list = []  # [timestamp, throughput kWh] hourly, 7 days; restored via the device Store
         self._wear_snapshot_at: float = 0.0
         self._restore.append("_wear_snapshots")
 
@@ -169,6 +171,13 @@ class PowerDevice(EmDevice):
             key = str(int(self.temp.asNumber))
             if key in curve and abs(actual) > curve[key]:
                 curve[key] = abs(actual)  # live evidence: the device proves it can do more at this temperature
+
+        # floor and band track the deliverable max at the current temperature, so the dispatch bands shift along
+        if self.temp._state is not None:
+            key = str(int(self.temp.asNumber))
+            for charging in (False, True):
+                p = self.profile[charging]
+                p.__post_init__(self._derate_curve[charging].get(key))
         self._task_event.set()  # wake the device task: fresh telemetry may confirm a pending command
         if now >= self._wear_snapshot_at:
             self._wear_snapshot_at = now + SNAPSHOT_INTERVAL_S
@@ -188,7 +197,7 @@ class PowerDevice(EmDevice):
         return self.request_power(signed)
 
     def wear_cycles(self) -> float:
-        """Equivalente volle cycli over de wear-window: delta van de eigen doorzet-tellers; teller-reset -> 0."""
+        """Equivalent full cycles over the wear window: delta of the device's own throughput counters; a counter reset -> 0."""
         current = getattr(self, "battery_input_aggr", EmEntity.Empty).asNumber + getattr(self, "battery_output_aggr", EmEntity.Empty).asNumber
         baseline = min(self._wear_snapshots[0][1], current) if self._wear_snapshots else current
         return (current - baseline) / self.capacity_kwh if self.capacity_kwh else 0.0
