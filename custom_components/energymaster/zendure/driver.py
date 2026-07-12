@@ -344,6 +344,7 @@ class ZendureDriver:
                 sn = json.loads(msg.payload.decode("utf-8", "ignore")).get("log").get("sn")
                 d = ZendureDevice(self.hass, prodkey, {"deviceid": deviceId, "sn": sn}, self)
                 self.devices[deviceId] = d
+                d.start_task()
                 self._save_devices()
                 _LOGGER.info("Discovered device %s (%s), awaiting acceptance", deviceId, prodkey)
             d._mqtt = client
@@ -351,8 +352,12 @@ class ZendureDriver:
             match topics[3]:
                 case "properties/report":
                     d.update_properties(json.loads(msg.payload.decode("utf-8", "ignore")), time.time())
-                    d._offline = time.time() + 60
                     d.connection.update_value(conn)
+
+                case "function/invoke/reply":
+                    payload = json.loads(msg.payload.decode("utf-8", "ignore"))
+                    if payload.get("messageId") == d._cmd_msg_id:
+                        d.command_reply()  # device confirms receipt of the last power command
 
                 case "register":
                     payload = json.loads(msg.payload.decode("utf-8", "ignore"))

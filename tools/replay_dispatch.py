@@ -18,6 +18,7 @@ spec = importlib.util.spec_from_file_location("conftest", ROOT / "tests" / "conf
 conftest = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(conftest)
 
+from tests.distribution.test_device_task import pump_device  # noqa: E402
 from tests.distribution.test_simulation import SimHarness  # noqa: E402
 
 P1_ENTITY = "sensor.power_actual"
@@ -99,9 +100,11 @@ async def main() -> None:
         harness._window_tick(sim_time)
         for device in harness.devs:
             device.tick(sim_time, 1.0)
-        fleet = sum(device.output_power(sim_time) for device in harness.devs)
+        fleet = sum(device.output_power() for device in harness.devs)
         p1_sim = int(house[second] - fleet)
         await harness.dist._process_p1(p1_sim, now=sim_time)
+        for device in harness.devs:
+            await pump_device(device, sim_time)  # the real device task logic runs on simulated time
 
         real_import_wh += max(0.0, p1_real[second]) / 3600.0
         real_export_wh += max(0.0, -p1_real[second]) / 3600.0

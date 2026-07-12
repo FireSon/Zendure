@@ -123,7 +123,7 @@ class Distribution(SolverEntry, EmDevice):
             self.mode.update_value(DistributionMode.OFF.value)
             self._reset_dispatch()
             for d in self.devices:
-                await d.power_off()
+                d.request_power(0)
 
     def _plan_direction(self) -> DistributionMode:
         # the mode implied by the solver plan for the current slot, mapped to a selectable mode
@@ -278,7 +278,7 @@ class Distribution(SolverEntry, EmDevice):
 
         output = 0
         for d in self.devices:
-            output += d.output_power(now)
+            output += d.output_power()
             solar += d.solar.asNumber
         setpoint = p1 + output
 
@@ -321,10 +321,10 @@ class Distribution(SolverEntry, EmDevice):
             self._direction_ws += sp * dt
             if self._direction_ws < DIRECTION_WS:
                 for d in self._active:
-                    await d.ramp_to(0.0, self._charging, now)
+                    d.ramp_to(0.0, self._charging)
                 return
             for d in self._active:
-                await d.on_setpoint(0, d.profile[self._charging], now)
+                d.request_power(0)
             self._active = []
             self._incoming = self._swap_out = None
             self._add_ws = self._drop_ws = 0.0
@@ -336,14 +336,14 @@ class Distribution(SolverEntry, EmDevice):
             order = self.charge_order if charging_wanted else self.discharge_order
 
         # make-before-break: inkomend device wordt volwaardig lid zodra het echt levert
-        if self._incoming is not None and abs(self._incoming.output_power(now)) >= ACTIVE_W:
+        if self._incoming is not None and abs(self._incoming.output_power()) >= ACTIVE_W:
             self._active.append(self._incoming)
             self._active.sort(key=lambda d: order.index(d) if d in order else 99)
             self._incoming = None
             if self._swap_out is not None:
                 if self._swap_out in self._active:
                     self._active.remove(self._swap_out)
-                    await self._swap_out.on_setpoint(0, self._swap_out.profile[self._charging], now)
+                    self._swap_out.request_power(0)
                 self._swap_out = None
 
         # bijschakelen: integraal van het tekort boven de 95%-band; lege set schakelt direct
@@ -370,7 +370,7 @@ class Distribution(SolverEntry, EmDevice):
                 self._drop_ws += (cap_low - sp) * dt
                 if self._drop_ws >= DROP_WS and now - self._last_add > DROP_COOLDOWN_S:
                     dropped = self._active.pop()
-                    await dropped.on_setpoint(0, dropped.profile[self._charging], now)
+                    dropped.request_power(0)
                     self._drop_ws = 0.0
             else:
                 self._drop_ws = 0.0
@@ -388,12 +388,12 @@ class Distribution(SolverEntry, EmDevice):
                 share = max(share, abs(p.floor))  # harde 10%-vloer overrult naar-rato
             share = max(0.0, min(share, p.band_high, remainder))
             remainder -= share
-            await d.ramp_to(share, self._charging, now)
+            d.ramp_to(share, self._charging)
         if self._incoming is not None:
-            await self._incoming.on_setpoint(-START_W if self._charging else START_W, self._incoming.profile[self._charging], now)  # vaste instap-probe, geen ramp
+            self._incoming.request_power(-START_W if self._charging else START_W)  # vaste instap-probe, geen ramp
         for d in self.devices:
             if d not in self._active and d is not self._incoming and d.setpoint != 0:
-                await d.on_setpoint(0, d.profile[self._charging], now)
+                d.request_power(0)
 
     async def update_mode(self, entity: EmSelect, _operation: Any) -> None:
         mode = DistributionMode(entity.value)
@@ -408,6 +408,5 @@ class Distribution(SolverEntry, EmDevice):
         match self._mode:
             case DistributionMode.OFF:
                 self._reset_dispatch()
-                if len(self.devices) > 0:
-                    for d in self.devices:
-                        await d.power_off()
+                for d in self.devices:
+                    d.request_power(0)

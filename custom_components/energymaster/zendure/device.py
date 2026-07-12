@@ -19,7 +19,7 @@ from homeassistant.core import HomeAssistant
 
 
 from ..const import Phase
-from ..device import DeviceConnection, PowerDevice, PowerProfile, PowerProfileCharge, PowerProfileDischarge
+from ..device import DeviceConnection, PowerDevice, PowerProfileCharge, PowerProfileDischarge
 from .battery import ZendureBattery
 from ..binary_sensor import EmBinarySensor
 from ..number import EmNumber
@@ -59,7 +59,7 @@ _BLEHTTP = [
 ]
 
 _HEMSEP = (
-    (10.0, 4.0, 0, 3.0, 0.7, 0.3),
+    (3.0, 0.7, 0.3),  # redirect_window, f_up, f_down
     "function/invoke",
     '{"function":"hemsEP","arguments":{"outputPower":0,"chargeState":0,"chargePower":0,"mode":0,"freq":0}}',
     '{"function":"hemsEP","arguments":{"outputPower":0,"chargeState":1,"chargePower":%i,"mode":9,"freq":0}}',
@@ -67,7 +67,7 @@ _HEMSEP = (
 )
 
 _HYPER = (
-    (12.0, 5.0, 200.0, 3.0, 0.7, 0.3),
+    (3.0, 0.7, 0.3),  # redirect_window, f_up, f_down
     "function/invoke",
     '{"function":"deviceAutomation","arguments":[{"autoModelProgram":0,"autoModel":0,"msgType":1,"autoModelValue":{"chargingType":0,"chargingPower":0,"freq":0,"outPower":0}}]}',
     '{"function":"deviceAutomation","arguments":[{"autoModelProgram":1,"autoModel":8,"msgType":1,"autoModelValue":{"chargingType":1,"price":2,"chargingPower":%i,"prices":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],"outPower":0,"freq":0}}]}',
@@ -142,6 +142,7 @@ class ZendureDevice(PowerDevice):
         self._ble_last_response: dict = {}
         self._ble_response_method: str = ""
         self._msg_id: int = 100000
+        self._cmd_msg_id: int = 0  # messageId of the last power command, matched against the function/invoke reply
         self._driver = driver
         self.batteries: dict[str, ZendureBattery | None] = {}
         self.on_update = driver.on_update
@@ -204,74 +205,55 @@ class ZendureDevice(PowerDevice):
                     self.on_update(self)
                 self.on_telemetry(int(self.home_output.asNumber) - int(self.home_input.asNumber), now)
 
-    async def on_setpoint(self, watts: int, p: PowerProfile, now: float) -> int:
-        """Send setpoint to device via MQTT/HTTP/BLE."""
-        watts = await super().on_setpoint(watts, p, now)
-
+    def set_power(self, watts: int, sleep: bool = False) -> None:
+        """Send the power command fire-and-forget via MQTT/HTTP/BLE; the sleep hint is ignored until Zendure power-save is implemented."""
         match self.connection.asInt:
             case DeviceConnection.MQTT_CLOUD | DeviceConnection.MQTT_LOCAL:
                 # via mqtt_publish so the command gets the messageId/timestamp/deviceId envelope the device expects
                 payload = self._cmd_power[0] if watts == 0 else self._cmd_power[1 if watts < 0 else 2] % abs(watts)
+                self._acked = False  # this transport replies: expect the ack; lowered before publish since the reply may arrive instantly
                 self.mqtt_publish(self._cmd_topic, json.loads(payload))
+                self._cmd_msg_id = self._msg_id  # the function/invoke reply carrying this messageId acks the command
 
             case DeviceConnection.HTTP:
-                try:
-                    payload = _BLEHTTP[0] if watts == 0 else _BLEHTTP[1 if watts < 0 else 2] % abs(watts)
-                    async with ClientSession() as session:
-                        await session.post(f"http://{self.ip}/properties/write", data=payload, headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT)
-                except Exception:
-                    _LOGGER.warning("HTTP write failed for %s (%s)", self.name, self.ip)
+                payload = _BLEHTTP[0] if watts == 0 else _BLEHTTP[1 if watts < 0 else 2] % abs(watts)
+                self.hass.async_create_task(self._http_write(payload))
 
             case DeviceConnection.BLE:
                 payload = _BLEHTTP[0] if watts == 0 else _BLEHTTP[1 if watts < 0 else 2] % abs(watts)
-                await self.ble_command(json.loads(payload), "write")
-        return watts
+                self.hass.async_create_task(self.ble_command(json.loads(payload), "write"))
 
-    async def _recover_fallback(self) -> None:
-        """Fallback polling: HTTP -> BLE connect -> BLE poll."""
-        interval = 3.0
+    async def _http_write(self, payload: str) -> None:
         try:
-            while True:
-                now = time.time()
-                self.connection.update_value(DeviceConnection.OFFLINE)
+            async with ClientSession() as session:
+                await session.post(f"http://{self.ip}/properties/write", data=payload, headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT)
+        except Exception:
+            _LOGGER.warning("HTTP write failed for %s (%s)", self.name, self.ip)
 
-                self.mqtt_publish("properties/read", {"properties": ["getAll"]})
+    async def recover_connection(self) -> None:
+        """One recovery attempt: MQTT poke, BLE poll or HTTP read; success shows up as fresh telemetry."""
+        self.connection.update_value(DeviceConnection.OFFLINE)
+        self.mqtt_publish("properties/read", {"properties": ["getAll"]})
 
-                if self._ble_client:
-                    if self._ble_client.is_connected or await self.ble_connect():
-                        try:
-                            payload = _BLEHTTP[1] % 100
-                            await self.ble_command(json.loads(payload), "write")
-                            await self.ble_wait_for("write_reply", timeout=3)
-                        except Exception as ex:
-                            _LOGGER.warning("BLE write failed for %s (%s): %s", self.name, self.blemac, ex)
-
-                        props = ["getAll"] if self._msg_id % 10 == 0 else ["gridInputPower", "outputHomePower", "outputPackPower", "packInputPower", "solarInputPower"]
-                        await self.ble_command({"properties": props, "method": "read"})
-                        try:
-                            while True:
-                                resp = await self.ble_wait_for(timeout=interval)
-                                self.update_properties(resp, time.time())
-                                self.connection.update_value(DeviceConnection.BLE)
-                        except asyncio.TimeoutError:
-                            pass
-                elif self.ip:
-                    try:
-                        async with ClientSession() as session:
-                            async with session.get(f"http://{self.ip}/properties/report", headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT) as resp:
-                                self.update_properties(await resp.json(), now)
-                                self.connection.update_value(DeviceConnection.HTTP)
-                    except Exception:
-                        _LOGGER.warning("HTTP read failed for %s (%s)", self.name, self.ip)
-                elif self.blemac:
-                    await self.ble_connect()
-
-                interval = 3.0 if self.connection.asInt != DeviceConnection.OFFLINE else min(interval * 2, 1800.0)
-                if self.connection.asInt != DeviceConnection.BLE:
-                    await asyncio.sleep(interval)
-        except asyncio.CancelledError:
-            if self._ble_client:
-                await self.ble_disconnect()
+        if self._ble_client or self.blemac:
+            if (self._ble_client and self._ble_client.is_connected) or await self.ble_connect():
+                props = ["getAll"] if self._msg_id % 10 == 0 else ["gridInputPower", "outputHomePower", "outputPackPower", "packInputPower", "solarInputPower"]
+                await self.ble_command({"properties": props, "method": "read"})
+                try:
+                    while True:
+                        resp = await self.ble_wait_for(timeout=3.0)
+                        self.update_properties(resp, time.time())
+                        self.connection.update_value(DeviceConnection.BLE)
+                except asyncio.TimeoutError:
+                    pass
+        elif self.ip:
+            try:
+                async with ClientSession() as session:
+                    async with session.get(f"http://{self.ip}/properties/report", headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT) as resp:
+                        self.update_properties(await resp.json(), time.time())
+                        self.connection.update_value(DeviceConnection.HTTP)
+            except Exception:
+                _LOGGER.warning("HTTP read failed for %s (%s)", self.name, self.ip)
 
     def mqtt_publish(self, topic: str, command: dict) -> None:
         """Send a JSON command to the device via MQTT."""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from enum import IntEnum
 import logging
 from collections.abc import Callable
@@ -206,29 +207,33 @@ class LpSolver:
             row_lower.append(-inf if lo_v is None else lo_v)
             row_upper.append(inf if hi_v is None else hi_v)
 
-        lp = highspy.HighsLp()
-        lp.num_col_ = len(self.cost)
-        lp.num_row_ = len(self._rows)
-        lp.col_cost_ = self.cost
-        lp.col_lower_ = self.lower
-        lp.col_upper_ = self.upper
-        lp.row_lower_ = np.asarray(row_lower, float)
-        lp.row_upper_ = np.asarray(row_upper, float)
-        lp.a_matrix_.format_ = highspy.MatrixFormat.kRowwise
-        lp.a_matrix_.start_ = np.asarray(start)
-        lp.a_matrix_.index_ = np.asarray(index)
-        lp.a_matrix_.value_ = np.asarray(value, float)
+        def solve():
+            # compute-heavy block, runs in an executor thread; only reads the arrays built above
+            lp = highspy.HighsLp()
+            lp.num_col_ = len(self.cost)
+            lp.num_row_ = len(self._rows)
+            lp.col_cost_ = self.cost
+            lp.col_lower_ = self.lower
+            lp.col_upper_ = self.upper
+            lp.row_lower_ = np.asarray(row_lower, float)
+            lp.row_upper_ = np.asarray(row_upper, float)
+            lp.a_matrix_.format_ = highspy.MatrixFormat.kRowwise
+            lp.a_matrix_.start_ = np.asarray(start)
+            lp.a_matrix_.index_ = np.asarray(index)
+            lp.a_matrix_.value_ = np.asarray(value, float)
 
-        h = highspy.Highs()
-        h.setOptionValue("output_flag", False)
-        h.setOptionValue("time_limit", 30.0)
-        h.passModel(lp)
-        h.run()
-        self._last_lp_status = 0 if h.getModelStatus() == highspy.HighsModelStatus.kOptimal else 1
+            solver = highspy.Highs()
+            solver.setOptionValue("output_flag", False)
+            solver.setOptionValue("time_limit", 30.0)
+            solver.passModel(lp)
+            solver.run()
+            return solver.getModelStatus(), np.asarray(solver.getSolution().col_value, float)
+
+        status, x = await asyncio.get_running_loop().run_in_executor(None, solve)
+        self._last_lp_status = 0 if status == highspy.HighsModelStatus.kOptimal else 1
         if self._last_lp_status != 0:
-            _LOGGER.warning("LP solve not optimal: %s", h.getModelStatus())
+            _LOGGER.warning("LP solve not optimal: %s", status)
             return None
-        x = np.asarray(h.getSolution().col_value, float)
         for col in self._columns:
             if col.dest is not None:
                 col.dest.data[12 : 12 + self.horizon] = x[col.index : col.index + self.horizon]

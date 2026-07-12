@@ -111,11 +111,12 @@ class Coordinator:
             await d.connect()
             await d.cloud_connect()
 
-        # restore persisted entity states (mode, soc knobs) into the devices
+        # restore persisted entity states (mode, soc knobs) into the devices, then start each device task
         await self.distribution.load_state()
         for d in self.drivers:
             for dev in d.devices.values():
                 await dev.load_state()
+                dev.start_task()
 
         # Initialize the Solver + SolverEntries
         self.solver.init([self.prices, self.forecast, self.baseload, self.distribution, *self.consumers])
@@ -147,6 +148,8 @@ class Coordinator:
             unsub()
         self._unsubs = []
         for d in self.drivers:
+            for dev in d.devices.values():
+                dev.stop_task()
             await d.disconnect()
 
     def _save_config(self) -> None:

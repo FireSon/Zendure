@@ -18,8 +18,10 @@ from custom_components.energymaster.select import EmSelect
 from custom_components.energymaster.sensor import EmSensor
 from custom_components.energymaster.switch import EmSwitch
 from custom_components.energymaster.zendure.device import ZendureDevice
+from tests.distribution.test_device_task import pump_device
 
 _DISCHARGE_MAX = {"SF2400AC": 2400, "SF2400AC_PLUS": 2400, "SF2400PRO": 2400, "SF1600AC": 1600, "SF1600AC_PLUS": 1600, "HYPER2000": 1200, "SF800": 800, "SF800PRO": 800}
+_SIM_PHYSICS = {"HYPER2000": (12.0, 5.0, 200.0)}  # lag_cold, lag_warm, ramp W/s (0 = step); default = SF-gedrag
 
 
 class _Driver:
@@ -48,27 +50,33 @@ class SimZendureDevice(ZendureDevice):
         if self.capacity_kwh:  # accu-loze devices rapporteren geen SoC-properties; span 0 filtert ze uit de dispatch
             self.update_properties({"properties": {"minSoc": 100, "socSet": 950, "electricLevel": int(start_soc)}}, 0.0)
 
+    async def recover_connection(self) -> None:
+        self.commands.append({"recover": True})  # no real BLE/HTTP attempts from the sim
+
     def mqtt_publish(self, topic: str, command: dict) -> None:
         self.commands.append(command)
+        if "function" not in command:
+            return  # properties/read etc. is no power command
         args = command["arguments"]
         if command["function"] == "deviceAutomation":  # Hyper
             v = args[0]["autoModelValue"]
             self._pending = -v["chargingPower"] if args[0]["autoModelProgram"] == 1 else v["outPower"]
         elif command["function"] == "hemsEP":  # SF-modellen
             self._pending = -args["chargePower"] if args["chargeState"] else args["outputPower"]
+        self.command_reply()  # the real device acks receipt of a function invoke
 
     def tick(self, now: float, dt: float) -> None:
         # pijplijn: een commando wordt ~lag na ontvangst effectief; nieuwere commando's overschrijven de waarde, niet de timer
+        lag_cold, lag_warm, ramp = _SIM_PHYSICS.get(self.zendure_model.name, (10.0, 4.0, 0.0))
         if self._pending is not None and self._pending_at == 0.0:
-            p = self.profile[self._pending < 0]
-            self._pending_at = now + (p.lag_cold if self._actual == 0 else p.lag_warm)  # lag uit het profiel
+            self._pending_at = now + (lag_cold if self._actual == 0 else lag_warm)
         if self._pending is not None and now >= self._pending_at:
             self._target, self._pending, self._pending_at = self._pending, None, 0.0
         p = self.profile[self._target < 0]
         target = max(-abs(p.power), min(abs(p.power), self._target))
         if self.capacity_kwh == 0 or target > 0 and self._soc_pct <= self.soc_min.asNumber or target < 0 and self._soc_pct >= self.soc_max.asNumber:
             target = 0
-        self._actual = float(target) if p.ramp_rate == 0 else self._actual + max(-p.ramp_rate * dt, min(p.ramp_rate * dt, target - self._actual))
+        self._actual = float(target) if ramp == 0 else self._actual + max(-ramp * dt, min(ramp * dt, target - self._actual))
         if self.capacity_kwh:
             self._soc_pct = max(0.0, min(100.0, self._soc_pct - self._actual * dt / 3600.0 / (self.capacity_kwh * 10)))
             aggr = self.battery_output_aggr if self._actual > 0 else self.battery_input_aggr  # kWh-tellers zoals live (wear-bron)
@@ -328,11 +336,13 @@ class SimHarness:
             for d in self.devs:
                 d.tick(sim_time, self.P1_INTERVAL)  # fysica + telemetrie-report door de echte verwerkingsketen
 
-            fleet_output = sum(d.output_power(sim_time) for d in self.devs)  # discharge positive
+            fleet_output = sum(d.output_power() for d in self.devs)  # discharge positive
             p1 = loads_w - solar_instant - fleet_output + noise
 
             self.dist.solar = [solar_w]
             await self.dist._process_p1(p1 if p1_filter is None else int(p1_filter(p1)), now=sim_time)
+            for d in self.devs:
+                await pump_device(d, sim_time)  # the real device task logic runs on simulated time
 
             m.total_ticks += 1
             if p1 > 0:
