@@ -16,6 +16,9 @@ from .entity import EmDevice, EmEntity
 
 _LOGGER = logging.getLogger(__name__)
 
+AGGREGATE_MAX_GAP_S = 300.0  # longer telemetry gaps are not integrated: the device state was unknown
+AGGREGATE_PUSH_S = 60.0  # the counter integrates every telemetry tick but pushes to HA at most this often
+
 
 async def async_setup_entry(
     _hass: HomeAssistant,
@@ -76,6 +79,7 @@ class EmSensor(SensorEntity, EmEntity):
             )
             aggr._last_value = 0.0
             aggr._last_update = 0.0
+            aggr._last_push = 0.0
             self._aggr = aggr
             setattr(device, aggr_key, aggr)
             aggr.register(device, aggr_key)
@@ -89,23 +93,32 @@ class EmSensor(SensorEntity, EmEntity):
             value = value
         else:
             value = round(value, self._cfg_precision)
+
+        # integrate on every report, also unchanged ones: otherwise hours of constant power are lost on a restart
+        if self._aggr is not None:
+            self._aggr._aggregate(value)
+
         if self._state == value:
             return False
         self._state = value
         self._attr_native_value = value
-        if self._aggr is not None:
-            self._aggr._aggregate(value)
         return True
 
     def _aggregate(self, watts: float) -> None:
         """Accumulate kWh from watts."""
-        now = time.time()
-        if self._last_update > 0:
+        # monotonic clock: NTP jumps and suspends must not distort the integration
+        now = time.monotonic()
+
+        # integrate the previous power over the elapsed interval; after a long gap the device state was unknown, so only re-prime
+        if 0 < self._last_update and now - self._last_update <= AGGREGATE_MAX_GAP_S:
             dt_h = (now - self._last_update) / 3600.0
             kwh = (self._state or 0.0) + self._last_value * dt_h / 1000.0
             self._state = kwh
             self._attr_native_value = kwh
-            if self.hass and self.hass.loop.is_running():
+
+            # the counter updates every telemetry tick; throttle the HA push to spare the recorder
+            if now - self._last_push >= AGGREGATE_PUSH_S and self.hass and self.hass.loop.is_running():
+                self._last_push = now
                 self.schedule_update_ha_state()
         self._last_value = watts
         self._last_update = now

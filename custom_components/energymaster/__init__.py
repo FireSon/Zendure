@@ -36,7 +36,7 @@ async def _async_register_frontend(hass) -> None:
 
     frontend_dir = Path(__file__).resolve().parent / "frontend"
     bundle = frontend_dir / "EnergyMaster-panel.js"
-    version = int(bundle.stat().st_mtime) if bundle.exists() else 0  # cache-buster: bundle mtime -> ?v=
+    version = await hass.async_add_executor_job(lambda: int(bundle.stat().st_mtime) if bundle.exists() else 0)  # cache-buster: bundle mtime -> ?v=; stat off the event loop
 
     if not hass.data.get(f"{DOMAIN}_frontend"):
         hass.data[f"{DOMAIN}_frontend"] = True

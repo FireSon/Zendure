@@ -239,7 +239,10 @@ class LpSolver:
                 col.dest.data[12 : 12 + self.horizon] = x[col.index : col.index + self.horizon]
 
         for entry in self._entries:
-            entry.entry_postrun(self)
+            try:
+                entry.entry_postrun(self)
+            except Exception:
+                _LOGGER.exception("entry_postrun failed for %s", type(entry).__name__)
         return x
 
     def phase_room(self, phase: Phase, idx: int, total: float) -> float:
@@ -262,7 +265,7 @@ class LpSolver:
         return data
 
     def plan(self) -> list[dict]:
-        # UI get_plan: elke SolverData als 96-slot serie, slot 0 = nu (index 12)
+        # UI get_plan: every SolverData as its full slot series (12 history slots first, index 12 = now)
         return [{"id": sd.id, "uom": sd.uom, "source": sd.source, "values": list(sd.data)} for sd in self._data]
 
     def column(self, cost: float = 0.0, lo: float = 0.0, hi: float = highspy.kHighsInf, tags=(), dest=None):

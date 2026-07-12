@@ -12,10 +12,11 @@ import time
 from enum import Enum
 
 import paho.mqtt.client as mqtt
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientTimeout
 from bleak import BleakClient
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 
 from ..const import Phase
@@ -225,8 +226,8 @@ class ZendureDevice(PowerDevice):
 
     async def _http_write(self, payload: str) -> None:
         try:
-            async with ClientSession() as session:
-                await session.post(f"http://{self.ip}/properties/write", data=payload, headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT)
+            session = async_get_clientsession(self.hass)  # HA's shared session, never closed here
+            await session.post(f"http://{self.ip}/properties/write", data=payload, headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT)
         except Exception:
             _LOGGER.warning("HTTP write failed for %s (%s)", self.name, self.ip)
 
@@ -248,10 +249,10 @@ class ZendureDevice(PowerDevice):
                     pass
         elif self.ip:
             try:
-                async with ClientSession() as session:
-                    async with session.get(f"http://{self.ip}/properties/report", headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT) as resp:
-                        self.update_properties(await resp.json(), time.time())
-                        self.connection.update_value(DeviceConnection.HTTP)
+                session = async_get_clientsession(self.hass)  # HA's shared session, never closed here
+                async with session.get(f"http://{self.ip}/properties/report", headers=SF_HTTP_HEADER, timeout=SF_HTTP_TIMEOUT) as resp:
+                    self.update_properties(await resp.json(), time.time())
+                    self.connection.update_value(DeviceConnection.HTTP)
             except Exception:
                 _LOGGER.warning("HTTP read failed for %s (%s)", self.name, self.ip)
 

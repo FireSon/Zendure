@@ -13,11 +13,13 @@ from datetime import datetime
 from typing import Any, Callable
 
 import paho.mqtt.client as mqtt
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientTimeout
 
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from ..device import DeviceConnection, EmDevice, PowerDevice
+from .battery import ZendureBattery
 from .device import ZendureDevice, _PRODKEY
 from .smartmeter import ZendureSmartMeter
 
@@ -151,14 +153,14 @@ class ZendureDriver:
 
                 headers = {"Content-Type": "application/json", "timestamp": str(timestamp), "nonce": nonce, "clientid": "zenHa", "sign": sign}
 
-                async with ClientSession() as session:
-                    async with session.post(
-                        f"{api_url}/api/ha/deviceList",
-                        json={"appKey": app_key},
-                        headers=headers,
-                        timeout=ClientTimeout(total=10),
-                    ) as resp:
-                        data = await resp.json()
+                session = async_get_clientsession(self.hass)  # HA's shared session, never closed here
+                async with session.post(
+                    f"{api_url}/api/ha/deviceList",
+                    json={"appKey": app_key},
+                    headers=headers,
+                    timeout=ClientTimeout(total=10),
+                ) as resp:
+                    data = await resp.json()
 
                 code = data.get("code")
                 meta.update({"last_sync_ts": int(time.time()), "http_code": code, "msg": data.get("msg", ""), "devices": []})
@@ -227,6 +229,7 @@ class ZendureDriver:
             client.disconnect()
             client.loop_stop()
         self._mqtt_clients.clear()
+        ZendureBattery._registry.clear()  # class-level registry must not hand out stale instances after a reload
 
     def _save_devices(self) -> None:
         """Snapshot devices and smartmeters into shared config and persist.
@@ -277,7 +280,11 @@ class ZendureDriver:
 
     def _on_mqtt_connect(self, client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info("MQTT [%s] connected, rc=%s", userdata, rc)
-        client.subscribe("/#")
+        if userdata == DeviceConnection.MQTT_LOCAL:
+            client.subscribe("/#")  # local broker: everything, discovery needs it
+        else:
+            for d in self.devices.values():  # cloud broker is multi-tenant: only our own devices
+                client.subscribe(f"/{d.prodkey}/{d.device_id}/#")
 
     def _on_mqtt_disconnect(self, client: Any, userdata: Any, _flags: Any, rc: Any, _props: Any) -> None:
         _LOGGER.info("MQTT [%s] disconnected, rc=%s", userdata, rc)
@@ -347,7 +354,8 @@ class ZendureDriver:
                 d.start_task()
                 self._save_devices()
                 _LOGGER.info("Discovered device %s (%s), awaiting acceptance", deviceId, prodkey)
-            d._mqtt = client
+            if d._mqtt is None:
+                d._mqtt = client  # a device lives on exactly one broker: first contact decides, no flapping
 
             match topics[3]:
                 case "properties/report":

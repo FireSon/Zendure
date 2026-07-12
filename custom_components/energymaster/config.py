@@ -103,12 +103,13 @@ CONFIG_SCHEMA: dict[type, list[ConfigField]] = {
         ConfigField("sn", EDIT_TYPE.string, readonly=True),
         ConfigField("ip", EDIT_TYPE.string, readonly=True),
         ConfigField("blemac", EDIT_TYPE.string, readonly=True),
-        ConfigField("blename", EDIT_TYPE.string, visible_when={ "name": "-" }),
+        ConfigField("ble_name", EDIT_TYPE.string, visible_when={ "name": "-" }),
         ConfigField("capacity_kwh", EDIT_TYPE.float, readonly=True),
         ConfigField("phase", EDIT_TYPE.phase),
     ],
     ElectricVehicle: [
         ConfigField("id", EDIT_TYPE.string, is_key=True),
+        ConfigField("power_entity", EDIT_TYPE.entity, required=False),  # measured charging power: excluded from the learned baseload
         ConfigField("charge_power_entity", EDIT_TYPE.entity),
         ConfigField("soc_entity", EDIT_TYPE.entity),
         ConfigField("connected_entity", EDIT_TYPE.entity),

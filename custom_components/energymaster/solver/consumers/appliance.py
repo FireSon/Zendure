@@ -114,7 +114,9 @@ class Appliance(SolverEntry):
         stats = await get_instance(lp.hass).async_add_executor_job(
             statistics_during_period, lp.hass, end - timedelta(days=10), end, {self.power_entity}, "5minute", None, {"mean"})
         rows = [r["mean"] for r in stats.get(self.power_entity, []) if r.get("mean") is not None]
-        series = [float(np.mean(rows[i:i + 3])) / 1000.0 for i in range(0, len(rows), 3)]   # 5-min means -> 15-min kW
+        state = lp.hass.states.get(self.power_entity)
+        factor = 1.0 if state is not None and state.attributes.get("unit_of_measurement") == "kW" else 0.001  # W assumed unless the sensor says kW
+        series = [float(np.mean(rows[i:i + 3])) * factor for i in range(0, len(rows), 3)]   # 5-min means -> 15-min kW
         runs, cur = [], []
         for kw in series:                       # split into runs above the on-threshold
             if kw > _ON_THRESHOLD_W / 1000.0:

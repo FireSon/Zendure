@@ -58,6 +58,12 @@ class FrankProvider(Provider):
                 start = int(datetime.fromisoformat(row["from"]).timestamp())
             except (KeyError, TypeError, ValueError):
                 continue  # a row without a valid timestamp cannot be placed
+
+            # row duration from the data itself: hourly rows fill 4 quarters, 15-min rows 1
+            try:
+                span = max(1, (int(datetime.fromisoformat(row["till"]).timestamp()) - start) // 900)
+            except (KeyError, TypeError, ValueError):
+                span = 4  # no usable till: assume the historical hourly format
             try:
                 buy_excl = float(row["marketPrice"])
                 tax = float(row.get("marketPriceTax") or 0.0)
@@ -66,8 +72,8 @@ class FrankProvider(Provider):
             except (KeyError, TypeError, ValueError) as err:
                 raise ProviderError(f"Frank Energie row malformed: {err}") from err
             all_in = buy_excl + tax + sourcing + etx
-            idx = (start - base) // 900  # quarter index of this hourly row
-            for q in range(4):
+            idx = (start - base) // 900  # quarter index of this row
+            for q in range(span):
                 slot = idx + q
                 if 0 <= slot < size:
                     buy[slot] = all_in

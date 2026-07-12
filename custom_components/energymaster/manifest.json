@@ -7,5 +7,5 @@
   "config_flow": true,
   "iot_class": "local_polling",
   "dependencies": ["http", "frontend", "panel_custom", "websocket_api", "recorder"],
-  "requirements": ["highspy", "paho-mqtt", "bleak", "pandas"]
+  "requirements": ["highspy", "paho-mqtt", "bleak", "numpy"]
 }

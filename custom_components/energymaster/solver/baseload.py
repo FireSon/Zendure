@@ -110,6 +110,6 @@ class BaseLoad(SolverEntry):
                 house = sum(sign * avg(eid, wd, h) for eid, sign in slot)
                 house += sum(avg(s, wd, h) for s in solar_ac) / 3.0  # roof PV split evenly (no per-panel phase)
                 house += sum((avg(out, wd, h) - avg(inp, wd, h)) * w for out, inp, w in batt)  # battery AC net
-                bg = max(0.0, house - sum(avg(c, wd, h) * w for c, w in cons))
+                bg = max(0.0, house - sum(abs(avg(c, wd, h)) * w for c, w in cons))  # abs: a reversed consumer meter must still subtract
                 for q in range(4):  # one hourly value fills 4 quarters
                     buf[12 + k * 4 + q] = bg

@@ -47,7 +47,11 @@ class EmBinarySensor(BinarySensorEntity, EmEntity):
         self.add([self])
 
     def set_state(self, value: Any) -> bool:
-        value = int(value) != 0
+        # device payloads mix numbers, numeric strings and on/true words; anything else counts as off
+        try:
+            value = float(value) != 0
+        except (TypeError, ValueError):
+            value = str(value).strip().lower() in ("on", "true", "yes")
         if self._state == value:
             return False
         self._state = value

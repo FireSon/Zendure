@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from collections.abc import Callable
@@ -74,6 +75,8 @@ class Coordinator:
         self.consumers: list[SolverEntry] = []  # HA entity registration (driver fills named devices)
         self._unsub_tick = async_track_time_change(self.hass, self._tick, minute=[0, 15, 30, 45], second=0)
         self._unsubs: list = []
+        self._solve_lock = asyncio.Lock()  # a requested solve queues neatly behind a running one
+        self.solver.globals["request_solve"] = lambda: self.hass.async_create_task(self._tick(dt_util.now()))  # entries trigger a fresh solve after learning (e.g. calibration)
 
     async def async_setup(self) -> None:
         # unsubscribe all entities
@@ -158,60 +161,10 @@ class Coordinator:
 
     async def _tick(self, now) -> None:
         # the 15-min solve tick; on a successful solve, signal the panel to re-fetch the plan
-        x = await self.solver.run(now)
+        async with self._solve_lock:
+            x = await self.solver.run(now)
         if x is not None:
-            self._log_plan(now)
             async_dispatcher_send(self.hass, f"{DOMAIN}_plan")
-
-    def _log_plan(self, now) -> None:
-        # diagnostic: what did this solve actually plan over the horizon?
-        import numpy as np
-
-        s = self.solver
-        h = s.horizon
-        d = self.distribution
-        pb = s.price_buy.data[12 : 12 + h] if s.price_buy is not None else np.zeros(h)
-        ps = s.price_sell.data[12 : 12 + h] if s.price_sell is not None else np.zeros(h)
-        sol = s.solar.data[12 : 12 + h] if s.solar is not None else np.zeros(h)
-        load = s.l1 + s.l2 + s.l3
-        buy = d.grid_buy.dest.data[12 : 12 + h]
-        sell = d.grid_sell.dest.data[12 : 12 + h]
-        dis = d._bat_discharge.dest.data[12 : 12 + h]
-        cha = d._bat_charge.dest.data[12 : 12 + h]
-        soc = d._bat_soc.dest.data[12 : 12 + h]
-        cap = d.capacity_kwh.asNumber
-        terminal = float(np.mean(s.price_sell.data[12 + h : 12 + h + 16])) if s.price_sell is not None else -1
-        pk = int(np.argmax(pb))  # most expensive buy slot
-        _LOGGER.info(
-            "PLAN @%s cap=%.1f soc0=%.0f%% soc=%.0f-%.0f%% | price=%.3f-%.3f term=%.3f | load=%.1f solar=%.1f buy=%.1f sell=%.1f charge=%.1f discharge=%.1f kWh"
-            " | peak@%.2f(slot%d): dis=%.2f load=%.2f",
-            now.strftime("%H:%M"),
-            cap,
-            soc[0] * 100,
-            soc.min() * 100,
-            soc.max() * 100,
-            float(pb.min()),
-            float(pb.max()),
-            terminal,
-            float(load.sum()) * 0.25,
-            float(sol.sum()) * 0.25,
-            float(buy.sum()) * 0.25,
-            float(sell.sum()) * 0.25,
-            float(cha.sum()) * 0.25,
-            float(dis.sum()) * 0.25,
-            float(pb[pk]),
-            pk,
-            float(dis[pk]),
-            float(load[pk]),
-        )
-        try:
-            lines = ["slot,buy,sell,load,grid_buy,grid_sell,charge,discharge,soc"]
-            for t in range(h):
-                lines.append(f"{t},{pb[t]:.4f},{ps[t]:.4f},{load[t]:.3f},{buy[t]:.3f},{sell[t]:.3f},{cha[t]:.3f},{dis[t]:.3f},{soc[t]:.4f}")
-            with open(self.hass.config.path("em_plan.csv"), "w") as f:
-                f.write("\n".join(lines))
-        except Exception:
-            _LOGGER.exception("plan csv dump failed")
 
     def track(self, entity_id: str, callback: Callable[[float], None], factor: float = 1) -> None:
         # the coordinator owns every entity-event registration; parses the state to float (x factor) so entries only implement the value handler

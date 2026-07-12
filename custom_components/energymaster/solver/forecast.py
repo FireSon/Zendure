@@ -36,7 +36,7 @@ class Forecast(SolverEntry):
         self.lat = hass.config.latitude if hass else config.get("latitude", 0.0)
         self.lon = hass.config.longitude if hass else config.get("longitude", 0.0)
         self._house_tz = ZoneInfo(hass.config.time_zone if hass else config.get("timezone", "UTC"))
-        self.solar_panels = [SolarPanel(name=p.get("name", ""), power_entity=p.get("power_entity", "")) for p in config.get("solar_panels", [])]
+        self.solar_panels = [SolarPanel(name=p.get("name", ""), power_entity=p.get("power_entity", ""), derate_entity=p.get("derate_entity", "")) for p in config.get("solar_panels", [])]
         self._poa = {}  # power_entity -> (a: np.ndarray[96] direct coeff per quarter, C: float diffuse coeff)
         self._last_cal = None  # date of the last calibration
 

@@ -64,12 +64,11 @@ class Heating(SolverEntry):
             self.slack = lp.column(cost=_COMFORT_PENALTY, lo=0.0)
             lp.rowQuarter({self.temp: 1.0, self.slack: 1.0}, lo=lambda t: self._tmin[t])
 
-        # discretized RC model -> temp[t+1] = (1-B)*temp[t] + A*power[t] + B*loss_temp + icept*A
-        A = 0.25 / (self.tau * self.slope)  # degC gained per kW of electrical input over one quarter
-        B = 0.25 / self.tau  # fraction of the gap to the loss temperature shed per quarter
-        G = self.icept * A  # free-gain contribution per quarter
-        loss = (lambda t: B * self._outdoor.data[12 + t] + G) if soft else (B * self.ambient + G)
-        lp.rowDelta(lambda t1, t2: self.temp[t1] + (B - 1.0) * self.temp[t2] - A * self.power[t2], const=loss)
+        # discretized RC model -> temp[t+1] = (1-B)*temp[t] + A*power[t] + B*loss_temp + icept*A, with
+        # A = 0.25/(tau*slope) degC per kW-quarter and B = 0.25/tau loss fraction per quarter.
+        # The lambdas read the live parameters so a recalibration only needs the row rebuild below.
+        loss = (lambda t: 0.25 / self.tau * self._outdoor.data[12 + t] + self.icept * 0.25 / (self.tau * self.slope)) if soft else (lambda t: 0.25 / self.tau * self.ambient + self.icept * 0.25 / (self.tau * self.slope))
+        self._rebuild_model = lp.rowDelta(lambda t1, t2: self.temp[t1] + (0.25 / self.tau - 1.0) * self.temp[t2] - 0.25 / (self.tau * self.slope) * self.power[t2], const=loss)
         if self.ramp_kw:  # bound how fast the power may change between consecutive quarters
             lp.rowDelta(lambda t1, t2: self.power[t1] - self.power[t2], lo=-self.ramp_kw, hi=self.ramp_kw)
 
@@ -105,6 +104,9 @@ class Heating(SolverEntry):
             self.slope, self.icept = res[0], res[1]
             if res[2] is not None:
                 self.tau = res[2]
+            self._rebuild_model()  # push the new parameters into the LP rows
+            if (request_solve := lp.globals.get("request_solve")) is not None:
+                request_solve()  # the standing plan was built with the old model: solve again right away
         await self.save_params(lp.hass, {"slope": self.slope, "icept": self.icept, "tau": self.tau})
 
 
@@ -125,6 +127,7 @@ async def fit_store(hass, elec_id: str, temp_id: str, lat: float, lon: float, am
     import aiohttp
     from homeassistant.components.recorder import get_instance
     from homeassistant.components.recorder.statistics import statistics_during_period
+    from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
     if not elec_id or not temp_id:
         return None
@@ -132,16 +135,18 @@ async def fit_store(hass, elec_id: str, temp_id: str, lat: float, lon: float, am
     start = now - timedelta(days=days)
     stats = await get_instance(hass).async_add_executor_job(
         statistics_during_period, hass, start, now, {elec_id, temp_id}, "hour", None, {"mean"})
-    pwr = {floor_hour(r["start"]): r["mean"] / 1000.0 for r in stats.get(elec_id, []) if r.get("mean") is not None}
+    state = hass.states.get(elec_id)
+    factor = 1.0 if state is not None and state.attributes.get("unit_of_measurement") == "kW" else 0.001  # W assumed unless the sensor says kW
+    pwr = {floor_hour(r["start"]): abs(r["mean"]) * factor for r in stats.get(elec_id, []) if r.get("mean") is not None}  # abs: a reversed meter reports negative
     tmp = {floor_hour(r["start"]): r["mean"] for r in stats.get(temp_id, []) if r.get("mean") is not None}
 
     if ambient is None:
         params = {"latitude": lat, "longitude": lon, "start_date": start.date().isoformat(),
                   "end_date": now.date().isoformat(), "hourly": "temperature_2m", "timezone": "UTC"}
         try:
-            async with aiohttp.ClientSession() as s:
-                async with s.get("https://archive-api.open-meteo.com/v1/archive", params=params) as r:
-                    h = (await r.json())["hourly"]
+            session = async_get_clientsession(hass)  # HA's shared session, never closed here
+            async with session.get("https://archive-api.open-meteo.com/v1/archive", params=params) as r:
+                h = (await r.json())["hourly"]
         except (aiohttp.ClientError, KeyError):
             return None
         ref = {floor_hour(t): tt for t, tt in zip(h["time"], h["temperature_2m"]) if tt is not None}

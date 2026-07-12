@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 from datetime import datetime, time
 from pathlib import Path
@@ -11,6 +12,7 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from .solver import LpSolver, SolverEntry
 
+_LOGGER = logging.getLogger(__name__)
 _EPEX_URL = "https://epexpredictor.batzill.com/prices_short"  # EpexPredictor (b3nn0): indicative 7-day curve
 _HTTP_TIMEOUT = ClientTimeout(total=15)
 
@@ -30,7 +32,10 @@ class DynamicPrice(SolverEntry):
         self.price_buy = lp.price_buy = lp.data("price_buy", "euro", 7, source=self.provider)
         self.price_sell = lp.price_sell = lp.data("price_sell", "euro", 7, source=self.provider)
         providers = {c.__name__.removesuffix("Provider").casefold(): c for c in Provider.__subclasses__()}
-        self._provider = providers.get(self.provider.removesuffix("Provider").casefold(), providers["energycharts"])()
+        name = self.provider.removesuffix("Provider").casefold()
+        if name not in providers:
+            _LOGGER.warning("Unknown price provider %r, falling back to energycharts (wholesale)", self.provider)
+        self._provider = providers.get(name, providers["energycharts"])()
         self._provider.init(self)
 
     async def entry_prerun(self, lp: LpSolver, now: datetime):
