@@ -86,6 +86,19 @@ def test_track_p1_phase_letters_map(monkeypatch) -> None:
     assert coord.p1_slots["l3"] == [("sensor.meter_phase_c_power", 1)]
 
 
+def test_track_p1_skips_the_capacity_tariff_entities(monkeypatch) -> None:
+    # a HomeWizard P1 in Belgium also gives the monthly peak and the quarter average in W; added to the total they fake an import
+    entities = [
+        power_entity("sensor.p1_digital_meter_power", platform="homewizard"),
+        power_entity("sensor.p1_digital_meter_peak_demand_current_month", platform="homewizard"),
+        power_entity("sensor.p1_digital_meter_active_average_demand", platform="homewizard"),
+    ]
+    coord, calls = make_coordinator(monkeypatch, entities)
+    coord._track_p1("device")
+    assert coord.p1_slots["total"] == [("sensor.p1_digital_meter_power", 1)]
+    assert [e for e, _, _ in calls] == ["sensor.p1_digital_meter_power"]
+
+
 def test_track_p1_huawei_phase_sign_flips(monkeypatch) -> None:
     # Huawei signs the grid export-positive, so its phases are negated against the import-positive convention
     entities = [

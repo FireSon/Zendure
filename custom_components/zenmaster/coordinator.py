@@ -53,6 +53,7 @@ P1_PROFILES: dict[str, Any] = {
     "sma": [("metering_power_absorbed", 1), ("metering_power_supplied", -1), ("feed", -1), ("draw", 1)],
 }
 PHASE_FRAGS = ((), ("phase_1", "phase1", "_l1", "phase_a"), ("phase_2", "phase2", "_l2", "phase_b"), ("phase_3", "phase3", "_l3", "phase_c"))  # indexed on Phase: the name fragments that put a P1 entity on that phase
+NOT_METER = ("demand", "peak")  # P1 entities in W or kW that are no reading of the grid: the capacity tariff's monthly peak and quarter average (HomeWizard, DSMR in Belgium)
 
 
 def phase_of(eid: str) -> Phase:
@@ -455,14 +456,14 @@ class Coordinator:
         for unsub in self._p1_unsubs:
             unsub()
         self._p1_unsubs.clear()
-        # every power entity on the P1 device goes on its phase (0 = the grid total) with a signed watt factor; only the total entities trigger
+        # every power entity on the P1 device goes on its phase (0 = the grid total) with a signed watt factor, except the capacity tariff's peak and average; only the total entities trigger
         entries = er.async_entries_for_device(er.async_get(self.hass), device_id)
         states = getattr(self.hass, "states", None)  # absent offline (tests/tools), then the registry is all there is
         entities = []
         for e in entries:
             attrs = getattr(states.get(e.entity_id) if states else None, "attributes", None) or {}
             unit = attrs.get("unit_of_measurement") or e.unit_of_measurement  # the integration sets both at runtime, so the state comes first
-            if (attrs.get("device_class") or e.original_device_class or e.device_class) == "power" or unit in ("W", "kW", "kilowatt", "kilowatts"):
+            if not any(f in e.entity_id for f in NOT_METER) and ((attrs.get("device_class") or e.original_device_class or e.device_class) == "power" or unit in ("W", "kW", "kilowatt", "kilowatts")):
                 entities.append((e.entity_id, 1000 if unit in ("kW", "kilowatt", "kilowatts") else 1))
         platform = entries[0].platform if entries else ""
         flip = -1 if platform == "huawei_solar" else 1  # Huawei signs the grid the other way: positive is export
