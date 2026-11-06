@@ -19,6 +19,8 @@ import './zm-ble-onboard.js';
 
 const LBL = 290;  // px: the name column, and the chart's left edge, so the rows and the plan share one time axis
 const RSP = 54;   // px: the price axis right of the chart, kept free on every row
+const NARROW = window.matchMedia('(max-width: 760px)');  // the phone: the chart and the rows scroll sideways under a narrow name column that stays put
+const LBL_NARROW = 160;  // px: the name column on the phone
 
 // ConnectionType from device.py: 0 offline, 1 local broker, 2 cloud, 3 zensdk (http), 4 ble
 const CONN_COLOR: Record<number, string> = { 0: '#e8645a', 1: '#4a90d9', 2: '#1fb89a', 3: '#3aa0c9', 4: '#4a90d9' };
@@ -64,11 +66,18 @@ export class ZmOverview extends LitElement {
   @state() private _picker = false;
   @state() private _busy = false;
   @state() private _onboardName: string | null = null;
+  @state() private _narrow = NARROW.matches;
   private _option: any = null;  // the chart option, rebuilt only when the plan or the theme changes, not on every hass update
+  private _onNarrow = () => { this._narrow = NARROW.matches; };
+  private get _lbl() { return this._narrow ? LBL_NARROW : LBL; }
+
+  // follow the phone layout when the screen turns or the window is resized past it
+  connectedCallback() { super.connectedCallback(); NARROW.addEventListener('change', this._onNarrow); }
+  disconnectedCallback() { super.disconnectedCallback(); NARROW.removeEventListener('change', this._onNarrow); }
 
   willUpdate(changed: Map<string, unknown>) {
     // a new option object resets the chart and drops its tooltip; hass changes several times a second
-    if (changed.has('d') || changed.has('theme')) this._option = this.d ? flowOption(this.d, chartColors(this.theme), LBL) : null;
+    if (changed.has('d') || changed.has('theme') || changed.has('_narrow')) this._option = this.d ? flowOption(this.d, chartColors(this.theme), this._lbl) : null;
   }
 
   static styles = [
@@ -95,12 +104,18 @@ export class ZmOverview extends LitElement {
       .box select { font-size: var(--zm-fs-m); cursor: pointer; }
       .box input::-webkit-inner-spin-button, .box input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
       .box em { font-style: normal; font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-dim); margin-left: 4px; }
+      /* on the phone the chart and the rows scroll sideways as one; the name column stays, opaque over the lanes, without the battery bar and status */
+      .narrow { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .narrow .wide { width: 1200px; }
+      .narrow .lbl { position: sticky; left: 0; z-index: 2; background: var(--zm-card); }
+      .narrow .row:nth-child(odd) .lbl { background: linear-gradient(var(--zm-zebra), var(--zm-zebra)), var(--zm-card); }
+      .narrow .bat, .narrow .st { display: none; }
       /* the rows, zebra striped, each one name block, one lane on the time axis and the free price column */
       .rowsw { position: relative; margin-top: 8px; }
       .now { position: absolute; top: 0; bottom: 0; border-left: 1.6px solid #f47a20; opacity: 0.7; pointer-events: none; }
       .row { display: flex; align-items: stretch; height: 44px; }
       .row:nth-child(odd) { background: var(--zm-zebra); }
-      .lbl { position: relative; flex: none; width: ${LBL}px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 6px; }
+      .lbl { position: relative; flex: none; width: var(--lbl); display: flex; align-items: center; gap: 8px; padding: 0 12px 0 6px; }
       .lbl:hover { background: var(--zm-border-2); }
       .row.dim .lbl > :not(.dpop), .row.dim .lane { opacity: 0.6; }
       .nm { flex: 1 1 auto; min-width: 0; }
@@ -431,16 +446,18 @@ export class ZmOverview extends LitElement {
     const cards = d ? consumerCards(d, this.config?.consumers ?? [], this.hass, this.actions, this.tiles).sort((a: any, b: any) => PHASE_ORDER.indexOf(this._consPhase(a.id)) - PHASE_ORDER.indexOf(this._consPhase(b.id))) : [];
     // the now line runs from the chart through the rows, in the middle of the current quarter
     const frac = d ? (d.NOW + 0.5) / d.N : 0;
+    // on the phone the controls sit above the chart instead of in its left margin
     return html`
-      ${d
-        ? html`<div class="top"><zm-chart class="flow" .option=${this._option}></zm-chart>${this._controls(false)}</div>`
-        : this._controls(true)}
+      ${!d || this._narrow ? this._controls(true) : nothing}
+      <div class=${this._narrow ? 'narrow' : ''} style="--lbl:${this._lbl}px"><div class="wide">
+      ${d ? html`<div class="top"><zm-chart class="flow" .option=${this._option}></zm-chart>${this._narrow ? nothing : this._controls(false)}</div>` : nothing}
       ${!devs.length && !cards.length
         ? html`<div class="empty">${t('ui.devices.empty', 'Geen Zendure-devices in de config.')}</div>`
         : html`<div class="rowsw">
             <div>${devs.filter((x) => !this._activeOnly || x.conn !== 0).map((x) => this._devRow(x))}${cards.map((c: any) => this._consRow(c))}</div>
-            ${d && this.view === 'plan' ? html`<div class="now" style="left:calc(${LBL}px + (100% - ${LBL + RSP}px) * ${frac})"></div>` : nothing}
+            ${d && this.view === 'plan' ? html`<div class="now" style="left:calc(${this._lbl}px + (100% - ${this._lbl + RSP}px) * ${frac})"></div>` : nothing}
           </div>`}
+      </div></div>
       <div class="foot">
         ${d ? html`<button class="addbtn" ?disabled=${this._busy} @click=${() => (this._picker = true)}>+ ${t('ui.consumers.add', 'Verbruiker toevoegen')}</button>` : nothing}
         ${devs.length ? html`<button class="addbtn" @click=${() => { this._activeOnly = !this._activeOnly; localStorage.setItem('zm-active-only', this._activeOnly ? '1' : '0'); }}>${this._activeOnly ? t('ui.devices.show_all', 'Alle apparaten') : t('ui.devices.show_active', 'Actieve apparaten')}</button>` : nothing}
