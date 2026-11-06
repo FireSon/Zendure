@@ -590,12 +590,6 @@
       "setpoint": {
         "name": "Setpoint"
       },
-      "t_min_day": {
-        "name": "Lowest temperature by day"
-      },
-      "t_min_night": {
-        "name": "Lowest temperature at night"
-      },
       "heat_max": {
         "name": "Heat output"
       },
@@ -616,6 +610,15 @@
       },
       "volume": {
         "name": "Volume"
+      },
+      "day_drop": {
+        "name": "Setback by day"
+      },
+      "night_drop": {
+        "name": "Setback at night"
+      },
+      "headroom": {
+        "name": "Room above setpoint"
       }
     },
     "button": {
@@ -659,8 +662,8 @@
         "description": "What is written to the linked entity: the temperature delta (offset in K), the electrical power, the capacity in percent or the temperature."
       },
       "setpoint_entity": {
-        "name": "Setpoint",
-        "description": "Number holding the wanted temperature in degrees."
+        "name": "Setpoint from entity",
+        "description": "A thermostat (climate), number or sensor that sets the setpoint. Empty: the setpoint above."
       },
       "ambient_entity": {
         "name": "Ambient sensor",
@@ -701,14 +704,6 @@
       "setpoint": {
         "name": "Setpoint",
         "description": "Temperature the solver aims for. Between 17:00 and 23:00 it is always reached."
-      },
-      "t_min_day": {
-        "name": "Lowest temperature by day",
-        "description": "How far the solver may drop below the setpoint between 07:00 and 17:00 when that saves money."
-      },
-      "t_min_night": {
-        "name": "Lowest temperature at night",
-        "description": "How far the solver may drop below the setpoint between 23:00 and 07:00 when that saves money."
       },
       "ambient": {
         "name": "Ambient temperature",
@@ -797,6 +792,18 @@
       "solver": {
         "name": "Solver",
         "description": "Plans the battery and the consumers against prices and the solar forecast. Off: the fleet runs on its own control and the planning tabs are hidden."
+      },
+      "day_drop": {
+        "name": "Setback by day",
+        "description": "This many degrees the solver may drop below the setpoint between 07:00 and 17:00 when it pays."
+      },
+      "night_drop": {
+        "name": "Setback at night",
+        "description": "This many degrees the solver may drop below the setpoint between 23:00 and 07:00 when it pays."
+      },
+      "headroom": {
+        "name": "Room above setpoint",
+        "description": "This many degrees above the setpoint the solver may heat the house to store heat."
       }
     },
     "section": {

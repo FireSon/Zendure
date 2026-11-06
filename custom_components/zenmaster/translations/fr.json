@@ -590,12 +590,6 @@
       "setpoint": {
         "name": "Consigne"
       },
-      "t_min_day": {
-        "name": "Température la plus basse le jour"
-      },
-      "t_min_night": {
-        "name": "Température la plus basse la nuit"
-      },
       "heat_max": {
         "name": "Puissance thermique"
       },
@@ -616,6 +610,15 @@
       },
       "volume": {
         "name": "Volume"
+      },
+      "day_drop": {
+        "name": "Abaissement en journée"
+      },
+      "night_drop": {
+        "name": "Abaissement la nuit"
+      },
+      "headroom": {
+        "name": "Marge au-dessus de la consigne"
       }
     },
     "button": {
@@ -659,8 +662,8 @@
         "description": "Ce qui est écrit dans l'entité liée : le delta de température (décalage en K), la puissance absorbée, la capacité en pourcentage ou la température."
       },
       "setpoint_entity": {
-        "name": "Consigne",
-        "description": "Nombre contenant la température souhaitée en degrés."
+        "name": "Consigne depuis une entité",
+        "description": "Un thermostat (climate), un nombre ou un capteur qui fixe la consigne. Vide : la consigne ci-dessus."
       },
       "ambient_entity": {
         "name": "Capteur ambiant",
@@ -701,14 +704,6 @@
       "setpoint": {
         "name": "Consigne",
         "description": "Température visée par le solveur. Entre 17:00 et 23:00 elle est toujours atteinte."
-      },
-      "t_min_day": {
-        "name": "Température la plus basse le jour",
-        "description": "Jusqu'où le solveur peut descendre sous la consigne entre 07:00 et 17:00 quand cela rapporte."
-      },
-      "t_min_night": {
-        "name": "Température la plus basse la nuit",
-        "description": "Jusqu'où le solveur peut descendre sous la consigne entre 23:00 et 07:00 quand cela rapporte."
       },
       "ambient": {
         "name": "Température ambiante",
@@ -797,6 +792,18 @@
       "solver": {
         "name": "Solveur",
         "description": "Planifie la batterie et les consommateurs selon les prix et la prévision solaire. Désactivé : la flotte se régule seule et les onglets de planification sont masqués."
+      },
+      "day_drop": {
+        "name": "Abaissement en journée",
+        "description": "De combien de degrés le solveur peut descendre sous la consigne entre 07:00 et 17:00 quand cela rapporte."
+      },
+      "night_drop": {
+        "name": "Abaissement la nuit",
+        "description": "De combien de degrés le solveur peut descendre sous la consigne entre 23:00 et 07:00 quand cela rapporte."
+      },
+      "headroom": {
+        "name": "Marge au-dessus de la consigne",
+        "description": "De combien de degrés au-dessus de la consigne le solveur peut chauffer la maison pour stocker de la chaleur."
       }
     },
     "section": {

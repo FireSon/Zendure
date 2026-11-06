@@ -232,17 +232,33 @@ class HeatingHeatPump(Heating):
     SOFT_FLOOR = True
     TILES = ["temp_entity", "control_entity"]
     CONFIG = [*_LINK, ConfigField("control_entity", {"entity": {"filter": [{"domain": "number"}, {"domain": "climate"}]}}, cast=str, required=False, section_key="link"),
-              ConfigField("control", {"select": {"options": _CONTROLS}}, cast=str, section_key="behaviour"), _MANAGE, ConfigField("setpoint", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"), _BAND[1],
-              ConfigField("t_min_day", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"), ConfigField("t_min_night", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"), _HEAT_MAX, _COP, *_TAIL]
-    # the house calls its comfort target the setpoint, like a thermostat; the shared code reads it as t_min
-    t_min = property(lambda self: self.setpoint, lambda self, v: setattr(self, "setpoint", v))
+              ConfigField("setpoint_entity", {"entity": {"filter": [{"domain": "climate"}, {"domain": "number"}, {"domain": "input_number"}, {"domain": "sensor"}]}}, cast=str, required=False, section_key="link"),
+              ConfigField("control", {"select": {"options": _CONTROLS}}, cast=str, section_key="behaviour"), _MANAGE, ConfigField("setpoint", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"),
+              ConfigField("day_drop", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), ConfigField("night_drop", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"),
+              ConfigField("headroom", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), _HEAT_MAX, _COP, *_TAIL]
+    # the house calls its comfort target the setpoint, like a thermostat; the shared code reads the target of this quarter as t_min
+    t_min = property(lambda self: self._target, lambda self, v: setattr(self, "setpoint", v))
+    _target = 19.5  # the setpoint of this quarter; the shared __init__ reads t_min before this class sets it
 
     def __init__(self) -> None:
         super().__init__()
-        self.t_min, self.t_max, self.t_min_day, self.t_min_night = 19.5, 20.5, 18.5, 18.0
+        self.t_min, self.day_drop, self.night_drop, self.headroom = 19.5, 1.0, 1.5, 1.0  # the setpoint, and how far the day and night may go under it and the plan above it
+        self.setpoint_entity = ""  # a climate, number or sensor that sets the setpoint instead of the number on the device
+        self._target = self.setpoint
         self.ci, self.cm, self.him, self.ua, self.q_int = 8.0, 12.5, 2.4, 0.2, 0.4  # a typical house until the calibration has fitted this one
         self.control_entity = ""  # the number or climate the plan of each quarter is written to
         self.control = "temperature"
+
+    async def entry_prerun(self, lp: LpSolver, now: datetime) -> None:
+        # the setpoint from its entity when one is linked (a climate's target, otherwise its state), else the number on the device
+        state = lp.hass.states.get(self.setpoint_entity) if self.setpoint_entity and lp.hass is not None else None
+        try:
+            self._target = float(state.attributes.get("temperature") if state.domain == "climate" else state.state)
+        except (AttributeError, TypeError, ValueError):
+            self._target = self.setpoint
+        # the day and night floors and the ceiling follow the setpoint
+        self.t_min_day, self.t_min_night, self.t_max = self._target - self.day_drop, self._target - self.night_drop, self._target + self.headroom
+        await super().entry_prerun(lp, now)
 
     def _runs(self, p: np.ndarray, mins: np.ndarray) -> np.ndarray:
         # blocks of power the MHI can make: a gap of one quarter is closed, since a restart costs more than running on

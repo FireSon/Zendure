@@ -475,11 +475,14 @@
       "setpoint": {
         "name": "setpoint"
       },
-      "t_min_day": {
-        "name": "t_min_day"
+      "day_drop": {
+        "name": "day_drop"
       },
-      "t_min_night": {
-        "name": "t_min_night"
+      "night_drop": {
+        "name": "night_drop"
+      },
+      "headroom": {
+        "name": "headroom"
       },
       "heat_max": {
         "name": "heat_max"
