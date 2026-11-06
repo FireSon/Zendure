@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "*.yaml": "home-assistant"
+    },
+    "files.autoSave": "afterDelay",
+    "files.watcherPolling": {
+        "**": { "pollingInterval": 1000 }
+    }
+}

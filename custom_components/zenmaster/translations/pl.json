@@ -1,0 +1,1071 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ZenMaster",
+        "description": "Skonfiguruj ZenMaster. Całą konfigurację (sterowniki, panele PV, odbiorniki, licznik P1) wykonuje się potem w panelu ZenMaster."
+      }
+    },
+    "abort": {
+      "already_configured": "ZenMaster jest już skonfigurowany"
+    }
+  },
+  "config_subentries": {
+    "appliance": {
+      "entry_type": "Urządzenie AGD",
+      "initiate_flow": {
+        "user": "Dodaj urządzenie AGD",
+        "reconfigure": "Skonfiguruj ponownie urządzenie AGD"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj urządzenie AGD",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "switch_entity": "Zezwolenie",
+                "power_entity": "Pomiar mocy"
+              },
+              "data_description": {
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie urządzenie AGD",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "switch_entity": "Zezwolenie",
+                "power_entity": "Pomiar mocy"
+              },
+              "data_description": {
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "electric_vehicle": {
+      "entry_type": "Ładowarka EV",
+      "initiate_flow": {
+        "user": "Dodaj ładowarkę EV",
+        "reconfigure": "Skonfiguruj ponownie ładowarkę EV"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj ładowarkę EV",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "charge_power_entity": "Ustawienie mocy ładowania",
+                "soc_entity": "Stan naładowania",
+                "connected_entity": "Podłączony",
+                "power_entity": "Pomiar mocy"
+              },
+              "data_description": {
+                "charge_power_entity": "Encja number ustawiająca moc ładowarki.",
+                "soc_entity": "Czujnik ze stanem naładowania auta w procentach.",
+                "connected_entity": "Czujnik binarny informujący, czy kabel jest podłączony.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie ładowarkę EV",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "charge_power_entity": "Ustawienie mocy ładowania",
+                "soc_entity": "Stan naładowania",
+                "connected_entity": "Podłączony",
+                "power_entity": "Pomiar mocy"
+              },
+              "data_description": {
+                "charge_power_entity": "Encja number ustawiająca moc ładowarki.",
+                "soc_entity": "Czujnik ze stanem naładowania auta w procentach.",
+                "connected_entity": "Czujnik binarny informujący, czy kabel jest podłączony.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "heating_heat_pump": {
+      "entry_type": "Pompa ciepła",
+      "initiate_flow": {
+        "user": "Dodaj pompę ciepła",
+        "reconfigure": "Skonfiguruj ponownie pompę ciepła"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj pompę ciepła",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie",
+                "control_entity": "Sterowanie"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
+                "control_entity": "Number lub climate, do którego plan jest zapisywany co kwadrans, w typie wybranym w Typ sterowania."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie pompę ciepła",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie",
+                "control_entity": "Sterowanie"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
+                "control_entity": "Number lub climate, do którego plan jest zapisywany co kwadrans, w typie wybranym w Typ sterowania."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "boiler_heat_pump": {
+      "entry_type": "Bojler (pompa ciepła)",
+      "initiate_flow": {
+        "user": "Dodaj bojler (pompa ciepła)",
+        "reconfigure": "Skonfiguruj ponownie bojler (pompa ciepła)"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj bojler (pompa ciepła)",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie",
+                "setpoint_entity": "Wartość zadana"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
+                "setpoint_entity": "Encja number z żądaną temperaturą w stopniach."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie bojler (pompa ciepła)",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie",
+                "setpoint_entity": "Wartość zadana"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
+                "setpoint_entity": "Encja number z żądaną temperaturą w stopniach."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "boiler_electric": {
+      "entry_type": "Bojler (elektryczny)",
+      "initiate_flow": {
+        "user": "Dodaj bojler (elektryczny)",
+        "reconfigure": "Skonfiguruj ponownie bojler (elektryczny)"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj bojler (elektryczny)",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie bojler (elektryczny)",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "pool_heat_pump": {
+      "entry_type": "Basen (pompa ciepła)",
+      "initiate_flow": {
+        "user": "Dodaj basen (pompa ciepła)",
+        "reconfigure": "Skonfiguruj ponownie basen (pompa ciepła)"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj basen (pompa ciepła)",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie basen (pompa ciepła)",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+          },
+          "sections": {
+            "link": {
+              "name": "Powiązania",
+              "data": {
+                "temp_entity": "Czujnik temperatury",
+                "power_entity": "Pomiar mocy",
+                "switch_entity": "Zezwolenie"
+              },
+              "data_description": {
+                "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "solar_panel": {
+      "entry_type": "Grupa PV",
+      "initiate_flow": {
+        "user": "Dodaj grupę PV",
+        "reconfigure": "Skonfiguruj ponownie grupę PV"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj grupę PV",
+          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
+          "data": {
+            "name": "Nazwa",
+            "power_entity": "Pomiar mocy",
+            "derate_entity": "Ograniczenie"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje.",
+            "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+            "derate_entity": "Encja number ograniczająca falownik; puste oznacza brak możliwości ograniczania."
+          }
+        },
+        "reconfigure": {
+          "title": "Skonfiguruj ponownie grupę PV",
+          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
+          "data": {
+            "name": "Nazwa",
+            "power_entity": "Pomiar mocy",
+            "derate_entity": "Ograniczenie"
+          },
+          "data_description": {
+            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje.",
+            "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
+            "derate_entity": "Encja number ograniczająca falownik; puste oznacza brak możliwości ograniczania."
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Ta nazwa jest już używana",
+        "name_required": "Podaj nazwę"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    },
+    "zendure": {
+      "entry_type": "Urządzenie Zendure",
+      "initiate_flow": {
+        "user": "Dodaj urządzenie Zendure",
+        "reconfigure": "Skonfiguruj urządzenie ponownie"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj urządzenie Zendure",
+          "description": "Urządzenia są zwykle wykrywane automatycznie. Dodaj ręcznie tylko wtedy, gdy urządzenie nigdy się nie pojawia.",
+          "data": {
+            "prodkey": "Klucz produktu",
+            "device_id": "Klucz urządzenia",
+            "sn": "Numer seryjny",
+            "ip": "Adres IP",
+            "blemac": "Adres Bluetooth"
+          },
+          "data_description": {
+            "prodkey": "productKey, który chmura Zendure raportuje dla urządzenia.",
+            "device_id": "deviceKey, który chmura Zendure raportuje dla urządzenia.",
+            "sn": "Numer seryjny z etykiety urządzenia.",
+            "ip": "Stały adres lokalnego API; ustalany automatycznie, gdy pusty.",
+            "blemac": "Ustalany automatycznie z rozgłoszenia Bluetooth, gdy pusty."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "Nazwa urządzenia nigdy się nie zmienia; jego adresy mogą.",
+          "data": {
+            "ip": "Adres IP",
+            "blemac": "Adres Bluetooth"
+          },
+          "data_description": {
+            "ip": "Stały adres lokalnego API; ustalany automatycznie, gdy pusty.",
+            "blemac": "Ustalany automatycznie z rozgłoszenia Bluetooth, gdy pusty."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "To urządzenie jest już skonfigurowane",
+        "unknown_prodkey": "Nieznany klucz produktu"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "state": {
+          "0": "Wykryto",
+          "1": "Offline",
+          "2": "MQTT (chmura)",
+          "3": "MQTT (lokalnie)",
+          "4": "Modbus",
+          "5": "HTTP",
+          "6": "Bluetooth"
+        }
+      },
+      "state": {
+        "name": "Stan"
+      }
+    },
+    "select": {
+      "power_phase": {
+        "name": "Faza"
+      },
+      "mode": {
+        "name": "Tryb pracy",
+        "state": {
+          "off": "Wył.",
+          "manual": "Moc ręczna",
+          "smart": "Inteligentne dopasowanie",
+          "smart_discharging": "Tylko inteligentne rozładowanie",
+          "smart_charging": "Tylko inteligentne ładowanie",
+          "store_solar": "Magazynuj energię słoneczną",
+          "individual": "Indywidualnie"
+        }
+      },
+      "phase": {
+        "name": "Faza"
+      },
+      "sensor_height": {
+        "name": "Wysokość czujnika"
+      }
+    },
+    "switch": {
+      "manage": {
+        "name": "Zarządzaj"
+      },
+      "legionella": {
+        "name": "Cykl antylegionella"
+      }
+    },
+    "time": {
+      "latest_start_time": {
+        "name": "Najpóźniejszy start"
+      },
+      "departure_time": {
+        "name": "Godzina wyjazdu"
+      }
+    },
+    "number": {
+      "power_rating": {
+        "name": "Moc znamionowa"
+      },
+      "cycle_duration_slots": {
+        "name": "Czas trwania cyklu"
+      },
+      "ev_max_soc": {
+        "name": "Docelowy stan naładowania"
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Limit ceny"
+      },
+      "capacity_kwh": {
+        "name": "Pojemność baterii"
+      },
+      "max_power_kw": {
+        "name": "Maksymalna moc ładowania"
+      },
+      "t_min": {
+        "name": "Dolna granica"
+      },
+      "t_max": {
+        "name": "Górna granica"
+      },
+      "setpoint": {
+        "name": "Nastawa"
+      },
+      "t_min_day": {
+        "name": "Najniższa temperatura w dzień"
+      },
+      "t_min_night": {
+        "name": "Najniższa temperatura w nocy"
+      },
+      "heat_max": {
+        "name": "Moc grzewcza"
+      },
+      "cop": {
+        "name": "COP"
+      },
+      "ambient": {
+        "name": "Temperatura otoczenia"
+      },
+      "legionella_days": {
+        "name": "Interwał antylegionella"
+      },
+      "legionella_band": {
+        "name": "Zakres antylegionella"
+      },
+      "max_power": {
+        "name": "Moc elektryczna"
+      },
+      "volume": {
+        "name": "Objętość"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Start"
+      },
+      "stop": {
+        "name": "Stop"
+      },
+      "skip": {
+        "name": "Pomiń"
+      },
+      "detect_phases": {
+        "name": "Wykryj fazy"
+      },
+      "export_replay": {
+        "name": "Eksportuj dane replay"
+      }
+    }
+  },
+  "config_panel": {
+    "field": {
+      "temp_entity": {
+        "name": "Czujnik temperatury",
+        "description": "Czujnik mierzący temperaturę tego zasobnika."
+      },
+      "power_entity": {
+        "name": "Pomiar mocy",
+        "description": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
+      },
+      "switch_entity": {
+        "name": "Zezwolenie",
+        "description": "Gdy jest włączone, solver może planować to urządzenie."
+      },
+      "control_entity": {
+        "name": "Sterowanie",
+        "description": "Number lub climate, do którego plan jest zapisywany co kwadrans, w typie wybranym w Typ sterowania."
+      },
+      "control": {
+        "name": "Typ sterowania",
+        "description": "Co jest zapisywane do powiązanej encji: delta temperatury (przesunięcie w K), pobierana moc, wydajność w procentach lub temperatura."
+      },
+      "setpoint_entity": {
+        "name": "Wartość zadana",
+        "description": "Encja number z żądaną temperaturą w stopniach."
+      },
+      "ambient_entity": {
+        "name": "Czujnik otoczenia",
+        "description": "Czujnik w pomieszczeniu, w którym stoi zbiornik. Puste: używana jest ustawiona temperatura otoczenia."
+      },
+      "t_min": {
+        "name": "Dolna granica",
+        "description": "Najniższa temperatura dopuszczana przez solver."
+      },
+      "t_max": {
+        "name": "Górna granica",
+        "description": "Najwyższa temperatura, do której solver może ładować. Wyżej oznacza większy bufor."
+      },
+      "legionella": {
+        "name": "Cykl antylegionella",
+        "description": "Ten zbiornik wymaga okresowej dezynfekcji termicznej do górnej granicy."
+      },
+      "legionella_days": {
+        "name": "Interwał antylegionella",
+        "description": "Dni między dwoma cyklami antylegionella. NEN 1006 wymaga co tydzień."
+      },
+      "legionella_band": {
+        "name": "Zakres antylegionella",
+        "description": "Dni przed i po tym interwale, spośród których wybierany jest najtańszy dzień."
+      },
+      "sensor_height": {
+        "name": "Wysokość czujnika",
+        "description": "Gdzie w zbiorniku znajduje się czujnik temperatury."
+      },
+      "bottom_entity": {
+        "name": "Czujnik dolny",
+        "description": "Opcjonalny czujnik na dole zbiornika. Model śledzi wtedy także dół."
+      },
+      "top_entity": {
+        "name": "Czujnik górny",
+        "description": "Opcjonalny czujnik na górze zbiornika. Model śledzi wtedy także górę."
+      },
+      "setpoint": {
+        "name": "Nastawa",
+        "description": "Temperatura, do której dąży solver. Między 17:00 a 23:00 jest zawsze osiągana."
+      },
+      "t_min_day": {
+        "name": "Najniższa temperatura w dzień",
+        "description": "Do tej wartości solver może zejść poniżej nastawy między 07:00 a 17:00, gdy to się opłaca."
+      },
+      "t_min_night": {
+        "name": "Najniższa temperatura w nocy",
+        "description": "Do tej wartości solver może zejść poniżej nastawy między 23:00 a 07:00, gdy to się opłaca."
+      },
+      "ambient": {
+        "name": "Temperatura otoczenia",
+        "description": "Temperatura pomieszczenia, do którego ten zasobnik traci ciepło."
+      },
+      "heat_max": {
+        "name": "Moc grzewcza",
+        "description": "Maksymalna moc grzewcza pompy ciepła w kW."
+      },
+      "cop": {
+        "name": "COP",
+        "description": "Sprawność, z jaką moc grzewcza jest przeliczana na moc elektryczną."
+      },
+      "phase": {
+        "name": "Faza",
+        "description": "Do której fazy podłączone jest to urządzenie. Ustalane co noc na podstawie historii."
+      },
+      "max_power": {
+        "name": "Moc elektryczna",
+        "description": "Maksymalna moc elektryczna w kW, którą solver może zaplanować."
+      },
+      "volume": {
+        "name": "Objętość",
+        "description": "Pojemność wodna zbiornika w litrach. Wynika z niej dokładnie liczba stopni na kWh, więc zastępuje kalibrację."
+      },
+      "name": {
+        "name": "Nazwa",
+        "description": "Nazwa; HA nazywa według niej urządzenie i jego encje."
+      },
+      "kind": {
+        "name": "Rodzaj",
+        "description": "Rodzaj urządzenia, tylko etykieta; zachowanie jest takie samo dla każdego rodzaju."
+      },
+      "latest_start_time": {
+        "name": "Najpóźniejszy start",
+        "description": "Godzina (GG:MM), do której cykl musi się rozpocząć; puste stosuje regułę domyślną."
+      },
+      "manage": {
+        "name": "Zarządzaj",
+        "description": "Wył.: ZenMaster nigdy nie uzbraja tego urządzenia i nie dotyka jego przełącznika."
+      },
+      "power_rating": {
+        "name": "Moc znamionowa",
+        "description": "Moc cyklu w kW, używana do czasu nauczenia profilu z historii."
+      },
+      "cycle_duration_slots": {
+        "name": "Czas trwania cyklu",
+        "description": "Czas trwania cyklu w kwadransach, używany do czasu nauczenia profilu."
+      },
+      "charge_power_entity": {
+        "name": "Ustawienie mocy ładowania",
+        "description": "Encja number ustawiająca moc ładowarki."
+      },
+      "soc_entity": {
+        "name": "Stan naładowania",
+        "description": "Czujnik ze stanem naładowania auta w procentach."
+      },
+      "connected_entity": {
+        "name": "Podłączony",
+        "description": "Czujnik binarny informujący, czy kabel jest podłączony."
+      },
+      "departure_time": {
+        "name": "Godzina wyjazdu",
+        "description": "Godzina (GG:MM), do której auto musi być naładowane."
+      },
+      "ev_max_soc": {
+        "name": "Docelowy stan naładowania",
+        "description": "Stan naładowania (0-1), do którego auto jest ładowane."
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Limit ceny",
+        "description": "Cena za kWh, poniżej której ładowanie się opłaca; z PV tylko poniżej jednej trzeciej tej ceny."
+      },
+      "capacity_kwh": {
+        "name": "Pojemność baterii",
+        "description": "Pojemność baterii auta w kWh."
+      },
+      "max_power_kw": {
+        "name": "Maksymalna moc ładowania",
+        "description": "Maksymalna moc ładowarki w kW."
+      },
+      "derate_entity": {
+        "name": "Ograniczenie",
+        "description": "Encja number ograniczająca falownik; puste oznacza brak możliwości ograniczania."
+      },
+      "solver": {
+        "name": "Solver",
+        "description": "Planuje akumulator i odbiorniki według cen i prognozy PV. Wyłączony: flota steruje się sama, a karty planowania są ukryte."
+      }
+    },
+    "section": {
+      "price": "Cena dynamiczna",
+      "link": "Powiązania",
+      "behaviour": "Zachowanie",
+      "plate": "Tabliczka znamionowa",
+      "expert": "Ekspert",
+      "cloud": "Chmura",
+      "local_broker": "Lokalny broker",
+      "wifi": "Wi-Fi"
+    },
+    "action": {
+      "arm_off": "Nie uzbrajaj",
+      "arm_on": "Zarządzaj ponownie",
+      "pause": "Pauza",
+      "skip": "Pomiń",
+      "start": "Start",
+      "stop": "Stop"
+    },
+    "button": {
+      "detect_phase": "Ustal fazę z historii",
+      "request_code": "Poproś o kod"
+    },
+    "option": {
+      "kind": {
+        "custom": "Inne",
+        "dishwasher": "Zmywarka",
+        "dryer": "Suszarka",
+        "washingmachine": "Pralka"
+      },
+      "phase": {
+        "0": "Wszystkie fazy"
+      },
+      "control": {
+        "delta": "Delta temperatury",
+        "power": "Pobierana moc",
+        "capacity": "Wydajność %",
+        "temperature": "Temperatura"
+      },
+      "provider": {
+        "none": "Brak",
+        "wholesale": "Hurtowa (spot, bez opłat)"
+      },
+      "sensor_height": {
+        "boven": "Góra",
+        "midden": "Środek",
+        "onder": "Dół"
+      }
+    },
+    "ui": {
+      "app": {
+        "consumers": "Odbiorniki",
+        "export": "oddawanie",
+        "import": "pobór",
+        "solar_groups": "Grupy PV · teraz",
+        "load_failed": "Błąd ładowania: {error}",
+        "loading": "ładowanie…",
+        "now": "teraz",
+        "power": "Moc",
+        "retry": "Ponów",
+        "savings": "Oszczędności",
+        "solar": "PV",
+        "system_active": "System aktywny, kliknij, aby wstrzymać",
+        "system_paused": "System wstrzymany, kliknij, aby aktywować",
+        "theme_dark": "Ciemny motyw",
+        "theme_light": "Jasny motyw",
+        "today": "dziś"
+      },
+      "ble": {
+        "busy": "Trwa…",
+        "cloud": "Chmura",
+        "connect": "Połącz",
+        "empty": "(puste)",
+        "local": "Lokalnie",
+        "log_broker": "Broker ({mode}): {url}",
+        "log_connected": "Połączono: {name}",
+        "log_connecting": "Łączenie… (wybierz urządzenie w przeglądarce)",
+        "log_done": "Gotowe: urządzenie pojawi się, gdy tylko zgłosi się do brokera.",
+        "log_error": "Błąd: {error}",
+        "log_provisioned": "Konfiguracja wysłana; czekam 25 s, aż urządzenie się przełączy…",
+        "log_reconnect": "Ponowne łączenie…",
+        "log_reconnect_station": "Ponowne łączenie dla trybu station…",
+        "log_station": "Wysyłanie polecenia station…",
+        "log_wait": "Czekam na ponowne połączenie… ({error})",
+        "no_info": "nie otrzymano informacji o urządzeniu",
+        "no_url": "(niedostępne, synchronizacja z chmurą jeszcze się nie odbyła)",
+        "title": "Parowanie urządzenia przez Bluetooth",
+        "unavailable": "Web Bluetooth nie jest tu dostępny. Wymaga HTTPS (lub localhost) i Chrome/Edge.",
+        "log_device": "Urządzenie: {id}",
+        "broker": "Broker"
+      },
+      "chart": {
+        "battery": "Bateria",
+        "consumers": "Odbiorniki",
+        "export": "Oddawanie do sieci",
+        "grid": "Sieć",
+        "import": "Pobór z sieci",
+        "load": "Zużycie domu",
+        "price": "Cena",
+        "price_buy": "Cena zakupu",
+        "price_dayahead": "Cena (day-ahead)",
+        "price_extrapolated": "Cena (ekstrapolacja)",
+        "price_sell": "Cena sprzedaży",
+        "solar": "PV",
+        "solar_forecast": "Prognoza PV",
+        "soc_min": "min. SoC",
+        "soc_max": "maks. SoC",
+        "dayahead": "day-ahead"
+      },
+      "common": {
+        "close": "Zamknij",
+        "cancel": "Anuluj",
+        "delete": "Usuń",
+        "edit": "Edytuj",
+        "no_plan": "Brak załadowanego planu.",
+        "save": "Zapisz",
+        "unknown_error": "nieznany błąd"
+      },
+      "consumer_type": {
+        "appliance": "Urządzenie AGD",
+        "boiler_electric": "Bojler",
+        "boiler_hp": "Bojler",
+        "dishwasher": "Zmywarka",
+        "dryer": "Suszarka",
+        "ev": "Ładowarka EV",
+        "heatpump": "Pompa ciepła",
+        "pool": "Basen",
+        "washingmachine": "Pralka"
+      },
+      "consumers": {
+        "add": "Dodaj odbiornik",
+        "next": "Następny",
+        "today": "Dziś",
+        "until": "{state} do {time}"
+      },
+      "devices": {
+        "controls": "Sterowanie",
+        "name": "Nazwa",
+        "open_ha": "Otwórz w Home Assistant",
+        "show_active": "Aktywne urządzenia",
+        "show_all": "Wszystkie urządzenia",
+        "steering": "regulacja",
+        "ble_pair": "Paruj przez BLE",
+        "correction": "Korekta",
+        "empty": "Brak urządzeń Zendure w konfiguracji.",
+        "manual": "Ręcznie",
+        "max_grid": "Maks. sieć",
+        "mode": "Tryb",
+        "pair": "Paruj",
+        "tile_in": "Wej.",
+        "tile_out": "Wyj.",
+        "tile_solar": "PV",
+        "tile_temp": "Temp."
+      },
+      "forecast": {
+        "d7": "7 dni",
+        "groups": "Grupy PV",
+        "groups_hint": "na połać dachu · orientacja i udział",
+        "h48": "48 godzin",
+        "hint": "PV jako słupki · cena jako linia",
+        "note": "Cena poza day-ahead jest szacunkiem z modelu cen.",
+        "per_day": "Oczekiwany uzysk PV na dzień",
+        "per_day_hint": "kWh · z prognozy 7-dniowej",
+        "title": "PV i cena · prognoza"
+      },
+      "group": {
+        "command_failed": "{cmd}: niepowodzenie",
+        "confirm_delete": "Usunąć {name}?",
+        "distribution": {
+          "tag": "sterowanie",
+          "title": "ZenMaster"
+        },
+        "not_saved": "nie zapisano:",
+        "price": {
+          "tag": "solver",
+          "title": "Ceny"
+        },
+        "zendure": {
+          "tag": "sterownik",
+          "title": "Zendure"
+        }
+      },
+      "kind": {
+        "boiler": "Bojler",
+        "boiler_electric": "Bojler",
+        "boiler_heat_pump": "Bojler",
+        "consumer": "Odbiornik",
+        "dishwasher": "Zmywarka",
+        "dryer": "Suszarka",
+        "electric_vehicle": "Punkt ładowania",
+        "heating_heat_pump": "Pompa ciepła",
+        "house": "Pompa ciepła",
+        "pool": "Basen",
+        "pool_heat_pump": "Basen",
+        "washingmachine": "Pralka"
+      },
+      "settings": {
+        "empty": "Brak ustawień w schemacie.",
+        "loading": "Ładowanie schematu…"
+      },
+      "solar": {
+        "actual": "Bieżąca",
+        "add": "Dodaj panel PV",
+        "confirm_delete": "Usunąć \"{name}\"?",
+        "empty": "brak grup PV w konfiguracji",
+        "name": "Nazwa",
+        "new_group": "Nowa grupa"
+      },
+      "state": {
+        "aborted": "Zatrzymano",
+        "armed": "Oczekuje",
+        "none": "Wył.",
+        "planned": "Zaplanowano",
+        "ready": "Gotowe",
+        "running": "Działa",
+        "unmanaged": "Niezarządzane"
+      },
+      "tab": {
+        "solar": {
+          "label": "Fotowoltaika"
+        },
+        "cijfers": {
+          "label": "Historia",
+          "subtitle": "Wyniki dziś i z ostatnich 30 dni.",
+          "title": "Trend"
+        },
+        "consumers": {
+          "subtitle": "Użycie na urządzenie i bezpośrednie sterowanie.",
+          "title": "Odbiorniki"
+        },
+        "dashboard": {
+          "label": "Planowanie",
+          "subtitle": "Inteligentne planowanie wokół PV, cen dynamicznych i baterii Zendure.",
+          "title": "Optymalizacja energii"
+        },
+        "devices": {
+          "label": "Urządzenia",
+          "subtitle": "Twoja flota Zendure na żywo.",
+          "title": "Urządzenia"
+        },
+        "forecast": {
+          "subtitle": "PV i cena na najbliższe godziny i dni.",
+          "title": "Prognoza"
+        },
+        "settings": {
+          "label": "Ustawienia",
+          "subtitle": "Konfiguracja systemu, ceny, prognozy i floty.",
+          "title": "Ustawienia"
+        }
+      },
+      "trend": {
+        "accuracy": "Trafność prog.",
+        "autarky": "Samowystarczalność",
+        "battery": "Bateria → dom",
+        "cumulative": "Narastająco",
+        "day": "Dzień {n}",
+        "day_short": "d{n}",
+        "hint": "każdy wiersz na tej samej osi dat · najedź, by zobaczyć dzień",
+        "mix": "Miks energii",
+        "per_day": "{unit}/dzień",
+        "share": "udział/dzień",
+        "solar": "Uzysk PV",
+        "tip_kpi": "Samowystarczalność {autarky}% · Oszczędności €{savings} · Prognoza {accuracy}%",
+        "tip_kwh": "PV {solar} · Bateria {battery} · Sieć {grid} kWh",
+        "tip_mix": "Miks · PV {solar}% · bateria {battery}% · sieć {grid}%",
+        "title": "Historia 30 dni"
+      },
+      "weekdays": "niedz.,pon.,wt.,śr.,czw.,pt.,sob."
+    }
+  }
+}

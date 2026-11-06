@@ -1,0 +1,1071 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ZenMaster",
+        "description": "Set up ZenMaster. All configuration (drivers, solar panels, consumers, P1 meter) is done afterwards in the ZenMaster panel."
+      }
+    },
+    "abort": {
+      "already_configured": "ZenMaster is already configured"
+    }
+  },
+  "config_subentries": {
+    "appliance": {
+      "entry_type": "Appliance",
+      "initiate_flow": {
+        "user": "Add appliance",
+        "reconfigure": "Reconfigure appliance"
+      },
+      "step": {
+        "user": {
+          "title": "Add appliance",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "switch_entity": "Release",
+                "power_entity": "Power measurement"
+              },
+              "data_description": {
+                "switch_entity": "While this is on the solver may schedule this device.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure appliance",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "switch_entity": "Release",
+                "power_entity": "Power measurement"
+              },
+              "data_description": {
+                "switch_entity": "While this is on the solver may schedule this device.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "electric_vehicle": {
+      "entry_type": "EV charger",
+      "initiate_flow": {
+        "user": "Add EV charger",
+        "reconfigure": "Reconfigure EV charger"
+      },
+      "step": {
+        "user": {
+          "title": "Add EV charger",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "charge_power_entity": "Charge power setting",
+                "soc_entity": "State of charge",
+                "connected_entity": "Connected",
+                "power_entity": "Power measurement"
+              },
+              "data_description": {
+                "charge_power_entity": "Number entity that sets the charger's power.",
+                "soc_entity": "Sensor with the car's state of charge in percent.",
+                "connected_entity": "Binary sensor that tells whether the cable is connected.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure EV charger",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "charge_power_entity": "Charge power setting",
+                "soc_entity": "State of charge",
+                "connected_entity": "Connected",
+                "power_entity": "Power measurement"
+              },
+              "data_description": {
+                "charge_power_entity": "Number entity that sets the charger's power.",
+                "soc_entity": "Sensor with the car's state of charge in percent.",
+                "connected_entity": "Binary sensor that tells whether the cable is connected.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "heating_heat_pump": {
+      "entry_type": "Heat pump",
+      "initiate_flow": {
+        "user": "Add heat pump",
+        "reconfigure": "Reconfigure heat pump"
+      },
+      "step": {
+        "user": {
+          "title": "Add heat pump",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release",
+                "control_entity": "Control"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device.",
+                "control_entity": "Number or climate the plan is written to every quarter, in the type chosen under Control type."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure heat pump",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release",
+                "control_entity": "Control"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device.",
+                "control_entity": "Number or climate the plan is written to every quarter, in the type chosen under Control type."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "boiler_heat_pump": {
+      "entry_type": "Boiler (heat pump)",
+      "initiate_flow": {
+        "user": "Add boiler (heat pump)",
+        "reconfigure": "Reconfigure boiler (heat pump)"
+      },
+      "step": {
+        "user": {
+          "title": "Add boiler (heat pump)",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release",
+                "setpoint_entity": "Setpoint"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device.",
+                "setpoint_entity": "Number holding the wanted temperature in degrees."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure boiler (heat pump)",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release",
+                "setpoint_entity": "Setpoint"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device.",
+                "setpoint_entity": "Number holding the wanted temperature in degrees."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "boiler_electric": {
+      "entry_type": "Boiler (electric)",
+      "initiate_flow": {
+        "user": "Add boiler (electric)",
+        "reconfigure": "Reconfigure boiler (electric)"
+      },
+      "step": {
+        "user": {
+          "title": "Add boiler (electric)",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure boiler (electric)",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "pool_heat_pump": {
+      "entry_type": "Pool (heat pump)",
+      "initiate_flow": {
+        "user": "Add pool (heat pump)",
+        "reconfigure": "Reconfigure pool (heat pump)"
+      },
+      "step": {
+        "user": {
+          "title": "Add pool (heat pump)",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure pool (heat pump)",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "Linking",
+              "data": {
+                "temp_entity": "Temperature sensor",
+                "power_entity": "Power measurement",
+                "switch_entity": "Release"
+              },
+              "data_description": {
+                "temp_entity": "The sensor that measures the temperature of this store.",
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+                "switch_entity": "While this is on the solver may schedule this device."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "solar_panel": {
+      "entry_type": "Solar group",
+      "initiate_flow": {
+        "user": "Add solar group",
+        "reconfigure": "Reconfigure solar group"
+      },
+      "step": {
+        "user": {
+          "title": "Add solar group",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name",
+            "power_entity": "Power measurement",
+            "derate_entity": "Curtailment"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it.",
+            "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+            "derate_entity": "Number entity that throttles the inverter; empty means it cannot curtail."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure solar group",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name",
+            "power_entity": "Power measurement",
+            "derate_entity": "Curtailment"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it.",
+            "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
+            "derate_entity": "Number entity that throttles the inverter; empty means it cannot curtail."
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "zendure": {
+      "entry_type": "Zendure device",
+      "initiate_flow": {
+        "user": "Add Zendure device",
+        "reconfigure": "Reconfigure device"
+      },
+      "step": {
+        "user": {
+          "title": "Add Zendure device",
+          "description": "Devices are normally found automatically. Add one by hand only when it never shows up.",
+          "data": {
+            "prodkey": "Product key",
+            "device_id": "Device key",
+            "sn": "Serial number",
+            "ip": "IP address",
+            "blemac": "Bluetooth address"
+          },
+          "data_description": {
+            "prodkey": "The productKey the Zendure cloud reports for the device.",
+            "device_id": "The deviceKey the Zendure cloud reports for the device.",
+            "sn": "The serial number on the device label.",
+            "ip": "Fixed address for the local API; learned automatically when empty.",
+            "blemac": "Learned automatically from the Bluetooth advertisement when empty."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "The name of a device never changes; its addresses can.",
+          "data": {
+            "ip": "IP address",
+            "blemac": "Bluetooth address"
+          },
+          "data_description": {
+            "ip": "Fixed address for the local API; learned automatically when empty.",
+            "blemac": "Learned automatically from the Bluetooth advertisement when empty."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "This device is already configured",
+        "unknown_prodkey": "Unknown product key"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "state": {
+          "0": "Discovered",
+          "1": "Offline",
+          "2": "MQTT (cloud)",
+          "3": "MQTT (local)",
+          "4": "Modbus",
+          "5": "HTTP",
+          "6": "Bluetooth"
+        }
+      },
+      "state": {
+        "name": "Status"
+      }
+    },
+    "select": {
+      "power_phase": {
+        "name": "Phase"
+      },
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "off": "Off",
+          "manual": "Manual",
+          "smart": "Smart",
+          "smart_discharging": "Smart discharging",
+          "smart_charging": "Smart charging",
+          "store_solar": "Store solar",
+          "individual": "Individual"
+        }
+      },
+      "phase": {
+        "name": "Phase"
+      },
+      "sensor_height": {
+        "name": "Sensor height"
+      }
+    },
+    "switch": {
+      "manage": {
+        "name": "Manage"
+      },
+      "legionella": {
+        "name": "Legionella run"
+      }
+    },
+    "time": {
+      "latest_start_time": {
+        "name": "Latest start time"
+      },
+      "departure_time": {
+        "name": "Departure time"
+      }
+    },
+    "number": {
+      "power_rating": {
+        "name": "Power rating"
+      },
+      "cycle_duration_slots": {
+        "name": "Cycle duration"
+      },
+      "ev_max_soc": {
+        "name": "Target state of charge"
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Price limit"
+      },
+      "capacity_kwh": {
+        "name": "Battery capacity"
+      },
+      "max_power_kw": {
+        "name": "Maximum charge power"
+      },
+      "t_min": {
+        "name": "Lower bound"
+      },
+      "t_max": {
+        "name": "Upper bound"
+      },
+      "setpoint": {
+        "name": "Setpoint"
+      },
+      "t_min_day": {
+        "name": "Lowest temperature by day"
+      },
+      "t_min_night": {
+        "name": "Lowest temperature at night"
+      },
+      "heat_max": {
+        "name": "Heat output"
+      },
+      "cop": {
+        "name": "COP"
+      },
+      "ambient": {
+        "name": "Ambient temperature"
+      },
+      "legionella_days": {
+        "name": "Legionella interval"
+      },
+      "legionella_band": {
+        "name": "Legionella band"
+      },
+      "max_power": {
+        "name": "Electrical power"
+      },
+      "volume": {
+        "name": "Volume"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Start"
+      },
+      "stop": {
+        "name": "Stop"
+      },
+      "skip": {
+        "name": "Skip"
+      },
+      "detect_phases": {
+        "name": "Detect phases"
+      },
+      "export_replay": {
+        "name": "Export replay data"
+      }
+    }
+  },
+  "config_panel": {
+    "field": {
+      "temp_entity": {
+        "name": "Temperature sensor",
+        "description": "The sensor that measures the temperature of this store."
+      },
+      "power_entity": {
+        "name": "Power measurement",
+        "description": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
+      },
+      "switch_entity": {
+        "name": "Release",
+        "description": "While this is on the solver may schedule this device."
+      },
+      "control_entity": {
+        "name": "Control",
+        "description": "Number or climate the plan is written to every quarter, in the type chosen under Control type."
+      },
+      "control": {
+        "name": "Control type",
+        "description": "What is written to the linked entity: the temperature delta (offset in K), the electrical power, the capacity in percent or the temperature."
+      },
+      "setpoint_entity": {
+        "name": "Setpoint",
+        "description": "Number holding the wanted temperature in degrees."
+      },
+      "ambient_entity": {
+        "name": "Ambient sensor",
+        "description": "Sensor in the room the tank stands in. Empty uses the configured ambient temperature."
+      },
+      "t_min": {
+        "name": "Lower bound",
+        "description": "Lowest temperature the solver allows."
+      },
+      "t_max": {
+        "name": "Upper bound",
+        "description": "Highest temperature the solver may charge to. Higher means more buffer."
+      },
+      "legionella": {
+        "name": "Legionella run",
+        "description": "This tank needs a periodic thermal disinfection up to its upper limit."
+      },
+      "legionella_days": {
+        "name": "Legionella interval",
+        "description": "Days between two legionella runs. NEN 1006 asks for weekly."
+      },
+      "legionella_band": {
+        "name": "Legionella band",
+        "description": "Days either side of that interval to pick the cheapest day from."
+      },
+      "sensor_height": {
+        "name": "Sensor height",
+        "description": "Where the temperature sensor sits in the tank."
+      },
+      "bottom_entity": {
+        "name": "Bottom sensor",
+        "description": "Optional sensor at the bottom of the tank. The model then follows the bottom too."
+      },
+      "top_entity": {
+        "name": "Top sensor",
+        "description": "Optional sensor at the top of the tank. The model then follows the top too."
+      },
+      "setpoint": {
+        "name": "Setpoint",
+        "description": "Temperature the solver aims for. Between 17:00 and 23:00 it is always reached."
+      },
+      "t_min_day": {
+        "name": "Lowest temperature by day",
+        "description": "How far the solver may drop below the setpoint between 07:00 and 17:00 when that saves money."
+      },
+      "t_min_night": {
+        "name": "Lowest temperature at night",
+        "description": "How far the solver may drop below the setpoint between 23:00 and 07:00 when that saves money."
+      },
+      "ambient": {
+        "name": "Ambient temperature",
+        "description": "Temperature of the room this store loses its heat to."
+      },
+      "heat_max": {
+        "name": "Heat output",
+        "description": "Maximum heat output of the heat pump in kW."
+      },
+      "cop": {
+        "name": "COP",
+        "description": "Efficiency used to turn the heat output into electrical power."
+      },
+      "phase": {
+        "name": "Phase",
+        "description": "Which phase this device is connected to. Determined from history every night."
+      },
+      "max_power": {
+        "name": "Electrical power",
+        "description": "Maximum electrical power in kW the solver may schedule."
+      },
+      "volume": {
+        "name": "Volume",
+        "description": "Water content of the tank in litres. It gives the degrees per kWh exactly, so it replaces a calibration."
+      },
+      "name": {
+        "name": "Name",
+        "description": "Name; HA names the device and its entities after it."
+      },
+      "kind": {
+        "name": "Kind",
+        "description": "Kind of appliance, a label only; the behaviour is the same for every kind."
+      },
+      "latest_start_time": {
+        "name": "Latest start time",
+        "description": "Time (HH:MM) by which the cycle must have started; empty applies the default rule."
+      },
+      "manage": {
+        "name": "Manage",
+        "description": "Off: ZenMaster never arms this appliance and never touches its switch."
+      },
+      "power_rating": {
+        "name": "Power rating",
+        "description": "Power of a cycle in kW, used until a profile has been learned from history."
+      },
+      "cycle_duration_slots": {
+        "name": "Cycle duration",
+        "description": "Duration of a cycle in quarters of an hour, used until a profile has been learned."
+      },
+      "charge_power_entity": {
+        "name": "Charge power setting",
+        "description": "Number entity that sets the charger's power."
+      },
+      "soc_entity": {
+        "name": "State of charge",
+        "description": "Sensor with the car's state of charge in percent."
+      },
+      "connected_entity": {
+        "name": "Connected",
+        "description": "Binary sensor that tells whether the cable is connected."
+      },
+      "departure_time": {
+        "name": "Departure time",
+        "description": "Time (HH:MM) by which the car must be charged."
+      },
+      "ev_max_soc": {
+        "name": "Target state of charge",
+        "description": "State of charge (0-1) to charge up to."
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Price limit",
+        "description": "Price per kWh under which charging pays; on solar only under a third of it."
+      },
+      "capacity_kwh": {
+        "name": "Battery capacity",
+        "description": "Capacity of the car battery in kWh."
+      },
+      "max_power_kw": {
+        "name": "Maximum charge power",
+        "description": "Maximum power of the charger in kW."
+      },
+      "derate_entity": {
+        "name": "Curtailment",
+        "description": "Number entity that throttles the inverter; empty means it cannot curtail."
+      },
+      "solver": {
+        "name": "Solver",
+        "description": "Plans the battery and the consumers against prices and the solar forecast. Off: the fleet runs on its own control and the planning tabs are hidden."
+      }
+    },
+    "section": {
+      "price": "Dynamic price",
+      "link": "Linking",
+      "behaviour": "Behaviour",
+      "plate": "Nameplate",
+      "expert": "Expert",
+      "cloud": "Cloud",
+      "local_broker": "Local broker",
+      "wifi": "Wifi"
+    },
+    "action": {
+      "arm_off": "Do not arm",
+      "arm_on": "Manage again",
+      "pause": "Pause",
+      "skip": "Skip",
+      "start": "Start",
+      "stop": "Stop"
+    },
+    "button": {
+      "detect_phase": "Determine phase from history",
+      "request_code": "Request code"
+    },
+    "option": {
+      "kind": {
+        "custom": "Other",
+        "dishwasher": "Dishwasher",
+        "dryer": "Dryer",
+        "washingmachine": "Washing machine"
+      },
+      "phase": {
+        "0": "All phases"
+      },
+      "control": {
+        "delta": "Temperature delta",
+        "power": "Electrical power",
+        "capacity": "Capacity %",
+        "temperature": "Temperature"
+      },
+      "provider": {
+        "none": "None",
+        "wholesale": "Wholesale (spot, bare)"
+      },
+      "sensor_height": {
+        "boven": "Top",
+        "midden": "Middle",
+        "onder": "Bottom"
+      }
+    },
+    "ui": {
+      "app": {
+        "consumers": "Consumers",
+        "export": "export",
+        "import": "import",
+        "solar_groups": "Solar groups · now",
+        "load_failed": "Loading failed: {error}",
+        "loading": "loading…",
+        "now": "now",
+        "power": "Power",
+        "retry": "Retry",
+        "savings": "Savings",
+        "solar": "Solar",
+        "system_active": "System active, click to pause",
+        "system_paused": "System paused, click to activate",
+        "theme_dark": "Dark theme",
+        "theme_light": "Light theme",
+        "today": "today"
+      },
+      "ble": {
+        "busy": "Busy…",
+        "cloud": "Cloud",
+        "connect": "Connect",
+        "empty": "(empty)",
+        "local": "Local",
+        "log_broker": "Broker ({mode}): {url}",
+        "log_connected": "Connected: {name}",
+        "log_connecting": "Connecting… (pick the device in the browser)",
+        "log_done": "Done: the device appears as soon as it reports to the broker.",
+        "log_error": "Error: {error}",
+        "log_provisioned": "Provisioning sent; waiting 25 s while the device switches over…",
+        "log_reconnect": "Reconnecting…",
+        "log_reconnect_station": "Reconnecting for station…",
+        "log_station": "Sending station command…",
+        "log_wait": "Waiting for reconnection… ({error})",
+        "no_info": "no device info received",
+        "no_url": "(not available, cloud sync has not run yet)",
+        "title": "Pair device via Bluetooth",
+        "unavailable": "Web Bluetooth is not available here. Requires HTTPS (or localhost) and Chrome/Edge.",
+        "log_device": "Device: {id}",
+        "broker": "Broker"
+      },
+      "chart": {
+        "battery": "Battery",
+        "consumers": "Consumers",
+        "export": "Export",
+        "grid": "Grid",
+        "import": "Grid import",
+        "load": "House load",
+        "price": "Price",
+        "price_buy": "Buy price",
+        "price_dayahead": "Price (day-ahead)",
+        "price_extrapolated": "Price (extrapolated)",
+        "price_sell": "Sell price",
+        "solar": "Solar",
+        "solar_forecast": "Solar forecast",
+        "soc_min": "min SoC",
+        "soc_max": "max SoC",
+        "dayahead": "day-ahead"
+      },
+      "common": {
+        "close": "Close",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "edit": "Edit",
+        "no_plan": "No plan loaded.",
+        "save": "Save",
+        "unknown_error": "unknown error"
+      },
+      "consumer_type": {
+        "appliance": "Appliance",
+        "boiler_electric": "Boiler",
+        "boiler_hp": "Boiler",
+        "dishwasher": "Dishwasher",
+        "dryer": "Dryer",
+        "ev": "EV charger",
+        "heatpump": "Heat pump",
+        "pool": "Pool",
+        "washingmachine": "Washing machine"
+      },
+      "consumers": {
+        "add": "Add consumer",
+        "next": "Next",
+        "today": "Today",
+        "until": "{state} until {time}"
+      },
+      "devices": {
+        "controls": "Controls",
+        "name": "Name",
+        "open_ha": "Open in Home Assistant",
+        "show_active": "Active devices",
+        "show_all": "All devices",
+        "steering": "control",
+        "ble_pair": "Pair via BLE",
+        "correction": "Correction",
+        "empty": "No Zendure devices in the config.",
+        "manual": "Manual",
+        "max_grid": "Max grid",
+        "mode": "Mode",
+        "pair": "Pair",
+        "tile_in": "In",
+        "tile_out": "Out",
+        "tile_solar": "Solar",
+        "tile_temp": "Temp"
+      },
+      "forecast": {
+        "d7": "7 days",
+        "groups": "Solar groups",
+        "groups_hint": "per roof plane · orientation & contribution",
+        "h48": "48 hours",
+        "hint": "solar as bars · price as line",
+        "note": "Price beyond day-ahead is an estimate from the price model.",
+        "per_day": "Expected solar yield per day",
+        "per_day_hint": "kWh · from the 7-day forecast",
+        "title": "Solar & price · outlook"
+      },
+      "group": {
+        "command_failed": "{cmd}: failed",
+        "confirm_delete": "Delete {name}?",
+        "distribution": {
+          "tag": "control",
+          "title": "ZenMaster"
+        },
+        "not_saved": "not saved:",
+        "price": {
+          "tag": "solver",
+          "title": "Prices"
+        },
+        "zendure": {
+          "tag": "driver",
+          "title": "Zendure"
+        }
+      },
+      "kind": {
+        "boiler": "Boiler",
+        "boiler_electric": "Boiler",
+        "boiler_heat_pump": "Boiler",
+        "consumer": "Consumer",
+        "dishwasher": "Dishwasher",
+        "dryer": "Dryer",
+        "electric_vehicle": "Charging point",
+        "heating_heat_pump": "Heat pump",
+        "house": "Heat pump",
+        "pool": "Pool",
+        "pool_heat_pump": "Pool",
+        "washingmachine": "Washing machine"
+      },
+      "settings": {
+        "empty": "No settings in the schema.",
+        "loading": "Loading schema…"
+      },
+      "solar": {
+        "actual": "Current",
+        "add": "Add solar panel",
+        "confirm_delete": "Delete \"{name}\"?",
+        "empty": "no solar groups in the config",
+        "name": "Name",
+        "new_group": "New group"
+      },
+      "state": {
+        "aborted": "Stopped",
+        "armed": "Waiting",
+        "none": "Off",
+        "planned": "Planned",
+        "ready": "Done",
+        "running": "Running",
+        "unmanaged": "Not managed"
+      },
+      "tab": {
+        "solar": {
+          "label": "Solar"
+        },
+        "cijfers": {
+          "label": "History",
+          "subtitle": "Performance today and over the last 30 days.",
+          "title": "Trend"
+        },
+        "consumers": {
+          "subtitle": "Use per device and direct control.",
+          "title": "Consumers"
+        },
+        "dashboard": {
+          "label": "Planning",
+          "subtitle": "Smart planning around solar, dynamic prices and your Zendure battery.",
+          "title": "Energy optimisation"
+        },
+        "devices": {
+          "label": "Devices",
+          "subtitle": "Your Zendure fleet, live.",
+          "title": "Devices"
+        },
+        "forecast": {
+          "subtitle": "Solar and price for the coming hours and days.",
+          "title": "Outlook"
+        },
+        "settings": {
+          "label": "Settings",
+          "subtitle": "Configure system, price, forecast and fleet.",
+          "title": "Settings"
+        }
+      },
+      "trend": {
+        "accuracy": "Forecast acc.",
+        "autarky": "Self-sufficiency",
+        "battery": "Battery → house",
+        "cumulative": "Cumulative",
+        "day": "Day {n}",
+        "day_short": "d{n}",
+        "hint": "every row on the same date axis · hover for one day",
+        "mix": "Energy mix",
+        "per_day": "{unit}/day",
+        "share": "share/day",
+        "solar": "Solar yield",
+        "tip_kpi": "Self-sufficiency {autarky}% · Savings €{savings} · Forecast {accuracy}%",
+        "tip_kwh": "Solar {solar} · Battery {battery} · Grid {grid} kWh",
+        "tip_mix": "Mix · solar {solar}% · battery {battery}% · grid {grid}%",
+        "title": "30-day history"
+      },
+      "weekdays": "Sun,Mon,Tue,Wed,Thu,Fri,Sat"
+    }
+  }
+}

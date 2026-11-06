@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+set -e
+
+cd "$(dirname "$0")/.."
+
+python3 -m pip install --requirement requirements.txt
+
+# Home Assistant config dir: default config + HACS.
+hass --script ensure_config -c config
+cd config && curl -sfSL https://get.hacs.xyz | bash -
+cd - > /dev/null
+
+# Link the ZenMaster integration + its config (config.json/zendure.json) from the repo so HA
+# loads it and finds <config>/ZenMaster/. config/ is gitignored (runtime only).
+mkdir -p config/custom_components config/ZenMaster
+ln -sfn "$(pwd)/custom_components/zenmaster" config/custom_components/zenmaster
+ln -sfn "$(pwd)/config.json" config/ZenMaster/config.json
+if [ -f zendure.json ]; then
+  ln -sfn "$(pwd)/zendure.json" config/ZenMaster/zendure.json
+fi
+
+if ! grep -q "custom_components.zenmaster" config/configuration.yaml; then
+  cat >> config/configuration.yaml <<'YAML'
+logger:
+  default: info
+  logs:
+    custom_components.zenmaster: debug
+YAML
+fi
+
+# Build the ZenMaster panel (Lit + TS -> ui/dist/zm-app.js + ui/dist/ZenMaster-panel.js, served
+# from ui/ by the integration). npm install re-resolves rollup's native binary for Linux.
+cd ui
+npm install
+npm run build

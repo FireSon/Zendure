@@ -1,0 +1,68 @@
+{
+  "NL": {
+    "energy_tax": 0.09161,
+    "vat": 21.0,
+    "wholesale_zone": "NL",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {},
+      "anwb": {"import_markup": 0.0149, "fixed_cost_per_day": 0.28},
+      "vandebron": {"import_markup": 0.01826, "fixed_cost_per_day": 0.23},
+      "eneco": {"import_markup": 0.01562, "fixed_cost_per_day": 0.23, "export_markup": -0.0292}
+    }
+  },
+  "DE": {
+    "energy_tax": 0.06662,
+    "grid_fee": 0.0924,
+    "vat": 19.0,
+    "wholesale_zone": "DE-LU",
+    "publish": "13:00",
+    "export_factor": 0.0,
+    "export_markup": 0.077,
+    "providers": {
+      "wholesale": {},
+      "enbw": {"import_markup": 0.0, "fixed_cost_per_day": 0.58}
+    }
+  },
+  "BE": {
+    "energy_tax": 0.0422,
+    "grid_fee": 0.0523,
+    "vat": 6.0,
+    "wholesale_zone": "BE",
+    "publish": "13:00",
+    "providers": {
+      "wholesale": {},
+      "ebem": {"import_factor": 1.08, "import_markup": 0.03145, "fixed_cost_per_day": 0.1918, "export_factor": 0.925, "export_markup": -0.011},
+      "octaplus": {"import_factor": 1.094, "import_markup": 0.02058, "fixed_cost_per_day": 0.1781, "export_factor": 0.922, "export_markup": -0.0131},
+      "eneco_be": {"import_factor": 1.02, "import_markup": 0.01833, "fixed_cost_per_day": 0.0411, "export_factor": 1.0, "export_markup": -0.013}
+    }
+  },
+  "FR": {
+    "energy_tax": 0.03062,
+    "vat": 20.0,
+    "wholesale_zone": "FR",
+    "publish": "13:00",
+    "export_factor": 0.0,
+    "export_markup": 0.011,
+    "grid_tou": {"winter": [11, 12, 1, 2, 3], "offpeak": "22:00-06:00", "peak_fee": [0.0772, 0.0171], "offpeak_fee": [0.0409, 0.012]},
+    "providers": {
+      "wholesale": {},
+      "sobry": {"import_markup": 0.010, "fixed_cost_per_day": 0.6523},
+      "frank_fr": {"import_markup": 0.019, "fixed_cost_per_day": 0.5734}
+    }
+  },
+  "AT": {
+    "energy_tax": 0.0072,
+    "grid_fee": 0.0768,
+    "vat": 20.0,
+    "wholesale_zone": "AT",
+    "publish": "13:00",
+    "export_factor": 0.81,
+    "export_markup": 0.0,
+    "providers": {
+      "wholesale": {},
+      "awattar": {"import_markup": 0.015, "fixed_cost_per_day": 0.189},
+      "smartenergy": {"import_markup": 0.012, "fixed_cost_per_day": 0.0983}
+    }
+  }
+}

@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <style>
+    /* Surfaces/text follow the Home Assistant theme when embedded; the warm
+       values here are the standalone fallback. Brand orange/teal are fixed. */
+    [data-zm-theme="light"]{
+      --zm-bg: var(--primary-background-color, #f4f1ea);
+      --zm-card: var(--card-background-color, #ffffff);
+      --zm-card-2:#fbf9f4; --zm-border:#ece6db; --zm-border-2:#f1ece3;
+      --zm-text: var(--primary-text-color, #34322d);
+      --zm-text-dim: var(--secondary-text-color, #8d877b);
+      --zm-text-faint:#b3ada1;
+      --zm-orange-soft:#fceadb; --zm-teal-soft:#dff3ee; --zm-amber-soft:#fdf0d9;
+      --zm-shadow:0 1px 2px rgba(70,52,24,0.05),0 10px 30px rgba(70,52,24,0.07);
+      --zm-shadow-sm:0 1px 2px rgba(70,52,24,0.05),0 4px 14px rgba(70,52,24,0.05);
+    }
+    [data-zm-theme="dark"]{
+      --zm-bg: var(--primary-background-color, #1b1916);
+      --zm-card: var(--card-background-color, #262320);
+      --zm-card-2:#2d2925; --zm-border:rgba(255,255,255,0.075); --zm-border-2:rgba(255,255,255,0.05);
+      --zm-text: var(--primary-text-color, #f2eee7);
+      --zm-text-dim: var(--secondary-text-color, #a79e90);
+      --zm-text-faint:#6d655a;
+      --zm-orange-soft:rgba(244,122,32,0.16); --zm-teal-soft:rgba(31,184,154,0.16); --zm-amber-soft:rgba(245,166,35,0.15);
+      --zm-shadow:0 1px 2px rgba(0,0,0,0.3),0 12px 30px rgba(0,0,0,0.4);
+      --zm-shadow-sm:0 1px 2px rgba(0,0,0,0.25),0 5px 16px rgba(0,0,0,0.3);
+    }
+    [data-zm-lead="balanced"]{ --zm-primary:#f47a20; --zm-primary-soft:var(--zm-orange-soft); --zm-secondary:#1fb89a; --zm-secondary-soft:var(--zm-teal-soft); }
+    [data-zm-lead="orange"]{ --zm-primary:#f47a20; --zm-primary-soft:var(--zm-orange-soft); --zm-secondary:#e8964a; --zm-secondary-soft:var(--zm-amber-soft); }
+    [data-zm-lead="teal"]{ --zm-primary:#1fb89a; --zm-primary-soft:var(--zm-teal-soft); --zm-secondary:#f47a20; --zm-secondary-soft:var(--zm-orange-soft); }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; }
+    body{ background:var(--zm-bg); color:var(--zm-text); font-family:'Nunito Sans',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+    button{ font:inherit; color:inherit; cursor:pointer; }
+    ::selection{ background:rgba(244,122,32,0.2); }
+    *::-webkit-scrollbar{ width:10px; height:10px; }
+    *::-webkit-scrollbar-thumb{ background:var(--zm-border); border-radius:8px; border:2px solid var(--zm-bg); }
+    *::-webkit-scrollbar-track{ background:transparent; }
+    @keyframes zm-rise{ from{opacity:0;transform:translateY(10px);} to{opacity:1;transform:none;} }
+    @keyframes zm-optpulse{ 0%,100%{ box-shadow:0 0 0 4px color-mix(in srgb, var(--zm-primary) 18%, transparent), 0 6px 18px color-mix(in srgb, var(--zm-primary) 42%, transparent); } 50%{ box-shadow:0 0 0 7px color-mix(in srgb, var(--zm-primary) 9%, transparent), 0 6px 22px color-mix(in srgb, var(--zm-primary) 55%, transparent); } }
+    @keyframes zm-flow{ to{ stroke-dashoffset:-24; } }
+    @keyframes zm-spin{ to{ transform:rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce){ .reveal{animation:none!important;} }
+    .zm-nav{ margin:0 auto; display:flex; align-items:center; gap:4px; background:var(--zm-card); border:1px solid var(--zm-border); border-radius:999px; padding:5px; box-shadow:var(--zm-shadow-sm); }
+    .zm-tab{ display:flex; align-items:center; justify-content:center; gap:7px; border:none; border-radius:999px; padding:9px 13px; cursor:pointer; background:transparent; color:var(--zm-text-dim); transition:background .2s,color .2s; }
+    .zm-tab[data-on="1"]{ background:var(--zm-primary); color:#fff; box-shadow:0 2px 8px var(--zm-primary-soft); }
+    .zm-tab svg{ width:23px; height:23px; flex:none; }
+    @media (max-width:760px){
+      .zm-wrap{ padding:0 14px 90px !important; }
+      .zm-header{ padding:12px 0 2px !important; gap:10px !important; justify-content:space-between !important; }
+      .zm-logo img{ height:84px !important; }
+      .zm-nav{ position:fixed; left:0; right:0; bottom:0; width:100%; margin:0; gap:0; border-radius:18px 18px 0 0; border-width:1px 0 0 0; padding:7px 2px; padding-bottom:calc(7px + env(safe-area-inset-bottom)); justify-content:space-around; z-index:60; box-shadow:0 -4px 22px rgba(0,0,0,0.1); }
+      .zm-tab{ flex-direction:column; gap:3px; padding:8px 6px; flex:1 1 0; min-width:0; border-radius:14px; }
+      .zm-tab[data-on="1"]{ background:transparent; color:var(--zm-primary); box-shadow:none; }
+      .zm-tab svg{ width:27px; height:27px; }
+    }
+  </style>
+</helmet>
+
+<div data-zm-theme="{{ theme }}" data-zm-lead="{{ lead }}" style="min-height:100vh;background:var(--zm-bg)">
+<div class="zm-wrap" style="max-width:1280px;margin:0 auto;padding:0 26px 80px">
+
+  <!-- ============ HEADER ============ -->
+  <header class="zm-header" style="display:flex;align-items:center;gap:20px;padding:22px 0 6px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center">
+      <div class="zm-logo" style="position:relative;display:inline-flex;align-items:center;justify-content:center">
+        <sc-if value="{{ logoLight }}" hint-placeholder-val="{{ true }}"><img src="nebula-light-color.png" alt="ZenMaster" style="height:128px;width:auto;display:block;mix-blend-mode:multiply"></sc-if>
+        <sc-if value="{{ logoDark }}" hint-placeholder-val="{{ false }}"><img src="nebula-dark.png" alt="ZenMaster" style="height:128px;width:auto;display:block;mix-blend-mode:screen"></sc-if>
+        <sc-if value="{{ logoLight }}" hint-placeholder-val="{{ true }}"><div style="position:absolute;left:50%;top:50%;transform:translate(-44%,-50%);font-family:'Fredoka',sans-serif;font-weight:700;font-size:24px;letter-spacing:0.01em;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 5px rgba(8,12,18,0.82),0 0 11px rgba(8,12,18,0.82),0 0 20px rgba(8,12,18,0.5)"><span style="color:#ff8a3d">Zen</span><span style="color:#ffffff">Master</span></div></sc-if>
+        <sc-if value="{{ logoDark }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Fredoka',sans-serif;font-weight:700;font-size:24px;letter-spacing:0.01em;text-transform:uppercase;white-space:nowrap;text-shadow:0 0 5px var(--zm-bg),0 0 11px var(--zm-bg)"><span style="color:#ff8a3d">Zen</span><span style="color:#f2eee7">Master</span></div></sc-if>
+      </div>
+    </div>
+
+    <nav class="zm-nav">
+      <sc-for list="{{ navTabs }}" as="t" hint-placeholder-count="6">
+        <button class="zm-tab" data-on="{{ t.dataOn }}" title="{{ t.label }}" onClick="{{ t.go }}">
+          <span style="display:flex;align-items:center;justify-content:center">
+            <sc-if value="{{ t.icoDash }}" hint-placeholder-val="{{ true }}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.6" height="8" rx="2.2" fill-opacity="0.18"></rect><rect x="13.4" y="3" width="7.6" height="5" rx="2.2" fill-opacity="0.18"></rect><rect x="13.4" y="12" width="7.6" height="9" rx="2.2" fill-opacity="0.18"></rect><rect x="3" y="15" width="7.6" height="6" rx="2.2" fill-opacity="0.18"></rect></svg></sc-if>
+            <sc-if value="{{ t.icoCij }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3v16.5a1 1 0 0 0 1 1H21" fill="none"></path><rect x="6" y="11" width="4" height="6" rx="1.4" fill-opacity="0.18"></rect><rect x="11.8" y="6.5" width="4" height="10.5" rx="1.4" fill-opacity="0.18"></rect><rect x="17.6" y="13.5" width="4" height="3.5" rx="1.4" fill-opacity="0.18"></rect></svg></sc-if>
+            <sc-if value="{{ t.icoCons }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7.5V3M15 7.5V3" fill="none"></path><path d="M6 7.5h12v3.5a6 6 0 0 1-12 0z" fill-opacity="0.18"></path><path d="M12 17v4" fill="none"></path></svg></sc-if>
+            <sc-if value="{{ t.icoFc }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8" r="3.4" fill-opacity="0.18"></circle><path d="M8.5 1.6v1.7M8.5 12.7v1.7M1.9 8h1.7M13.4 8h1.7M3.8 3.3l1.2 1.2M13.2 3.3l-1.2 1.2" fill="none"></path><path d="M8 20h9.4a3.3 3.3 0 0 0 .2-6.6A4.9 4.9 0 0 0 9 11.8 3.5 3.5 0 0 0 8 20z" fill-opacity="0.18"></path></svg></sc-if>
+            <sc-if value="{{ t.icoDev }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6.5" width="17" height="11" rx="3" fill-opacity="0.18"></rect><path d="M22 10.5v3" fill="none"></path><rect x="5.5" y="9.5" width="7" height="5" rx="1.4" stroke="none"></rect></svg></sc-if>
+            <sc-if value="{{ t.icoSet }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill-opacity="0.16"></path><circle cx="12" cy="12" r="3" fill="none"></circle></svg></sc-if>
+          </span>
+        </button>
+      </sc-for>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onClick="{{ toggleOpt }}" title="{{ optTitle }}" style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:{{ optBtnBg }};border:1.5px solid {{ optBtnBorder }};color:{{ optIconColor }};cursor:pointer;box-shadow:{{ optGlow }};animation:{{ optPulse }};transition:background 0.3s,box-shadow 0.3s,color 0.3s,border-color 0.3s">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v8"></path><path d="M6.4 7.2a8 8 0 1 0 11.2 0"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- shared page header: per-tab title + live stats -->
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin:0 0 14px">
+    <div>
+      <h1 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:29px;letter-spacing:-0.015em;color:var(--zm-text)">{{ head.title }}</h1>
+      <p style="margin:5px 0 0;font-family:'Nunito Sans',sans-serif;font-size:15px;color:var(--zm-text-dim)">{{ head.subtitle }}</p>
+    </div>
+    <sc-if value="{{ head.showStats }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:stretch;gap:10px;padding-bottom:2px">
+      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;background:var(--zm-card);border:1px solid var(--zm-border);border-radius:14px;padding:9px 14px;min-width:96px">
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:11px;font-weight:700;color:var(--zm-text-dim)">Vermogen</div>
+        <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:18px;line-height:1;color:{{ head.powerColor }}">{{ head.power }}<span style="font-size:10px;color:var(--zm-text-dim);font-weight:600"> kW</span></div>
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--zm-text-faint)">nu</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;background:var(--zm-card);border:1px solid var(--zm-border);border-radius:14px;padding:9px 14px;min-width:96px">
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:11px;font-weight:700;color:var(--zm-text-dim)">Zon</div>
+        <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:18px;line-height:1;color:#f5a623">{{ head.solar }}<span style="font-size:10px;color:var(--zm-text-dim);font-weight:600"> kW</span></div>
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--zm-text-faint)">nu</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:3px;background:var(--zm-card);border:1px solid var(--zm-border);border-radius:14px;padding:9px 14px;min-width:96px">
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:11px;font-weight:700;color:var(--zm-text-dim)">Besparing</div>
+        <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:18px;line-height:1;color:#13967d">€{{ head.save }}</div>
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--zm-text-faint)">vandaag</div>
+      </div>
+    </div></sc-if>
+  </div>
+
+  <!-- ============ DASHBOARD ============ -->
+  <sc-if value="{{ tab.isDashboard }}" hint-placeholder-val="{{ true }}">
+  <div>
+    <!-- tabbed card: grafiek / plan per kwartier (tabstrip onderaan) -->
+    <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);overflow:hidden;animation:zm-rise 0.4s cubic-bezier(0.2,0.7,0.3,1) both">
+      <sc-if value="{{ dashCardChart }}" hint-placeholder-val="{{ true }}">
+        <div style="padding:18px 18px 4px">
+          <div id="flowChart" style="width:100%;height:402px"></div>
+        </div>
+      </sc-if>
+      <sc-if value="{{ dashCardTable }}" hint-placeholder-val="{{ false }}">
+        <div style="max-height:466px;overflow:auto">
+          <table style="border-collapse:collapse;width:100%;font-family:'Nunito Sans',sans-serif;font-size:12.5px">
+            <thead><tr>
+              <sc-for list="{{ planCols }}" as="c" hint-placeholder-count="10"><th style="position:sticky;top:0;background:var(--zm-card-2);color:var(--zm-text-dim);font-weight:700;padding:11px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--zm-border)">{{ c }}</th></sc-for>
+            </tr></thead>
+            <tbody>
+              <sc-for list="{{ planRows }}" as="r" hint-placeholder-count="12">
+                <tr style="border-bottom:1px solid var(--zm-border-2)">
+                  <sc-for list="{{ r.cells }}" as="cell" hint-placeholder-count="10"><td style="padding:8px 12px;text-align:right;color:var(--zm-text);white-space:nowrap;font-variant-numeric:tabular-nums">{{ cell }}</td></sc-for>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </sc-if>
+      <div style="display:flex;gap:6px;border-top:1px solid var(--zm-border);padding:9px 14px;background:var(--zm-card-2)">
+        <sc-if value="{{ dashCardChart }}" hint-placeholder-val="{{ true }}"><button onClick="{{ goChart }}" style="border:none;border-radius:999px;padding:7px 16px;font-family:'Fredoka',sans-serif;font-weight:500;font-size:13px;background:var(--zm-primary);color:#fff;box-shadow:0 2px 8px var(--zm-primary-soft)">Grafiek</button></sc-if>
+        <sc-if value="{{ dashCardTable }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goChart }}" style="border:none;border-radius:999px;padding:7px 16px;font-family:'Fredoka',sans-serif;font-weight:500;font-size:13px;background:transparent;color:var(--zm-text-dim)">Grafiek</button></sc-if>
+        <sc-if value="{{ dashCardTable }}" hint-placeholder-val="{{ false }}"><button onClick="{{ goTable }}" style="border:none;border-radius:999px;padding:7px 16px;font-family:'Fredoka',sans-serif;font-weight:500;font-size:13px;background:var(--zm-primary);color:#fff;box-shadow:0 2px 8px var(--zm-primary-soft)">Plan per kwartier</button></sc-if>
+        <sc-if value="{{ dashCardChart }}" hint-placeholder-val="{{ true }}"><button onClick="{{ goTable }}" style="border:none;border-radius:999px;padding:7px 16px;font-family:'Fredoka',sans-serif;font-weight:500;font-size:13px;background:transparent;color:var(--zm-text-dim)">Plan per kwartier</button></sc-if>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ CIJFERS ============ -->
+  <sc-if value="{{ tab.isCijfers }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin:24px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">Vandaag</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">uit de huidige optimalisatie</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(264px,1fr));gap:14px">
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Zelfvoorziening</span><span style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);margin-left:auto">autarkie</span></div>
+        <div id="cijGauge" style="width:100%;height:142px"></div>
+      </div>
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Energiemix</span><span style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);margin-left:auto">herkomst huisverbruik</span></div>
+        <div id="cijMix" style="width:100%;height:142px"></div>
+      </div>
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Besparing vandaag</span></div>
+        <div style="margin-top:10px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:42px;line-height:1;color:#13967d">€{{ cij.comp.save }}<span style="font-size:15px;color:var(--zm-text-dim)">/dag</span></div>
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-dim);margin-top:4px">bespaard t.o.v. niet optimaliseren</div>
+        <div style="margin-top:auto;padding-top:18px">
+          <div style="display:flex;justify-content:space-between;font-family:'Nunito Sans',sans-serif;font-size:12px;font-weight:700;color:var(--zm-text-dim);margin-bottom:5px"><span>Zonder optimalisatie</span><span style="color:var(--zm-text)">€{{ cij.comp.zonder }}</span></div>
+          <svg width="100%" height="9" viewBox="0 0 100 9" preserveAspectRatio="none" style="display:block;border-radius:5px;overflow:hidden;background:var(--zm-card-2)"><rect x="0" y="0" width="100" height="9" fill="var(--zm-text-faint)"></rect></svg>
+          <div style="display:flex;justify-content:space-between;font-family:'Nunito Sans',sans-serif;font-size:12px;font-weight:700;color:var(--zm-text-dim);margin:11px 0 5px"><span style="color:#13967d">Met ZenMaster</span><span style="color:var(--zm-text)">€{{ cij.comp.met }}</span></div>
+          <svg width="100%" height="9" viewBox="0 0 100 9" preserveAspectRatio="none" style="display:block;border-radius:5px;overflow:hidden;background:var(--zm-card-2)"><rect x="0" y="0" width="{{ cij.comp.metW }}" height="9" fill="#1fb89a"></rect></svg>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:28px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">30-daagse trend</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">historie · vereist opslag-backend</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px">
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Besparing per dag</span><span style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);margin-left:auto">+ cumulatief</span></div>
+        <div id="cijSav" style="width:100%;height:240px"></div>
+      </div>
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Zelfvoorziening</span><span style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);margin-left:auto">% per dag</span></div>
+        <div id="cijAut" style="width:100%;height:240px"></div>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:28px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">Verdeling &amp; kwaliteit</h3>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px">
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Verbruik per bron</span><span style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);margin-left:auto">vandaag · kWh</span></div>
+        <div id="cijCons" style="width:100%;height:210px"></div>
+      </div>
+      <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+        <div style="display:flex;align-items:baseline;gap:8px"><span style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text)">Forecast-nauwkeurigheid</span><span style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);margin-left:auto">voorspeld vs. werkelijk</span></div>
+        <div id="cijAcc" style="width:100%;height:210px"></div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ PLANNING ============ -->
+  <sc-if value="{{ tab.isConsumers }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin:6px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">Inzet per verbruiker — vandaag</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">swimlane per apparaat</span>
+    </div>
+    <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both"><div id="consSwim" style="width:100%;height:138px"></div></div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:26px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">Verbruikers</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">bedien per apparaat</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+      <sc-for list="{{ consumerCards }}" as="c" hint-placeholder-count="3">
+        <div class="reveal" style="display:flex;flex-direction:column;background:var(--zm-card);border:1px solid var(--zm-border);border-radius:18px;box-shadow:var(--zm-shadow);padding:16px 17px;animation:zm-rise 0.4s ease both">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="flex:none;width:40px;height:40px;border-radius:12px;background:{{ c.iconBg }};color:{{ c.iconColor }};display:flex;align-items:center;justify-content:center">
+              <sc-if value="{{ c.isHp }}" hint-placeholder-val="{{ true }}"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10a3 3 0 1 0-3-3M3 12h14a3 3 0 1 1-3 3M3 16h8a2.5 2.5 0 1 1-2.5 2.5"></path></svg></sc-if>
+              <sc-if value="{{ c.isBoiler }}" hint-placeholder-val="{{ false }}"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z"></path></svg></sc-if>
+              <sc-if value="{{ c.isEv }}" hint-placeholder-val="{{ false }}"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L5 13h5l-1 9 9-12h-6z"></path></svg></sc-if>
+            </span>
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.label }}</div>
+              <div style="font-family:'Nunito Sans',sans-serif;font-size:11.5px;font-weight:700;color:{{ c.statusColor }}">{{ c.statusLabel }}</div>
+            </div>
+            <span style="flex:none;width:9px;height:9px;border-radius:50%;background:{{ c.statusDot }}"></span>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <div style="flex:1.4">
+              <div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint);text-transform:uppercase;letter-spacing:0.04em">Vermogen nu</div>
+              <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:27px;line-height:1.05;color:{{ c.iconColor }};margin-top:2px">{{ c.powerW }}<span style="font-size:12px;color:var(--zm-text-dim)">W</span></div>
+            </div>
+            <div style="flex:1;background:var(--zm-card-2);border-radius:10px;padding:8px 10px"><div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint)">Vandaag</div><div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text);margin-top:1px">{{ c.energyToday }}<span style="font-size:9px;color:var(--zm-text-dim)"> kWh</span></div></div>
+            <div style="flex:1;background:var(--zm-card-2);border-radius:10px;padding:8px 10px"><div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint)">Volgende</div><div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--zm-text);margin-top:1px">{{ c.nextLabel }}</div></div>
+          </div>
+
+          <div style="margin-top:14px;border-top:1px solid var(--zm-border-2);padding-top:12px">
+            <div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint);text-transform:uppercase;letter-spacing:0.04em">Acties</div>
+            <div style="display:flex;gap:6px;margin-top:8px">
+              <sc-for list="{{ c.actions }}" as="a" hint-placeholder-count="3">
+                <button onClick="{{ a.go }}" style="flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;border:1.5px solid {{ a.bd }};background:{{ a.bg }};color:{{ a.fg }};border-radius:10px;padding:7px 8px;cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:500;font-size:12.5px;transition:all .15s">
+                  <span style="display:flex">
+                    <sc-if value="{{ a.isStart }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"></path></svg></sc-if>
+                    <sc-if value="{{ a.isPause }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if>
+                    <sc-if value="{{ a.isStop }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"></rect></svg></sc-if>
+                    <sc-if value="{{ a.isSkip }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5l9 7-9 7z"></path><rect x="16" y="5" width="2.6" height="14" rx="1"></rect></svg></sc-if>
+                  </span>
+                  {{ a.label }}
+                </button>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ FORECAST ============ -->
+  <sc-if value="{{ tab.isForecast }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin:24px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">48-uurs vooruitblik</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">zon boven · prijs onder · day-ahead grens gemarkeerd</span>
+    </div>
+    <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+      <div id="fc48Chart" style="width:100%;height:320px"></div>
+      <div style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);padding:6px 2px 0">Prijs voorbij day-ahead is geëxtrapoleerd — wacht op prijs-forecast backend.</div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:10px;margin:26px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">7-daagse vooruitblik</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">zon boven · prijs onder · per dag · sleep om te navigeren</span>
+    </div>
+    <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:var(--zm-shadow);padding:18px;animation:zm-rise 0.4s ease both">
+      <div id="fc7dChart" style="width:100%;height:340px"></div>
+      <div style="font-family:'Nunito Sans',sans-serif;font-size:12px;color:var(--zm-text-faint);padding:6px 2px 0">Prijs voorbij 48 uur is geëxtrapoleerd — wacht op prijs-forecast backend.</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ DEVICES ============ -->
+  <sc-if value="{{ tab.isDevices }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="display:flex;align-items:center;gap:10px;margin:24px 0 14px">
+      <h3 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:17px;color:var(--zm-text)">Zendure fleet</h3>
+      <span style="font-family:'Nunito Sans',sans-serif;font-size:13px;color:var(--zm-text-dim);margin-left:auto">live telemetrie · HA-only</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(286px,1fr));gap:14px">
+      <sc-for list="{{ devices }}" as="d" hint-placeholder-count="4">
+        <div class="reveal" style="position:relative;overflow:hidden;background:var(--zm-card);border:1px solid var(--zm-border);border-radius:18px;box-shadow:var(--zm-shadow);padding:16px 17px;animation:zm-rise 0.4s ease both">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">
+            <defs><linearGradient id="zmds{{ d.idx }}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1fb89a" stop-opacity="0.20"></stop><stop offset="1" stop-color="#1fb89a" stop-opacity="0"></stop></linearGradient></defs>
+            <rect x="0" y="{{ d.socY }}" width="100" height="{{ d.socH }}" fill="url(#zmds{{ d.idx }})"></rect>
+          </svg>
+          <div style="position:relative">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="flex:none;width:38px;height:38px;border-radius:12px;background:var(--zm-teal-soft);display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#1fb89a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="15" height="10" rx="2.5"></rect><path d="M21 10v4"></path></svg></span>
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:14.5px;color:var(--zm-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ d.name }}</div>
+                <div style="font-family:'Nunito Sans',sans-serif;font-size:11.5px;color:var(--zm-text-dim);font-weight:600">{{ d.model }}</div>
+              </div>
+              <span style="flex:none;width:9px;height:9px;border-radius:50%;background:#1fb89a;box-shadow:0 0 0 3px var(--zm-teal-soft)"></span>
+            </div>
+            <div style="display:flex;align-items:center;gap:16px;margin-top:14px">
+              <div style="flex:1">
+                <div style="font-family:'Nunito Sans',sans-serif;font-size:10.5px;font-weight:700;color:var(--zm-text-faint);text-transform:uppercase;letter-spacing:0.04em">Vermogen nu</div>
+                <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:32px;line-height:1.05;color:{{ d.powerColor }};margin-top:2px">{{ d.powerVal }}<span style="font-size:13px;color:var(--zm-text-dim)">W</span></div>
+                <div style="font-family:'Nunito Sans',sans-serif;font-size:11.5px;font-weight:700;color:var(--zm-text-dim);margin-top:3px">{{ d.powerLabel }}</div>
+              </div>
+              <div style="flex:none;text-align:center;border-left:1px solid var(--zm-border-2);padding-left:16px">
+                <svg width="44" height="74" viewBox="0 0 44 74">
+                  <defs><linearGradient id="zmbat{{ d.idx }}" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#138a74"></stop><stop offset="0.55" stop-color="#1fb89a"></stop><stop offset="1" stop-color="#6fe0c8"></stop></linearGradient></defs>
+                  <rect x="15" y="1" width="14" height="4" rx="1.5" fill="var(--zm-text-faint)"></rect>
+                  <rect x="4" y="6" width="36" height="64" rx="8" fill="none" stroke="var(--zm-text-faint)" stroke-width="2.4"></rect>
+                  <rect x="8" y="{{ d.battY }}" width="28" height="{{ d.battH }}" rx="4" fill="url(#zmbat{{ d.idx }})"></rect>
+                </svg>
+                <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:19px;line-height:1;color:var(--zm-text);margin-top:6px">{{ d.socPct }}<span style="font-size:11px;color:var(--zm-text-dim)">%</span></div>
+                <div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint);text-transform:uppercase;letter-spacing:0.04em;margin-top:2px">Laadstand</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px">
+              <div style="flex:1;background:var(--zm-card-2);border-radius:10px;padding:8px 10px"><div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint)">Zon</div><div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:14px;color:#f5a623;margin-top:1px">{{ d.solar }}<span style="font-size:9px;color:var(--zm-text-dim)">W</span></div></div>
+              <div style="flex:1;background:var(--zm-card-2);border-radius:10px;padding:8px 10px"><div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint)">Temp</div><div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:14px;color:var(--zm-text);margin-top:1px">{{ d.temp }}<span style="font-size:9px;color:var(--zm-text-dim)">°C</span></div></div>
+              <div style="flex:1;background:var(--zm-card-2);border-radius:10px;padding:8px 10px"><div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint)">Status</div><div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:14px;color:#1fb89a;margin-top:1px">{{ d.powerLabel }}</div></div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ SETTINGS ============ -->
+  <sc-if value="{{ tab.isSettings }}" hint-placeholder-val="{{ false }}">
+  <div>
+    <div style="position:sticky;top:8px;z-index:5;display:flex;align-items:center;gap:12px;padding:8px 8px 8px 14px;margin-bottom:16px;background:var(--zm-card);border:1px solid var(--zm-border);border-radius:14px;box-shadow:var(--zm-shadow-sm)">
+      <div style="display:flex;align-items:center;gap:9px">
+        <span style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9px;background:var(--zm-primary-soft);flex:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--zm-primary)" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2.3"></circle><circle cx="8" cy="17" r="2.3"></circle></svg></span>
+        <span style="font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:var(--zm-text-faint)">Velden</span>
+        <div style="display:inline-flex;background:var(--zm-card-2);border:1px solid var(--zm-border);border-radius:999px;padding:3px;gap:2px">
+          <span style="padding:5px 14px;border-radius:999px;font-family:'Fredoka',sans-serif;font-weight:500;font-size:12.5px;background:var(--zm-primary);color:#fff;box-shadow:0 1px 4px var(--zm-primary-soft);cursor:pointer">Basis</span>
+          <span style="padding:5px 14px;border-radius:999px;font-family:'Fredoka',sans-serif;font-weight:500;font-size:12.5px;color:var(--zm-text-dim);cursor:pointer" style-hover="color:var(--zm-text)">Expert</span>
+        </div>
+      </div>
+      <span style="margin-left:auto;font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:12.5px;color:var(--zm-primary)">2 wijzigingen</span>
+      <button style="font-family:'Fredoka',sans-serif;font-weight:500;font-size:13px;padding:7px 15px;border-radius:999px;border:1px solid var(--zm-border);background:transparent;color:var(--zm-text-dim)">herstel</button>
+      <button style="font-family:'Fredoka',sans-serif;font-weight:500;font-size:13px;padding:7px 17px;border-radius:999px;border:none;background:var(--zm-primary);color:#fff;box-shadow:0 2px 8px var(--zm-primary-soft)">opslaan</button>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">
+      <sc-for list="{{ settings }}" as="grp" hint-placeholder-count="4">
+        <div class="reveal" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:18px;box-shadow:var(--zm-shadow);padding:15px 16px;animation:zm-rise 0.4s ease both">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="flex:none;width:34px;height:34px;border-radius:11px;background:{{ grp.iconBg }};display:flex;align-items:center;justify-content:center">
+              <sc-if value="{{ grp.iconSys }}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ grp.iconColor }}" stroke-width="2.1" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"></path><circle cx="15" cy="7" r="2.3"></circle><circle cx="8" cy="17" r="2.3"></circle></svg></sc-if>
+              <sc-if value="{{ grp.iconPrice }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ grp.iconColor }}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 8a5 5 0 100 8M4 11h8M4 14h7"></path></svg></sc-if>
+              <sc-if value="{{ grp.iconSun }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ grp.iconColor }}" stroke-width="2.1" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"></circle><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5 5l1.4 1.4M17.6 17.6l1.4 1.4M19 5l-1.4 1.4M6.4 17.6l-1.4 1.4"></path></svg></sc-if>
+              <sc-if value="{{ grp.iconBat }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{ grp.iconColor }}" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="15" height="10" rx="2.5"></rect><path d="M21 10v4"></path></svg></sc-if>
+            </span>
+            <h4 style="margin:0;font-family:'Fredoka',sans-serif;font-weight:600;font-size:16px;color:var(--zm-text)">{{ grp.title }}</h4>
+            <span style="margin-left:auto;font-family:'Nunito Sans',sans-serif;font-size:11.5px;font-weight:700;color:var(--zm-text-faint);background:var(--zm-card-2);padding:3px 9px;border-radius:999px">{{ grp.tag }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <sc-for list="{{ grp.fields }}" as="f" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;gap:8px;background:var(--zm-card-2);border-radius:9px;padding:7px 10px;min-height:38px">
+                <span style="flex:1 1 auto;min-width:0;font-family:'Nunito Sans',sans-serif;font-size:11.5px;font-weight:700;color:var(--zm-text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.id }}</span>
+                <span style="flex:none">
+                  <sc-if value="{{ f.isToggle }}" hint-placeholder-val="{{ false }}"><span style="position:relative;display:inline-block;width:36px;height:21px;vertical-align:middle"><span style="position:absolute;inset:0;border-radius:999px;background:{{ f.toggleTrack }}"></span><span style="position:absolute;top:3px;left:{{ f.knobLeft }};width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span></span></sc-if>
+                  <sc-if value="{{ f.isInput }}" hint-placeholder-val="{{ true }}"><span style="display:block;min-width:64px;background:var(--zm-card);color:var(--zm-text);border:1px solid var(--zm-border);border-radius:7px;font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:12.5px;padding:4px 9px;text-align:right;font-variant-numeric:tabular-nums">{{ f.value }}</span></sc-if>
+                  <sc-if value="{{ f.isSelect }}" hint-placeholder-val="{{ false }}"><span style="display:flex;align-items:center;gap:6px;background:var(--zm-card);color:var(--zm-text);border:1px solid var(--zm-border);border-radius:7px;font-family:'Nunito Sans',sans-serif;font-weight:700;font-size:12.5px;padding:4px 9px">{{ f.value }}<span style="color:var(--zm-text-faint)">▾</span></span></sc-if>
+                </span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ popup.show }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closePopup }}" style="position:fixed;inset:0;background:rgba(20,18,14,0.34);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px">
+    <div onClick="{{ stopPop }}" style="background:var(--zm-card);border:1px solid var(--zm-border);border-radius:20px;box-shadow:0 24px 60px rgba(0,0,0,0.28);padding:20px 22px;width:340px;max-width:100%;animation:zm-rise 0.22s ease both">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="flex:none;width:13px;height:13px;border-radius:4px;background:{{ popup.color }}"></span>
+        <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:18px;color:var(--zm-text)">{{ popup.label }}</div>
+        <button onClick="{{ closePopup }}" style="margin-left:auto;flex:none;border:none;background:var(--zm-card-2);width:30px;height:30px;border-radius:50%;cursor:pointer;color:var(--zm-text-dim);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+      </div>
+      <div style="font-family:'Nunito Sans',sans-serif;font-size:13px;font-weight:700;color:var(--zm-text-dim);margin-top:6px">{{ popup.time }}</div>
+      <div style="font-family:'Fredoka',sans-serif;font-weight:600;font-size:22px;color:{{ popup.color }};margin-top:12px">{{ popup.powerText }}</div>
+      <sc-if value="{{ popup.isCons }}" hint-placeholder-val="{{ false }}">
+        <div style="font-family:'Nunito Sans',sans-serif;font-size:10px;font-weight:700;color:var(--zm-text-faint);text-transform:uppercase;letter-spacing:0.04em;margin-top:18px">Acties</div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <sc-for list="{{ popup.actions }}" as="a" hint-placeholder-count="3">
+            <button onClick="{{ a.go }}" style="flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;border:1.5px solid {{ a.bd }};background:{{ a.bg }};color:{{ a.fg }};border-radius:11px;padding:9px 8px;cursor:pointer;font-family:'Fredoka',sans-serif;font-weight:500;font-size:12.5px;transition:all .15s">
+              <span style="display:flex">
+                <sc-if value="{{ a.isStart }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5l12 7-12 7z"></path></svg></sc-if>
+                <sc-if value="{{ a.isPause }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"></rect><rect x="14" y="5" width="4" height="14" rx="1"></rect></svg></sc-if>
+                <sc-if value="{{ a.isStop }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"></rect></svg></sc-if>
+                <sc-if value="{{ a.isSkip }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5l9 7-9 7z"></path><rect x="16" y="5" width="2.6" height="14" rx="1"></rect></svg></sc-if>
+              </span>
+              {{ a.label }}
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;},&quot;colorLead&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;balanced&quot;,&quot;orange&quot;,&quot;teal&quot;],&quot;default&quot;:&quot;teal&quot;,&quot;tsType&quot;:&quot;'balanced'|'orange'|'teal'&quot;}}">
+class Component extends DCLogic {
+  state = { tab: 'dashboard', dashCard: 'chart', optimizing: true, consAction: {}, popup: null };
+
+  get data() { return (this._data ??= this._build()); }
+
+  _build() {
+    const N = 96, NOW = 50; // 12:30 — daytime flow
+    const times = [];
+    for (let i=0;i<N;i++){ const m=i*15, h=Math.floor(m/60), mm=m%60; times.push(String(h).padStart(2,'0')+':'+String(mm).padStart(2,'0')); }
+    const hr = i => i*15/60;
+    const nz = (i,a) => Math.sin(i*a)*0.5 + Math.sin(i*a*2.3+1)*0.3;
+
+    const price_buy=[], price_sell=[];
+    for (let i=0;i<N;i++){ const h=hr(i); let p;
+      if (h<5) p=0.21+0.02*Math.sin(h);
+      else if (h<9) p=0.22+0.14*Math.exp(-Math.pow(h-7.8,2)/1.3);
+      else if (h<16) p=0.20-0.075*Math.exp(-Math.pow(h-13,2)/6);
+      else if (h<21.5) p=0.24+0.17*Math.exp(-Math.pow(h-19,2)/2.4);
+      else p=0.27-0.012*(h-21.5);
+      p += 0.008*nz(i,0.5); p=Math.max(0.05,p);
+      price_buy.push(p); price_sell.push(Math.max(0,p*0.93-0.03));
+    }
+    const solar=[];
+    for (let i=0;i<N;i++){ const h=hr(i); let s=3.9*Math.exp(-Math.pow(h-13,2)/7.5); if(h<6.2||h>20.8) s=0; s*=(1+0.05*nz(i,0.9)); solar.push(Math.max(0,s)); }
+    const load=[];
+    for (let i=0;i<N;i++){ const h=hr(i); let l=0.22+0.34*Math.exp(-Math.pow(h-8,2)/1.6)+0.55*Math.exp(-Math.pow(h-19.5,2)/3.2)+0.07*Math.max(0,Math.sin((h-6)/12*Math.PI)); l+=0.02*nz(i,1.3); load.push(Math.max(0.12,l)); }
+    const hp=[], boiler=[], ev=[];
+    for (let i=0;i<N;i++){ const h=hr(i);
+      let v=0; if((h>=5&&h<8)||(h>=17&&h<22)) v=1.5+0.55*Math.exp(-Math.pow(h-19,2)/3.2); if(h>=6.6&&h<7.4) v=0; hp.push(v>0.25?v:0);
+      boiler.push((h>=11&&h<12.25)?1.9:0);
+      let e=0; if(h>=1&&h<5) e=3.3; if(h>=12.5&&h<14) e=2.4; ev.push(e);
+    }
+    const consumers=[
+      {id:'heatpump', label:'Warmtepomp', type:'hp', power:hp, color:'#f47a20'},
+      {id:'boiler', label:'Boiler', type:'boiler', power:boiler, color:'#f5a623'},
+      {id:'ev', label:'EV-lader', type:'ev', power:ev, color:'#1fb89a'},
+    ];
+    const cap=7.68, socMin=0.10, socMax=1.0;
+    const charge=[], discharge=[], soc=[]; let s=0.28;
+    for (let i=0;i<N;i++){ const h=hr(i); const cons=hp[i]+boiler[i]+ev[i]; const surplus=solar[i]-load[i]-cons;
+      let c=0,d=0;
+      if (h>=1&&h<4.5 && s<0.88) c=1.4;
+      if (surplus>0.2 && s<socMax) c=Math.max(c, Math.min(surplus,2.4));
+      if (h>=17.5&&h<22 && s>socMin+0.03) d=Math.min(2.2,(s-socMin)*4.2);
+      const dSoc=(c*0.985 - d/0.985)*0.25/cap;
+      let ns=s+dSoc;
+      if (ns>socMax){ c-=(ns-socMax)*cap/0.25; ns=socMax; if(c<0)c=0; }
+      if (ns<socMin){ d-=(socMin-ns)*cap/0.25; ns=socMin; if(d<0)d=0; }
+      charge.push(Math.max(0,c)); discharge.push(Math.max(0,d)); s=ns; soc.push(s);
+    }
+    const grid_buy=[], grid_sell=[];
+    for (let i=0;i<N;i++){ const cons=hp[i]+boiler[i]+ev[i]; const bal=solar[i]+discharge[i]-load[i]-cons-charge[i];
+      if (bal>=0){ grid_sell.push(bal); grid_buy.push(0); } else { grid_buy.push(-bal); grid_sell.push(0); } }
+
+    const sum=a=>a.reduce((x,y)=>x+y,0), e=a=>sum(a)*0.25;
+    const consE = sum(consumers.map(c=>e(c.power)));
+    const consumptionKwh = e(load)+consE;
+    const kpis = {
+      net_cost: sum(grid_buy.map((g,i)=>g*price_buy[i]-grid_sell[i]*price_sell[i]))*0.25,
+      import_kwh: e(grid_buy), export_kwh: e(grid_sell), solar_kwh: e(solar),
+      throughput: e(charge)+e(discharge), soc_min: Math.min(...soc)*100,
+    };
+    const autarky = Math.max(0,Math.min(100,(consumptionKwh - kpis.import_kwh)/consumptionKwh*100));
+    const kwh=a=>a.reduce((x,y)=>x+y,0)*0.25;
+    const battToHome=kwh(discharge), gridImp=kpis.import_kwh, solarToHome=Math.max(0, consumptionKwh - gridImp - battToHome);
+    const sav30=[],aut30=[],cum30=[],dayLbl=[]; let cum=0;
+    for (let k=0;k<30;k++){ const s=Math.max(0.4,1.7+0.7*Math.sin(k*0.5)+0.4*Math.sin(k*1.3+1)+0.2*Math.sin(k*2.1)); sav30.push(+s.toFixed(2)); cum+=s; cum30.push(+cum.toFixed(1)); aut30.push(+Math.max(45,Math.min(92,68+13*Math.sin(k*0.4)+6*Math.sin(k*1.1+2))).toFixed(0)); dayLbl.push(k+1); }
+    const cij={ mix:[{name:'Zon',value:+solarToHome.toFixed(1),color:'#f5a623'},{name:'Accu',value:+battToHome.toFixed(1),color:'#1fb89a'},{name:'Net',value:+gridImp.toFixed(1),color:'#e8645a'}],
+      cons:[{name:'Warmtepomp',value:+kwh(hp).toFixed(1),color:'#f47a20'},{name:'EV-lader',value:+kwh(ev).toFixed(1),color:'#1fb89a'},{name:'Boiler',value:+kwh(boiler).toFixed(1),color:'#f5a623'},{name:'Huislast',value:+kwh(load).toFixed(1),color:'#c9c1b2'}],
+      sav30, aut30, cum30, dayLbl, mape:8.4, comp:{save:'1,87',zonder:'3,12',met:'1,25',metW:'40'} };
+
+    const fcSolar=[], fcPriceA=[], fcPriceB=[];
+    for (let H=0;H<48;H++){ const h=H%24;
+      fcSolar.push(Math.max(0, 3.6*Math.exp(-Math.pow(h-13,2)/8)*(H<24?1:0.82)));
+      const base=(h<5?0.21:h<9?0.22+0.13*Math.exp(-Math.pow(h-7.8,2)/1.3):h<16?0.20-0.07*Math.exp(-Math.pow(h-13,2)/6):h<21.5?0.24+0.16*Math.exp(-Math.pow(h-19,2)/2.4):0.26);
+      if (H<24){ fcPriceA.push(+base.toFixed(3)); fcPriceB.push(null); } else { fcPriceA.push(null); fcPriceB.push(+(base*1.04+0.01*Math.sin(H)).toFixed(3)); }
+    }
+    fcPriceB[23]=fcPriceA[23];
+
+    const fc7Solar=[], fc7PriceA=[], fc7PriceB=[], fc7Cats=[];
+    for (let H=0;H<168;H++){ const h=H%24, day=Math.floor(H/24);
+      fc7Cats.push(String(h).padStart(2,'0')+':00');
+      fc7Solar.push(+(Math.max(0, 3.6*Math.exp(-Math.pow(h-13,2)/8)*(1-day*0.02)*(1+0.07*Math.sin(day*1.3)))).toFixed(2));
+      const base=(h<5?0.21:h<9?0.22+0.13*Math.exp(-Math.pow(h-7.8,2)/1.3):h<16?0.20-0.07*Math.exp(-Math.pow(h-13,2)/6):h<21.5?0.24+0.16*Math.exp(-Math.pow(h-19,2)/2.4):0.26);
+      const p=+(Math.max(0.05,base*(1+0.08*Math.sin(day*1.1)))).toFixed(3);
+      if (H<48){ fc7PriceA.push(p); fc7PriceB.push(null); } else { fc7PriceA.push(null); fc7PriceB.push(+(p*1.03+0.01*Math.sin(H)).toFixed(3)); }
+    }
+    fc7PriceB[47]=fc7PriceA[47];
+    return { N, NOW, times, price_buy, price_sell, solar, load, consumers, charge, discharge, soc, socMin, socMax, grid_buy, grid_sell, kpis, autarky, cij, fcSolar, fcPriceA, fcPriceB, fc7Solar, fc7PriceA, fc7PriceB, fc7Cats };
+  }
+
+  // theme-aware chart palette (ECharts canvas can't read CSS vars)
+  get C() {
+    const dark = (this.props.theme ?? 'light') === 'dark';
+    return {
+      solar:'#f5a623', consumers:'#f47a20', load:dark?'#5f594e':'#d8d0c1',
+      import:'#e8645a', export:'#8ad2c0', charge:'#3aa0c9', discharge:'#1fb89a',
+      soc:'#1fb89a', priceBuy:'#f47a20', priceSell:'#1fb89a',
+      text:dark?'#f2eee7':'#34322d', textDim:dark?'#a79e90':'#8d877b',
+      line:dark?'rgba(255,255,255,0.07)':'#ece6db', grid:dark?'rgba(255,255,255,0.05)':'rgba(70,52,24,0.05)',
+      tipBg:dark?'#262320':'#ffffff', tipBorder:dark?'rgba(255,255,255,0.1)':'#ece6db', tipText:dark?'#f2eee7':'#34322d',
+    };
+  }
+
+  _spark(arr,w=132,h=30,pad=3){ const n=arr.length,mn=Math.min(...arr),mx=Math.max(...arr),rng=(mx-mn)||1;
+    return arr.map((v,i)=>{ const x=pad+i/(n-1)*(w-2*pad); const y=h-pad-((v-mn)/rng)*(h-2*pad); return x.toFixed(1)+','+y.toFixed(1); }).join(' '); }
+  _hist(end,vol,n=30){ const a=[]; for(let i=0;i<n;i++) a.push(end*(1+vol*Math.sin(i*0.7)+vol*0.6*Math.sin(i*1.9+1)+(n-i)/n*vol*0.5)); a[n-1]=end; return a; }
+
+  renderVals(){
+    const d=this.data, t=this.state.tab, i=d.NOW;
+    const lead = this.props.colorLead ?? 'balanced';
+    const consNow = d.consumers.reduce((s,c)=>s+c.power[i],0);
+    const homeNow = d.load[i]+consNow;
+    const batNet = d.discharge[i]-d.charge[i];
+    const gridNet = d.grid_sell[i]-d.grid_buy[i];
+
+    const navTabs = [
+      {id:'dashboard',label:'Dashboard'},{id:'cijfers',label:'Cijfers'},{id:'consumers',label:'Verbruikers'},{id:'forecast',label:'Forecast'},{id:'devices',label:'Devices'},{id:'settings',label:'Settings'},
+    ].map(x=>({ label:x.label, on:t===x.id, off:t!==x.id, dataOn:t===x.id?'1':'0', go:()=>this._go(x.id),
+      icoDash:x.id==='dashboard',icoCij:x.id==='cijfers',icoCons:x.id==='consumers',icoFc:x.id==='forecast',icoDev:x.id==='devices',icoSet:x.id==='settings' }));
+
+    const circ = 2*Math.PI*62;
+    const netNow = d.solar[i]+d.discharge[i]-homeNow-d.charge[i];
+    const kdef=[
+      {label:'Zelfvoorziening',uom:'%',v:d.autarky,dec:0,accent:'#1fb89a',vol:0.1,good:true,delta:'+3%',sub:'van verbruik'},
+      {label:'Net nu',uom:'kW',v:netNow,dec:1,accent:'#f47a20',vol:0.2,signed:true,good:netNow>=0,delta:'',sub:netNow>=0?'teruglevering':'inkoop'},
+      {label:'Netto kosten',uom:'€',v:d.kpis.net_cost,dec:2,accent:'#f47a20',vol:0.18,good:true,delta:'−€0,41',sub:'goedkoper'},
+      {label:'Netinkoop',uom:'kWh',v:d.kpis.import_kwh,dec:1,accent:'#e8645a',vol:0.22,good:true,delta:'−1,3',sub:'minder'},
+      {label:'Teruglevering',uom:'kWh',v:d.kpis.export_kwh,dec:1,accent:'#8ad2c0',vol:0.3,good:false,delta:'+0,8',sub:'meer'},
+      {label:'Zon benut',uom:'kWh',v:d.kpis.solar_kwh,dec:1,accent:'#f5a623',vol:0.25,good:true,delta:'+2,1',sub:'meer'},
+      {label:'Accu doorzet',uom:'kWh',v:d.kpis.throughput,dec:1,accent:'#3aa0c9',vol:0.15,good:false,delta:'+0,6',sub:'cycli'},
+      {label:'SoC min',uom:'%',v:d.kpis.soc_min,dec:0,accent:'#1fb89a',vol:0.1,good:true,delta:'+4',sub:'reserve'},
+    ];
+    const kpis=kdef.map(k=>({ label:k.label,uom:k.uom,value:(k.signed&&k.v>=0?'+':'')+k.v.toFixed(k.dec).replace('.',','),accent:k.accent,spark:this._spark(this._hist(k.v||1,k.vol)),good:k.good,bad:k.delta?!k.good:false,delta:k.delta,sub:k.sub }));
+
+    const tmins=tt=>(+tt.slice(0,2))*60+(+tt.slice(3,5));
+    const grad={ '#1fb89a':'linear-gradient(90deg,#1fb89a,#3fd6b8)', '#f5a623':'linear-gradient(90deg,#f5a623,#ffc869)', '#f47a20':'linear-gradient(90deg,#f47a20,#ff9a4d)' };
+    const planRaw=[
+      {title:'Accu laden', start:'01:00', end:'04:30', save:'+€0,42', color:'#1fb89a'},
+      {title:'Boiler', start:'11:00', end:'12:15', save:'+€0,18', color:'#f5a623'},
+      {title:'EV laden', start:'12:30', end:'14:00', save:'+€0,31', color:'#1fb89a'},
+      {title:'Teruglevering', start:'13:00', end:'16:00', save:'+€0,12', color:'#f5a623'},
+      {title:'Accu ontladen', start:'17:30', end:'22:00', save:'+€0,88', color:'#f47a20'},
+    ];
+    const planBars=planRaw.map(p=>({ title:p.title, start:p.start, save:p.save, startPct:(tmins(p.start)/1440*100).toFixed(2)+'%', widthPct:((tmins(p.end)-tmins(p.start))/1440*100).toFixed(2)+'%', barBg:grad[p.color] }));
+
+    const topRaw=[{label:'Warmtepomp',v:d.consumers[0].power[i],color:'#f47a20'},{label:'EV-lader',v:d.consumers[2].power[i],color:'#1fb89a'},{label:'Boiler',v:d.consumers[1].power[i],color:'#f5a623'},{label:'Huislast',v:d.load[i],color:'#3aa0c9'}];
+    const topMax=Math.max(0.5,...topRaw.map(x=>x.v));
+    const topConsumers=topRaw.map(x=>({ label:x.label, kw:x.v.toFixed(2).replace('.',','), pct:(x.v/topMax*100).toFixed(0), color:x.color }));
+
+    const planCols=['tijd','€ in','€ uit','zon','last','wp','ev','net in','net uit','soc'];
+    const planRows=d.times.map((tm,idx)=>({ cells:[ tm,d.price_buy[idx].toFixed(3),d.price_sell[idx].toFixed(3),d.solar[idx].toFixed(2),d.load[idx].toFixed(2),d.consumers[0].power[idx].toFixed(2),d.consumers[2].power[idx].toFixed(2),d.grid_buy[idx].toFixed(2),d.grid_sell[idx].toFixed(2),(d.soc[idx]*100).toFixed(0) ] }));
+
+    const consMeta={ heatpump:['start','pause','stop','skip'], boiler:['start','stop'], ev:['start','pause','skip'] };
+    const actMeta={ start:{l:'Start',c:'#13967d'}, pause:{l:'Pauze',c:'#f5a623'}, stop:{l:'Stop',c:'#e8645a'}, skip:{l:'Skip',c:'#3aa0c9'} };
+    const stMap={ start:['Actief','#13967d','#1fb89a'], pause:['Gepauzeerd','#f5a623','#f5a623'], stop:['Gestopt','#e8645a','#e8645a'], skip:['Overgeslagen','#3aa0c9','#3aa0c9'] };
+    const consumerCards=d.consumers.map(cc=>{ const pw=cc.power[i]; const onNow=pw>0.02;
+      const eToday=cc.power.reduce((a,b)=>a+b,0)*0.25; let nextIdx=-1; for(let k=i+1;k<d.N;k++){ if(cc.power[k]>0.02){ nextIdx=k; break; } }
+      const chosen=this.state.consAction[cc.id]||(onNow?'start':'');
+      const st = (chosen&&stMap[chosen]) ? stMap[chosen] : (onNow?['Actief','#13967d','#1fb89a']:['Inactief','var(--zm-text-dim)','var(--zm-border)']);
+      return { id:cc.id, label:cc.label, isHp:cc.id==='heatpump', isBoiler:cc.id==='boiler', isEv:cc.id==='ev',
+        iconBg:'color-mix(in srgb, '+cc.color+' 15%, transparent)', iconColor:cc.color,
+        powerW:(pw*1000).toFixed(0), statusLabel:st[0], statusColor:st[1], statusDot:st[2],
+        energyToday:eToday.toFixed(1).replace('.',','), nextLabel: nextIdx>=0? d.times[nextIdx] : '—',
+        actions:(consMeta[cc.id]||['start','stop']).map(a=>{ const m=actMeta[a]; const active=chosen===a;
+          return { id:a, label:m.l, isStart:a==='start',isPause:a==='pause',isStop:a==='stop',isSkip:a==='skip',
+            fg:active?'#fff':m.c, bg:active?m.c:'color-mix(in srgb, '+m.c+' 12%, transparent)', bd:active?m.c:'transparent',
+            go:()=>this.setState(s=>({consAction:{...s.consAction,[cc.id]:a}})) }; }) };
+    });
+    let popupView={show:false};
+    if(this.state.popup){ const p=this.state.popup, slot=p.slot;
+      if(p.kind==='bat'){ const net=d.discharge[slot]-d.charge[slot];
+        popupView={ show:true, isCons:false, label:'Zendure accu', time:d.times[slot], color: net>=0?'#1fb89a':'#3aa0c9',
+          powerText:(Math.abs(net)<1e-2?'Idle':(net>=0?'Ontladen ':'Laden ')+Math.abs(net).toFixed(2).replace('.',',')+' kW'), actions:[] };
+      } else { const cc=d.consumers.find(x=>x.id===p.id); if(cc){ const pw=cc.power[slot]; const chosen=this.state.consAction[cc.id]||'';
+        popupView={ show:true, isCons:true, label:cc.label, time:d.times[slot], color:cc.color,
+          powerText: pw>0.02 ? ('Inzet '+pw.toFixed(2).replace('.',',')+' kW') : 'Niet actief in dit slot',
+          actions:(consMeta[cc.id]||['start','stop']).map(a=>{ const m=actMeta[a]; const active=chosen===a;
+            return { id:a, label:m.l, isStart:a==='start',isPause:a==='pause',isStop:a==='stop',isSkip:a==='skip',
+              fg:active?'#fff':m.c, bg:active?m.c:'color-mix(in srgb, '+m.c+' 12%, transparent)', bd:active?m.c:'transparent',
+              go:()=>this.setState(s=>({consAction:{...s.consAction,[cc.id]:a}})) }; }) };
+      } }
+    }
+    const base=d.soc[i]*100;
+    const devices=[
+      {name:'Hyper 2000 · A',model:'Hyper 2000',soc:base+6,output:840,input:0,solar:120,temp:24},
+      {name:'Hyper 2000 · B',model:'Hyper 2000',soc:base-3,output:760,input:0,solar:95,temp:25},
+      {name:'SolarFlow 800',model:'SolarFlow 800',soc:base+11,output:0,input:0,solar:0,temp:22},
+      {name:'AB2000 uitbreiding',model:'AB2000',soc:base-1,output:0,input:140,solar:0,temp:23},
+    ].map((x,idx)=>{ const soc=Math.max(0,Math.min(100,x.soc)); const net=x.output-x.input; const fh=soc/100*56;
+      return { ...x, idx, socPct:soc.toFixed(0), socY:(100-soc).toFixed(1), socH:soc.toFixed(1), battY:(66-fh).toFixed(1), battH:fh.toFixed(1),
+        powerVal:(net>=0?'+':'')+net, powerColor:net>0?'#1fb89a':net<0?'#3aa0c9':'var(--zm-text-dim)', powerLabel:net>0?'levert aan huis':net<0?'wordt geladen':'inactief' }; });
+
+    const tog=on=>({ isToggle:true,isInput:false,isSelect:false,toggleTrack:on?'var(--zm-primary)':'var(--zm-border)',knobLeft:on?'18px':'3px' });
+    const inp=(v,meta='')=>({ isInput:true,isToggle:false,isSelect:false,value:v,meta });
+    const sel=v=>({ isSelect:true,isToggle:false,isInput:false,value:v,meta:'' });
+    const settings=[
+      {title:'Systeem',tag:'core',iconSys:true,iconColor:'#f47a20',iconBg:'var(--zm-orange-soft)',fields:[{id:'grid_max_kw',...inp('17,0','0..25')},{id:'horizon_slots',...inp('96','req')},{id:'slot_minutes',...inp('15')},{id:'battery_reserve',...inp('10','%')}]},
+      {title:'Prijs',tag:'entsoe',iconPrice:true,iconColor:'#f5a623',iconBg:'var(--zm-amber-soft)',fields:[{id:'provider',...sel('ENTSO-E')},{id:'energy_tax',...inp('0,1228')},{id:'markup_buy',...inp('0,020')},{id:'include_vat',...tog(true)}]},
+      {title:'Forecast & zon',tag:'pv',iconSun:true,iconColor:'#1fb89a',iconBg:'var(--zm-teal-soft)',fields:[{id:'solar_provider',...sel('Forecast.Solar')},{id:'declination',...inp('35','°')},{id:'azimuth',...inp('180','°')},{id:'safety_margin',...tog(true)}]},
+      {title:'Zendure fleet',tag:'mqtt',iconBat:true,iconColor:'#3aa0c9',iconBg:'var(--zm-teal-soft)',fields:[{id:'mode',...sel('match-meter')},{id:'min_soc',...inp('10','%')},{id:'max_soc',...inp('100','%')},{id:'ble_fallback',...tog(false)}]},
+    ];
+
+    const fmt=v=>(v>=0?'+':'')+v.toFixed(2).replace('.',',');
+    this._scheduleDraw();
+    return {
+      theme:this.props.theme ?? 'light', lead,
+      logoLight:(this.props.theme ?? 'light')!=='dark', logoDark:(this.props.theme ?? 'light')==='dark',
+      navTabs, consumerCards,
+      popup: popupView, closePopup:()=>this.setState({popup:null}), stopPop:(e)=>{ if(e&&e.stopPropagation) e.stopPropagation(); },
+      tab:{ isDashboard:t==='dashboard',isCijfers:t==='cijfers',isConsumers:t==='consumers',isForecast:t==='forecast',isDevices:t==='devices',isSettings:t==='settings' },
+      dashCardChart:this.state.dashCard!=='table', dashCardTable:this.state.dashCard==='table',
+      goChart:()=>this.setState({dashCard:'chart'}), goTable:()=>this.setState({dashCard:'table'}),
+      optimizing:this.state.optimizing,
+      optTitle:this.state.optimizing?'Systeem actief — klik om te pauzeren':'Systeem gepauzeerd — klik om te activeren',
+      optBtnBg:this.state.optimizing?'linear-gradient(145deg,#ff9a4d,#f47a20)':'var(--zm-card-2)',
+      optBtnBorder:this.state.optimizing?'transparent':'var(--zm-border)',
+      optIconColor:this.state.optimizing?'#fff':'var(--zm-text-faint)',
+      optGlow:this.state.optimizing?'0 0 0 4px color-mix(in srgb, var(--zm-primary) 18%, transparent), 0 6px 18px color-mix(in srgb, var(--zm-primary) 45%, transparent)':'none',
+      optPulse:this.state.optimizing?'zm-optpulse 2.4s ease-in-out infinite':'none',
+      toggleOpt:()=>this.setState(s=>({optimizing:!s.optimizing})),
+      now:{ time:d.times[i] },
+      head:{ showStats:t!=='settings', power:(netNow>=0?'+':'')+netNow.toFixed(1).replace('.',','), powerColor:netNow>=0?'#1fb89a':'#e8645a', solar:d.solar[i].toFixed(1).replace('.',','), save:'1,87',
+        title:({dashboard:'Energie-optimalisatie',cijfers:'Kerncijfers',consumers:'Verbruikers',forecast:'Vooruitblik',devices:'Apparaten',settings:'Instellingen'})[t]||'ZenMaster',
+        subtitle:({dashboard:'Slim plannen rond zon, dynamische prijzen en je Zendure-accu.',cijfers:'Prestaties van vandaag en de afgelopen 30 dagen.',consumers:'Inzet per apparaat en directe bediening.',forecast:'Zon en prijs voor de komende uren en dagen.',devices:'Je Zendure-fleet, live.',settings:'Systeem, prijs, forecast en fleet configureren.'})[t]||'' },
+      autarky:{ pct:d.autarky.toFixed(0), dash:(d.autarky/100*circ).toFixed(1)+' '+circ.toFixed(1), save:'1,87', co2:'4,2' },
+      flow:{
+        solar:d.solar[i].toFixed(1).replace('.',','), home:homeNow.toFixed(1).replace('.',','), soc:base.toFixed(0),
+        batVal:fmt(batNet), batColor:batNet>=0?'#1fb89a':'#3aa0c9',
+        gridVal:fmt(gridNet), gridColor:gridNet>=0?'#1fb89a':'#e8645a',
+        solarHomeOp:d.solar[i]>0.2?'0.95':'0.12', solarBatOp:d.charge[i]>0.2?'0.95':'0.12',
+        gridHomeOp:d.grid_buy[i]>0.2?'0.95':'0.12', batHomeOp:d.discharge[i]>0.2?'0.95':'0.12',
+      },
+      kpis, planBars, cij:d.cij,
+      planCols, planRows, devices, settings,
+    };
+  }
+
+  // ---------- charts ----------
+  _go(tab){ this.setState({ tab }); }
+  _scheduleDraw(){ clearTimeout(this._drawT); this._drawT=setTimeout(()=>this._drawActive(),30); }
+  updated(){ this._drawActive(); }
+  componentDidMount(){ this._onResize=()=>{ for(const k in (this._charts||{})){ try{this._charts[k].resize();}catch(e){} } }; window.addEventListener('resize',this._onResize); this._drawActive(); }
+  componentWillUnmount(){ window.removeEventListener('resize',this._onResize); for(const k in (this._charts||{})){ try{this._charts[k].dispose();}catch(e){} } }
+
+  _init(id){ if(!window.echarts) return null; this._charts ??= {}; const el=document.getElementById(id); if(!el) return null;
+    if(this._charts[id]){ if(this._charts[id].getDom()===el) return this._charts[id]; try{this._charts[id].dispose();}catch(e){} }
+    this._charts[id]=window.echarts.init(el,null,{renderer:'canvas'}); return this._charts[id]; }
+  _axis(){ const C=this.C; return { axisLine:{lineStyle:{color:C.line}}, axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11}, splitLine:{lineStyle:{color:C.grid}} }; }
+  _ival(n){ return Math.max(0,Math.round(n/8)-1); }
+  _tip(){ const C=this.C; return { backgroundColor:C.tipBg, borderColor:C.tipBorder, borderWidth:1, textStyle:{color:C.tipText,fontFamily:'Nunito Sans',fontSize:12}, extraCssText:'border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.12);' }; }
+
+  _kpiGauge(){ const c=this._init('cijGauge'); if(!c) return; const d=this.data,C=this.C;
+    c.setOption({ backgroundColor:'transparent', animation:false, series:[{type:'gauge',startAngle:212,endAngle:-32,min:0,max:100,radius:'94%',center:['50%','56%'],
+      progress:{show:true,width:18,roundCap:true,itemStyle:{color:'#1fb89a'}}, axisLine:{lineStyle:{width:18,color:[[1,C.grid]]}}, pointer:{show:false}, axisTick:{show:false}, splitLine:{show:false}, axisLabel:{show:false}, anchor:{show:false}, title:{show:false},
+      detail:{offsetCenter:[0,'4%'],formatter:v=>'{a|'+Math.round(v)+'}{b|%}',rich:{a:{fontFamily:'Fredoka',fontSize:42,fontWeight:600,color:C.text},b:{fontFamily:'Fredoka',fontSize:18,color:C.textDim}}},
+      data:[{value:d.autarky}] }] },{notMerge:true}); }
+
+  _kpiMix(){ const c=this._init('cijMix'); if(!c) return; const d=this.data,C=this.C;
+    c.setOption({ backgroundColor:'transparent', animation:false, tooltip:{trigger:'item',...this._tip(),valueFormatter:v=>v+' kWh'},
+      legend:{bottom:0,icon:'circle',itemWidth:9,itemHeight:9,textStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:12}},
+      series:[{type:'pie',radius:['56%','82%'],center:['50%','44%'],avoidLabelOverlap:false,padAngle:3,itemStyle:{borderRadius:6,borderColor:C.tipBg,borderWidth:2},label:{show:false},
+        data:d.cij.mix.map(m=>({value:m.value,name:m.name,itemStyle:{color:m.color}})) }] },{notMerge:true}); }
+
+  _kpiSav30(){ const c=this._init('cijSav'); if(!c) return; const d=this.data,C=this.C,A=this._axis();
+    c.setOption({ backgroundColor:'transparent', animation:false, tooltip:{trigger:'axis',axisPointer:{type:'shadow'},...this._tip()},
+      legend:{top:0,right:0,icon:'roundRect',itemWidth:11,itemHeight:7,textStyle:{color:C.textDim,fontSize:11,fontFamily:'Nunito Sans'}},
+      grid:{top:30,right:44,bottom:24,left:40},
+      xAxis:{type:'category',data:d.cij.dayLbl,...A,axisLabel:{...A.axisLabel,interval:4},axisTick:{show:false}},
+      yAxis:[{type:'value',...A,axisLabel:{...A.axisLabel,formatter:v=>'€'+v}},{type:'value',...A,splitLine:{show:false},axisLabel:{...A.axisLabel,formatter:v=>'€'+v}}],
+      series:[{name:'Per dag',type:'bar',data:d.cij.sav30,itemStyle:{color:'#1fb89a',borderRadius:[3,3,0,0]}},{name:'Cumulatief',type:'line',yAxisIndex:1,data:d.cij.cum30,symbol:'none',smooth:true,lineStyle:{color:'#f47a20',width:2.4}}] },{notMerge:true}); }
+
+  _kpiAut30(){ const c=this._init('cijAut'); if(!c) return; const d=this.data,C=this.C,A=this._axis();
+    c.setOption({ backgroundColor:'transparent', animation:false, tooltip:{trigger:'axis',...this._tip(),valueFormatter:v=>v+' %'},
+      grid:{top:18,right:18,bottom:24,left:40},
+      xAxis:{type:'category',data:d.cij.dayLbl,...A,axisLabel:{...A.axisLabel,interval:4},axisTick:{show:false}},
+      yAxis:{type:'value',min:0,max:100,...A,axisLabel:{...A.axisLabel,formatter:v=>v+'%'}},
+      series:[{name:'Zelfvoorziening',type:'line',data:d.cij.aut30,symbol:'none',smooth:true,lineStyle:{color:'#1fb89a',width:2.6},areaStyle:{color:'rgba(31,184,154,0.14)'}}] },{notMerge:true}); }
+
+  _kpiCons(){ const c=this._init('cijCons'); if(!c) return; const d=this.data,C=this.C,A=this._axis(); const items=d.cij.cons;
+    c.setOption({ backgroundColor:'transparent', animation:false, tooltip:{trigger:'axis',axisPointer:{type:'shadow'},...this._tip(),valueFormatter:v=>v+' kWh'},
+      grid:{top:8,right:26,bottom:24,left:98},
+      xAxis:{type:'value',...A,axisLabel:{...A.axisLabel,formatter:v=>v+' kWh'}},
+      yAxis:{type:'category',inverse:true,data:items.map(x=>x.name),axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.text,fontFamily:'Nunito Sans',fontWeight:700,fontSize:12}},
+      series:[{type:'bar',data:items.map(x=>({value:x.value,itemStyle:{color:x.color,borderRadius:[0,5,5,0]}})),barWidth:'58%'}] },{notMerge:true}); }
+
+  _kpiAcc(){ const c=this._init('cijAcc'); if(!c) return; const d=this.data,C=this.C;
+    c.setOption({ backgroundColor:'transparent', animation:false, series:[{type:'gauge',startAngle:212,endAngle:-32,min:0,max:25,radius:'94%',center:['50%','56%'],
+      progress:{show:true,width:18,roundCap:true,itemStyle:{color:'#f5a623'}}, axisLine:{lineStyle:{width:18,color:[[1,C.grid]]}}, pointer:{show:false}, axisTick:{show:false}, splitLine:{show:false}, axisLabel:{show:false}, title:{show:false},
+      detail:{offsetCenter:[0,'4%'],formatter:v=>'{a|'+v.toFixed(1)+'}{b|% MAPE}',rich:{a:{fontFamily:'Fredoka',fontSize:38,fontWeight:600,color:C.text},b:{fontFamily:'Fredoka',fontSize:14,color:C.textDim}}},
+      data:[{value:d.cij.mape}] }] },{notMerge:true}); }
+
+  _drawActive(){ const draw=()=>{ if(!window.echarts){ setTimeout(draw,200); return; } const t=this.state.tab;
+    try{ if(t==='dashboard'){ this._flow(); } else if(t==='cijfers'){ this._kpiGauge(); this._kpiMix(); this._kpiSav30(); this._kpiAut30(); this._kpiCons(); this._kpiAcc(); } else if(t==='consumers'){ this._consSwim(); } else if(t==='forecast'){ this._fc48(); this._fc7d(); } }catch(e){ /* noop */ }
+    for(const k in this._charts){ try{this._charts[k].resize();}catch(e){} } };
+    setTimeout(draw,30); }
+
+  _flow(){ const c=this._init('flowChart'); if(!c) return; const d=this.data,C=this.C;
+    const neg=a=>a.map(v=>-v); const consSum=new Array(d.N).fill(0); for(const cc of d.consumers) cc.power.forEach((v,i)=>consSum[i]+=v);
+    const bars=[
+      {name:'Zon',stack:'pos',color:C.solar,data:d.solar},{name:'Teruglevering',stack:'pos',color:C.export,data:d.grid_sell},
+      {name:'Huislast',stack:'neg',color:C.load,data:neg(d.load)},{name:'Verbruikers',stack:'neg',color:C.consumers,data:neg(consSum)},{name:'Netinkoop',stack:'neg',color:C.import,data:neg(d.grid_buy)},
+    ].map(b=>({name:b.name,type:'bar',xAxisIndex:0,yAxisIndex:0,stack:b.stack,data:b.data,itemStyle:{color:b.color,borderRadius:2},barCategoryGap:'18%',emphasis:{focus:'series'}}));
+    bars[0].markLine={silent:true,symbol:'none',data:[{xAxis:d.NOW}],lineStyle:{color:'#f47a20',width:1.6,opacity:0.7},label:{formatter:'nu',color:'#f47a20',fontFamily:'Nunito Sans',fontWeight:700,fontSize:11}};
+    const lines=[{name:'Inkoopprijs',color:C.priceBuy,type:'solid',data:d.price_buy},{name:'Verkoopprijs',color:C.priceSell,type:'dashed',data:d.price_sell}].map(l=>({name:l.name,type:'line',xAxisIndex:0,yAxisIndex:1,data:l.data,symbol:'none',smooth:true,lineStyle:{color:l.color,width:2,type:l.type},z:5}));
+    const soc={name:'SoC',type:'line',xAxisIndex:0,yAxisIndex:2,data:d.soc.map(v=>v*100),symbol:'none',smooth:true,lineStyle:{color:C.soc,width:2.4,type:'dotted'},markLine:{silent:true,symbol:'none',data:[{yAxis:d.socMin*100,lineStyle:{color:C.import,type:'dashed',width:1},label:{formatter:'min SoC',color:C.import,fontFamily:'Nunito Sans',fontSize:9,position:'insideEndTop'}},{yAxis:d.socMax*100,lineStyle:{color:C.textDim,type:'dashed',width:1},label:{formatter:'max SoC',color:C.textDim,fontFamily:'Nunito Sans',fontSize:9,position:'insideEndTop'}}]}};
+    const lanes=[]; const signed=d.discharge.map((v,j)=>v-d.charge[j]); lanes.push({label:'Zendure +/-',kind:'bat',values:signed,scale:Math.max(0.001,...signed.map(Math.abs))});
+    for(const cc of d.consumers) lanes.push({label:cc.label,kind:'cons',values:cc.power,scale:Math.max(0.001,...cc.power.map(Math.abs))});
+    const laneLabels=lanes.map(l=>l.label); const ldata=[]; lanes.forEach((lane,row)=>lane.values.forEach((v,slot)=>{ if(Math.abs(v)<1e-3) return; ldata.push([slot,row,v,lane.kind==='bat'?1:0,lane.scale]); }));
+    const swim={type:'custom',xAxisIndex:1,yAxisIndex:3,renderItem:(prm,api)=>{ const slot=api.value(0),row=api.value(1),val=api.value(2),isBat=api.value(3)===1,scale=api.value(4)||1; const start=api.coord([slot,row]),end=api.coord([slot+1,row]); const rowH=Math.max(2,api.size([0,1])[1]-1); const w=Math.max(1,end[0]-start[0]); const bh=Math.max(1.5,rowH*Math.min(1,Math.abs(val)/scale)); const fill=isBat?(val>=0?C.discharge:C.charge):C.consumers; const top=start[1]-rowH/2; return {type:'group',children:[{type:'rect',shape:{x:start[0]+0.5,y:top,width:Math.max(1,w-1),height:rowH,r:2},style:{fill:C.grid,opacity:0.28}},{type:'rect',shape:{x:start[0]+1.5,y:start[1]+rowH/2-bh,width:Math.max(1,w-3),height:bh,r:1},style:{fill,opacity:0.96}},{type:'rect',shape:{x:start[0]+0.5,y:top,width:Math.max(1,w-1),height:rowH,r:2},style:{fill:'none',stroke:fill,lineWidth:1.2,opacity:0.9}}]}; },data:ldata,encode:{x:0,y:1}};
+    c.setOption({ backgroundColor:'transparent', animation:false, textStyle:{fontFamily:'Nunito Sans',color:C.textDim},
+      tooltip:{trigger:'axis',axisPointer:{type:'cross',lineStyle:{color:C.line}},...this._tip(), formatter:ps=>{ if(!ps||!ps.length) return ''; const t=ps[0].axisValue; const rows=[]; ps.forEach(p=>{ const nm=p.seriesName||''; if(p.seriesType==='custom'){ const v=p.value; const row=v[1], val=Number(v[2]); const lbl=lanes[row]?lanes[row].label:''; const col=row===0?(val>=0?C.discharge:C.charge):C.consumers; rows.push('<span style=\"display:inline-block;width:8px;height:8px;border-radius:2px;background:'+col+';margin-right:6px\"></span>'+lbl+': '+val.toFixed(2)+' kW'); } else { let val=Array.isArray(p.value)?p.value[1]:p.value; if(val==null) return; let txt; if(/rijs/.test(nm)) txt='\u20ac'+Number(val).toFixed(3); else if(nm==='SoC') txt=Number(val).toFixed(0)+'%'; else txt=Number(val).toFixed(2)+' kW'; rows.push(p.marker+nm+': '+txt); } }); return '<b>'+t+'</b><br/>'+rows.join('<br/>'); } },
+      legend:{top:0,left:104,icon:'roundRect',itemWidth:11,itemHeight:7,data:['Zon','Teruglevering','Huislast','Verbruikers','Netinkoop','Inkoopprijs','Verkoopprijs','SoC'],textStyle:{color:C.textDim,fontSize:12,fontFamily:'Nunito Sans'}},
+      axisPointer:{link:[{xAxisIndex:'all'}]},
+      grid:[{left:104,right:54,top:30,height:218},{left:104,right:54,top:286,bottom:26}],
+      xAxis:[
+        {type:'category',gridIndex:0,data:d.times,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{show:false},axisPointer:{label:{show:false}}},
+        {type:'category',gridIndex:1,data:d.times,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11,interval:this._ival(d.N)},axisPointer:{label:{show:false}}},
+      ],
+      yAxis:[
+        {type:'value',gridIndex:0,name:'kW',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},axisLine:{lineStyle:{color:C.line}},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:10},splitLine:{lineStyle:{color:C.grid}}},
+        {type:'value',gridIndex:0,name:'€/kWh',position:'right',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},axisLine:{lineStyle:{color:C.line}},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:10,formatter:v=>v.toFixed(2)},splitLine:{show:false}},
+        {type:'value',gridIndex:0,name:'SoC %',position:'right',offset:46,min:0,max:100,show:false,nameTextStyle:{color:C.soc,fontFamily:'Nunito Sans',fontSize:11},axisLine:{show:false},axisLabel:{show:false},splitLine:{show:false}},
+        {type:'category',gridIndex:1,data:laneLabels,inverse:true,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.text,fontFamily:'Nunito Sans',fontWeight:700,fontSize:11}},
+      ],
+      series:[...bars,...lines,soc,swim],
+    },{notMerge:true});
+    c.off('click'); c.on('click', p=>{ if(p.seriesType!=='custom') return; const slot=p.value[0], row=p.value[1]; if(row===0){ this.setState({popup:{kind:'bat',slot}}); } else { const cc=d.consumers[row-1]; if(cc) this.setState({popup:{kind:'cons',id:cc.id,slot}}); } }); }
+
+  _socChart(){ const c=this._init('socChart'); if(!c) return; const d=this.data,C=this.C,A=this._axis();
+    c.setOption({ backgroundColor:'transparent', animation:false, tooltip:{trigger:'axis',...this._tip(),valueFormatter:v=>Number.isFinite(v)?v.toFixed(1)+' %':'-'},
+      grid:{top:16,right:54,bottom:28,left:44},
+      xAxis:{type:'category',data:d.times,...A,axisLabel:{...A.axisLabel,interval:this._ival(d.N)},axisTick:{show:false}},
+      yAxis:{type:'value',min:0,max:100,name:'SoC %',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},...A},
+      series:[{name:'SoC',type:'line',data:d.soc.map(v=>v*100),symbol:'none',smooth:true,lineStyle:{color:C.soc,width:2.6},areaStyle:{color:'rgba(31,184,154,0.12)'},
+        markLine:{silent:true,symbol:'none',data:[{yAxis:d.socMin*100,lineStyle:{color:C.import,type:'dashed',width:1.2},label:{formatter:'min',color:C.import,fontFamily:'Nunito Sans',fontSize:11,position:'insideEndTop'}},{yAxis:d.socMax*100,lineStyle:{color:C.textDim,type:'dashed',width:1.2},label:{formatter:'max',color:C.textDim,fontFamily:'Nunito Sans',fontSize:11,position:'insideEndTop'}}]}}],
+    },{notMerge:true}); }
+
+  _planCombo(){ const c=this._init('planChart'); if(!c) return; const d=this.data,C=this.C;
+    const buy=d.price_buy.map((v,j)=>[j,v]), sell=d.price_sell.map((v,j)=>[j,v]);
+    const lanes=[]; const signed=d.discharge.map((v,j)=>v-d.charge[j]); lanes.push({label:'Zendure +/-',kind:'bat',values:signed,scale:Math.max(0.001,...signed.map(Math.abs))});
+    for(const cc of d.consumers) lanes.push({label:cc.label,kind:'cons',values:cc.power,scale:Math.max(0.001,...cc.power.map(Math.abs))});
+    const labels=lanes.map(l=>l.label); const ldata=[]; lanes.forEach((lane,row)=>lane.values.forEach((v,slot)=>{ if(Math.abs(v)<1e-3) return; ldata.push([slot,row,v,lane.kind==='bat'?1:0,lane.scale]); }));
+    c.setOption({ backgroundColor:'transparent', animation:false,
+      axisPointer:{link:[{xAxisIndex:'all'}],lineStyle:{color:C.priceBuy,width:1,type:'dashed'}},
+      tooltip:{trigger:'axis',...this._tip(),formatter:ps=>{ const s=Math.round(ps[0].axisValue!=null?ps[0].axisValue:ps[0].value[0]); let out='<b>'+(d.times[s]??'')+'</b><br/>Inkoop €'+Number(d.price_buy[s]).toFixed(3)+' · Verkoop €'+Number(d.price_sell[s]).toFixed(3); const act=lanes.filter(l=>Math.abs(l.values[s])>1e-2); if(act.length){ act.forEach(l=>{ out+='<br/>'+l.label+': '+l.values[s].toFixed(2)+' kW'; }); } return out; }},
+      grid:[{left:50,right:18,top:14,height:90},{left:50,right:18,top:130,bottom:34}],
+      xAxis:[
+        {type:'value',gridIndex:0,min:0,max:d.N,axisPointer:{show:true,label:{show:false}},axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{show:false},splitLine:{lineStyle:{color:C.grid}}},
+        {type:'value',gridIndex:1,min:0,max:d.N,axisPointer:{show:true,label:{show:false}},axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11,formatter:v=>d.times[Math.round(v)]??''},interval:Math.round(d.N/8),splitLine:{show:false}},
+      ],
+      yAxis:[
+        {type:'value',gridIndex:0,name:'€/kWh',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:10,formatter:v=>v.toFixed(2)},splitLine:{lineStyle:{color:C.grid}}},
+        {type:'category',gridIndex:1,data:labels,inverse:true,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.text,fontFamily:'Nunito Sans',fontWeight:700,fontSize:12}},
+      ],
+      series:[
+        {name:'Inkoop',type:'line',xAxisIndex:0,yAxisIndex:0,data:buy,symbol:'none',smooth:true,lineStyle:{color:C.priceBuy,width:2.4},areaStyle:{color:'rgba(244,122,32,0.10)'}},
+        {name:'Verkoop',type:'line',xAxisIndex:0,yAxisIndex:0,data:sell,symbol:'none',smooth:true,lineStyle:{color:C.priceSell,width:1.8,type:'dashed'}},
+        {type:'custom',xAxisIndex:1,yAxisIndex:1,renderItem:(prm,api)=>{ const slot=api.value(0),row=api.value(1),val=api.value(2),isBat=api.value(3)===1,scale=api.value(4)||1; const start=api.coord([slot,row]),end=api.coord([slot+1,row]),h=Math.max(2,api.size([0,1])[1]-1);
+          const fill=isBat?(val>=0?C.discharge:C.charge):C.consumers; const opacity=Math.min(1,0.28+0.72*(Math.abs(val)/scale));
+          return {type:'rect',shape:{x:start[0],y:start[1]-h/2,width:Math.max(1,end[0]-start[0]),height:h,r:3},style:{fill,opacity}}; },data:ldata,encode:{x:0,y:1}},
+      ],
+    },{notMerge:true}); }
+
+  _consSwim(){ const c=this._init('consSwim'); if(!c) return; const d=this.data,C=this.C;
+    const lanes=[]; const signed=d.discharge.map((v,j)=>v-d.charge[j]); lanes.push({label:'Zendure +/-',kind:'bat',values:signed,scale:Math.max(0.001,...signed.map(Math.abs))});
+    for(const cc of d.consumers) lanes.push({label:cc.label,kind:'cons',color:cc.color,values:cc.power,scale:Math.max(0.001,...cc.power.map(Math.abs))});
+    const labels=lanes.map(l=>l.label); const ldata=[]; lanes.forEach((lane,row)=>lane.values.forEach((v,slot)=>{ if(Math.abs(v)<1e-3) return; ldata.push([slot,row,v,lane.kind==='bat'?1:0,lane.scale,lane.color||C.consumers]); }));
+    c.setOption({ backgroundColor:'transparent', animation:false,
+      tooltip:{trigger:'axis',axisPointer:{type:'line',lineStyle:{color:C.priceBuy,width:1,type:'dashed'}},...this._tip(),formatter:ps=>{ const s=Math.round(ps[0].axisValue!=null?ps[0].axisValue:ps[0].value[0]); let out='<b>'+(d.times[s]??'')+'</b>'; const act=lanes.filter(l=>Math.abs(l.values[s])>1e-2); if(act.length){ act.forEach(l=>{ out+='<br/>'+l.label+': '+l.values[s].toFixed(2)+' kW'; }); } else { out+='<br/>geen inzet'; } return out; }},
+      grid:{left:104,right:24,top:12,bottom:34},
+      xAxis:{type:'value',min:0,max:d.N,axisPointer:{show:true,label:{show:false}},axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11,formatter:v=>d.times[Math.round(v)]??''},interval:Math.round(d.N/8),splitLine:{show:false}},
+      yAxis:{type:'category',data:labels,inverse:true,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.text,fontFamily:'Nunito Sans',fontWeight:700,fontSize:12}},
+      series:[{type:'custom',renderItem:(prm,api)=>{ const slot=api.value(0),row=api.value(1),val=api.value(2),isBat=api.value(3)===1,scale=api.value(4)||1,col=api.value(5); const start=api.coord([slot,row]),end=api.coord([slot+1,row]); const rowH=Math.max(2,api.size([0,1])[1]-1); const w=Math.max(1,end[0]-start[0]); const bh=Math.max(1.5,rowH*Math.min(1,Math.abs(val)/scale)); const fill=isBat?(val>=0?C.discharge:C.charge):col; const top=start[1]-rowH/2; return {type:'group',children:[{type:'rect',shape:{x:start[0]+0.5,y:top,width:Math.max(1,w-1),height:rowH,r:2},style:{fill:C.grid,opacity:0.28}},{type:'rect',shape:{x:start[0]+1.5,y:start[1]+rowH/2-bh,width:Math.max(1,w-3),height:bh,r:1},style:{fill,opacity:0.96}},{type:'rect',shape:{x:start[0]+0.5,y:top,width:Math.max(1,w-1),height:rowH,r:2},style:{fill:'none',stroke:fill,lineWidth:1.2,opacity:0.9}}]}; },data:ldata,encode:{x:0,y:1}}],
+    },{notMerge:true});
+    c.off('click'); c.on('click', p=>{ if(p.seriesType!=='custom') return; const slot=p.value[0], row=p.value[1]; if(row===0){ this.setState({popup:{kind:'bat',slot}}); } else { const cc=d.consumers[row-1]; if(cc) this.setState({popup:{kind:'cons',id:cc.id,slot}}); } }); }
+
+  _lane(){ const c=this._init('laneChart'); if(!c) return; const d=this.data,C=this.C,A=this._axis(); c.group='zm-plan';
+    const lanes=[]; const signed=d.discharge.map((v,i)=>v-d.charge[i]); lanes.push({label:'Zendure +/-',kind:'bat',values:signed,scale:Math.max(0.001,...signed.map(Math.abs))});
+    for(const cc of d.consumers) lanes.push({label:cc.label,kind:'cons',values:cc.power,scale:Math.max(0.001,...cc.power.map(Math.abs))});
+    const labels=lanes.map(l=>l.label); const data=[]; lanes.forEach((lane,row)=>lane.values.forEach((v,slot)=>{ if(Math.abs(v)<1e-3) return; data.push([slot,row,v,lane.kind==='bat'?1:0,lane.scale]); }));
+    c.setOption({ backgroundColor:'transparent', animation:false, tooltip:{trigger:'item',axisPointer:{type:'line',lineStyle:{color:C.priceBuy,width:1,type:'dashed'}},...this._tip(),formatter:p=>{const[slot,row,val]=p.value; return `<b>${labels[row]}</b><br/>${d.times[slot]} · ${Number(val).toFixed(2)} kW`;}},
+      grid:{top:6,right:16,bottom:26,left:110},
+      xAxis:{type:'value',min:0,max:d.N,axisPointer:{show:true,label:{show:false}},...A,interval:Math.max(1,Math.round(d.N/8)),axisLabel:{...A.axisLabel,formatter:v=>d.times[Math.round(v)]??''}},
+      yAxis:{type:'category',data:labels,inverse:true,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.text,fontFamily:'Nunito Sans',fontWeight:700,fontSize:12}},
+      series:[{type:'custom',renderItem:(prm,api)=>{ const slot=api.value(0),row=api.value(1),val=api.value(2),isBat=api.value(3)===1,scale=api.value(4)||1; const start=api.coord([slot,row]),end=api.coord([slot+1,row]),h=Math.min(26,api.size([0,1])[1]*0.72);
+        const fill=isBat?(val>=0?C.discharge:C.charge):C.consumers; const opacity=Math.min(1,0.28+0.72*(Math.abs(val)/scale));
+        return {type:'rect',shape:{x:start[0],y:start[1]-h/2,width:Math.max(1,end[0]-start[0]),height:h,r:3},style:{fill,opacity}}; },data,encode:{x:0,y:1}}],
+    },{notMerge:true});
+    try{ if(window.echarts&&this._charts.priceChart) window.echarts.connect('zm-plan'); }catch(e){} }
+
+  _fc48(){ const c=this._init('fc48Chart'); if(!c) return; const d=this.data,C=this.C,A=this._axis();
+    const cats=[]; for(let H=0;H<48;H++) cats.push((H%24).toString().padStart(2,'0')+':00');
+    c.setOption({ backgroundColor:'transparent', animation:false, textStyle:{fontFamily:'Nunito Sans',color:C.textDim},
+      tooltip:{trigger:'axis',axisPointer:{type:'cross',lineStyle:{color:C.line}},...this._tip()},
+      legend:{bottom:0,icon:'roundRect',itemWidth:11,itemHeight:7,textStyle:{color:C.textDim,fontSize:12}},
+      grid:{top:18,right:52,bottom:42,left:44},
+      xAxis:{type:'category',data:cats,...A,axisLabel:{...A.axisLabel,interval:5},axisTick:{show:false}},
+      yAxis:[{type:'value',name:'kW',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},...A},{type:'value',name:'€/kWh',position:'right',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},...A,splitLine:{show:false},axisLabel:{...A.axisLabel,formatter:v=>v.toFixed(2)}}],
+      series:[{name:'Zon-forecast',type:'bar',data:d.fcSolar,itemStyle:{color:C.solar,borderRadius:2,opacity:0.85}},{name:'Prijs (day-ahead)',type:'line',yAxisIndex:1,data:d.fcPriceA,symbol:'none',smooth:true,lineStyle:{color:C.priceBuy,width:2.4},z:5},{name:'Prijs (extrapolatie)',type:'line',yAxisIndex:1,data:d.fcPriceB,symbol:'none',smooth:true,lineStyle:{color:C.priceBuy,width:1.8,type:'dashed',opacity:0.7},z:5,markLine:{silent:true,symbol:'none',data:[{xAxis:23}],lineStyle:{color:C.line},label:{show:false}}}],
+    },{notMerge:true}); }
+
+  _fc7d(){ const c=this._init('fc7dChart'); if(!c) return; const d=this.data,C=this.C,A=this._axis();
+    const days=['ma','di','wo','do','vr','za','zo'];
+    c.setOption({ backgroundColor:'transparent', animation:false, textStyle:{fontFamily:'Nunito Sans',color:C.textDim},
+      tooltip:{trigger:'axis',axisPointer:{type:'cross',lineStyle:{color:C.line}},...this._tip()},
+      legend:{top:0,right:0,icon:'roundRect',itemWidth:11,itemHeight:7,textStyle:{color:C.textDim,fontSize:12}},
+      grid:{top:30,right:52,bottom:62,left:44},
+      dataZoom:[{type:'inside',start:0,end:100},{type:'slider',height:18,bottom:24,start:0,end:100,borderColor:C.line,fillerColor:'rgba(244,122,32,0.12)',handleStyle:{color:C.priceBuy},moveHandleStyle:{color:C.priceBuy},textStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:10},dataBackground:{lineStyle:{color:C.line},areaStyle:{color:C.grid}},selectedDataBackground:{lineStyle:{color:C.priceBuy},areaStyle:{color:'rgba(244,122,32,0.1)'}}}],
+      xAxis:{type:'category',data:d.fc7Cats,boundaryGap:true,axisLine:{lineStyle:{color:C.line}},axisTick:{show:false},axisLabel:{color:C.textDim,fontFamily:'Nunito Sans',fontWeight:700,fontSize:11,interval:idx=>idx%24===0,formatter:(v,idx)=>days[Math.floor(idx/24)]||''}},
+      yAxis:[{type:'value',name:'kW',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},...A},{type:'value',name:'€/kWh',position:'right',nameTextStyle:{color:C.textDim,fontFamily:'Nunito Sans',fontSize:11},...A,splitLine:{show:false},axisLabel:{...A.axisLabel,formatter:v=>v.toFixed(2)}}],
+      series:[
+        {name:'Zon-forecast',type:'bar',data:d.fc7Solar,itemStyle:{color:C.solar,borderRadius:1,opacity:0.82}},
+        {name:'Prijs',type:'line',yAxisIndex:1,data:d.fc7PriceA,symbol:'none',smooth:true,lineStyle:{color:C.priceBuy,width:2.2},z:5,
+          markLine:{silent:true,symbol:'none',data:[24,48,72,96,120,144].map(x=>({xAxis:x,lineStyle:{color:x===48?C.textDim:C.line,type:x===48?'solid':'dashed',opacity:x===48?0.7:0.4},label:x===48?{formatter:'day-ahead',color:C.textDim,fontFamily:'Nunito Sans',fontSize:10,position:'insideEndTop'}:{show:false}}))}},
+        {name:'Prijs (extrapolatie)',type:'line',yAxisIndex:1,data:d.fc7PriceB,symbol:'none',smooth:true,lineStyle:{color:C.priceBuy,width:1.8,type:'dashed',opacity:0.65},z:5},
+      ],
+    },{notMerge:true}); }
+}
+</script>
+</body>
+</html>

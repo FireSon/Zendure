@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.venv/
+/config/
+/secrets.json
+/.zendure_creds.json
+ui/node_modules/
+ui/dist/
+/firmware/
+
+# local data exports for experiments (production history)
+data/
+
+# notes for the assistant, kept local
+zendure.md

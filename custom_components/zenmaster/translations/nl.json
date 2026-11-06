@@ -1,0 +1,1071 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ZenMaster",
+        "description": "ZenMaster instellen. Alle configuratie (drivers, zonnepanelen, verbruikers, P1-meter) doe je daarna in het ZenMaster-paneel."
+      }
+    },
+    "abort": {
+      "already_configured": "ZenMaster is al geconfigureerd"
+    }
+  },
+  "config_subentries": {
+    "appliance": {
+      "entry_type": "Apparaat",
+      "initiate_flow": {
+        "user": "Apparaat toevoegen",
+        "reconfigure": "Apparaat aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "Apparaat toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "switch_entity": "Vrijgave",
+                "power_entity": "Vermogensmeting"
+              },
+              "data_description": {
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Apparaat aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "switch_entity": "Vrijgave",
+                "power_entity": "Vermogensmeting"
+              },
+              "data_description": {
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "electric_vehicle": {
+      "entry_type": "EV-lader",
+      "initiate_flow": {
+        "user": "EV-lader toevoegen",
+        "reconfigure": "EV-lader aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "EV-lader toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "charge_power_entity": "Laadvermogen instellen",
+                "soc_entity": "Laadtoestand",
+                "connected_entity": "Aangesloten",
+                "power_entity": "Vermogensmeting"
+              },
+              "data_description": {
+                "charge_power_entity": "Number-entiteit waarmee het laadvermogen van de lader wordt gezet.",
+                "soc_entity": "Sensor met de laadtoestand van de auto in procenten.",
+                "connected_entity": "Binary sensor die aangeeft of de kabel is aangesloten.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "EV-lader aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "charge_power_entity": "Laadvermogen instellen",
+                "soc_entity": "Laadtoestand",
+                "connected_entity": "Aangesloten",
+                "power_entity": "Vermogensmeting"
+              },
+              "data_description": {
+                "charge_power_entity": "Number-entiteit waarmee het laadvermogen van de lader wordt gezet.",
+                "soc_entity": "Sensor met de laadtoestand van de auto in procenten.",
+                "connected_entity": "Binary sensor die aangeeft of de kabel is aangesloten.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "heating_heat_pump": {
+      "entry_type": "Warmtepomp",
+      "initiate_flow": {
+        "user": "Warmtepomp toevoegen",
+        "reconfigure": "Warmtepomp aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "Warmtepomp toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave",
+                "control_entity": "Sturing"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
+                "control_entity": "Number of climate waarnaar het plan elk kwartier geschreven wordt, in het type dat bij Stuurtype gekozen is."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Warmtepomp aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave",
+                "control_entity": "Sturing"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
+                "control_entity": "Number of climate waarnaar het plan elk kwartier geschreven wordt, in het type dat bij Stuurtype gekozen is."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "boiler_heat_pump": {
+      "entry_type": "Boiler (warmtepomp)",
+      "initiate_flow": {
+        "user": "Boiler (warmtepomp) toevoegen",
+        "reconfigure": "Boiler (warmtepomp) aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "Boiler (warmtepomp) toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave",
+                "setpoint_entity": "Setpoint"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
+                "setpoint_entity": "Number met de gewenste temperatuur in graden."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Boiler (warmtepomp) aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave",
+                "setpoint_entity": "Setpoint"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
+                "setpoint_entity": "Number met de gewenste temperatuur in graden."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "boiler_electric": {
+      "entry_type": "Boiler (elektrisch)",
+      "initiate_flow": {
+        "user": "Boiler (elektrisch) toevoegen",
+        "reconfigure": "Boiler (elektrisch) aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "Boiler (elektrisch) toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Boiler (elektrisch) aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "pool_heat_pump": {
+      "entry_type": "Zwembad (warmtepomp)",
+      "initiate_flow": {
+        "user": "Zwembad (warmtepomp) toevoegen",
+        "reconfigure": "Zwembad (warmtepomp) aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "Zwembad (warmtepomp) toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Zwembad (warmtepomp) aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+          },
+          "sections": {
+            "link": {
+              "name": "Koppeling",
+              "data": {
+                "temp_entity": "Temperatuursensor",
+                "power_entity": "Vermogensmeting",
+                "switch_entity": "Vrijgave"
+              },
+              "data_description": {
+                "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "solar_panel": {
+      "entry_type": "Zonnegroep",
+      "initiate_flow": {
+        "user": "Zonnegroep toevoegen",
+        "reconfigure": "Zonnegroep aanpassen"
+      },
+      "step": {
+        "user": {
+          "title": "Zonnegroep toevoegen",
+          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
+          "data": {
+            "name": "Naam",
+            "power_entity": "Vermogensmeting",
+            "derate_entity": "Begrenzing"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar.",
+            "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+            "derate_entity": "Number-entiteit waarmee de omvormer begrensd wordt; leeg betekent niet begrenzen."
+          }
+        },
+        "reconfigure": {
+          "title": "Zonnegroep aanpassen",
+          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
+          "data": {
+            "name": "Naam",
+            "power_entity": "Vermogensmeting",
+            "derate_entity": "Begrenzing"
+          },
+          "data_description": {
+            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar.",
+            "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
+            "derate_entity": "Number-entiteit waarmee de omvormer begrensd wordt; leeg betekent niet begrenzen."
+          }
+        }
+      },
+      "error": {
+        "name_exists": "Deze naam is al in gebruik",
+        "name_required": "Geef een naam op"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    },
+    "zendure": {
+      "entry_type": "Zendure-apparaat",
+      "initiate_flow": {
+        "user": "Zendure-apparaat toevoegen",
+        "reconfigure": "Apparaat opnieuw configureren"
+      },
+      "step": {
+        "user": {
+          "title": "Zendure-apparaat toevoegen",
+          "description": "Apparaten worden normaal automatisch gevonden. Voeg er alleen handmatig een toe als het nooit verschijnt.",
+          "data": {
+            "prodkey": "Productsleutel",
+            "device_id": "Apparaatsleutel",
+            "sn": "Serienummer",
+            "ip": "IP-adres",
+            "blemac": "Bluetooth-adres"
+          },
+          "data_description": {
+            "prodkey": "De productKey die de Zendure-cloud voor het apparaat meldt.",
+            "device_id": "De deviceKey die de Zendure-cloud voor het apparaat meldt.",
+            "sn": "Het serienummer op het typeplaatje.",
+            "ip": "Vast adres voor de lokale API; wordt automatisch geleerd als het leeg is.",
+            "blemac": "Wordt automatisch uit de Bluetooth-advertentie geleerd als het leeg is."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "De naam van een apparaat verandert nooit; zijn adressen wel.",
+          "data": {
+            "ip": "IP-adres",
+            "blemac": "Bluetooth-adres"
+          },
+          "data_description": {
+            "ip": "Vast adres voor de lokale API; wordt automatisch geleerd als het leeg is.",
+            "blemac": "Wordt automatisch uit de Bluetooth-advertentie geleerd als het leeg is."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "Dit apparaat is al geconfigureerd",
+        "unknown_prodkey": "Onbekende productsleutel"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "state": {
+          "0": "Ontdekt",
+          "1": "Offline",
+          "2": "MQTT (cloud)",
+          "3": "MQTT (lokaal)",
+          "4": "Modbus",
+          "5": "HTTP",
+          "6": "Bluetooth"
+        }
+      },
+      "state": {
+        "name": "Status"
+      }
+    },
+    "select": {
+      "power_phase": {
+        "name": "Fase"
+      },
+      "mode": {
+        "name": "Modus",
+        "state": {
+          "off": "Uit",
+          "manual": "Handmatig",
+          "smart": "Slim",
+          "smart_discharging": "Slim ontladen",
+          "smart_charging": "Slim laden",
+          "store_solar": "Zon opslaan",
+          "individual": "Individueel"
+        }
+      },
+      "phase": {
+        "name": "Fase"
+      },
+      "sensor_height": {
+        "name": "Sensorhoogte"
+      }
+    },
+    "switch": {
+      "manage": {
+        "name": "Beheren"
+      },
+      "legionella": {
+        "name": "Legionellarun"
+      }
+    },
+    "time": {
+      "latest_start_time": {
+        "name": "Uiterlijke starttijd"
+      },
+      "departure_time": {
+        "name": "Vertrektijd"
+      }
+    },
+    "number": {
+      "power_rating": {
+        "name": "Vermogen"
+      },
+      "cycle_duration_slots": {
+        "name": "Cyclusduur"
+      },
+      "ev_max_soc": {
+        "name": "Doel-laadtoestand"
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Prijsgrens"
+      },
+      "capacity_kwh": {
+        "name": "Accucapaciteit"
+      },
+      "max_power_kw": {
+        "name": "Maximaal laadvermogen"
+      },
+      "t_min": {
+        "name": "Ondergrens"
+      },
+      "t_max": {
+        "name": "Bovengrens"
+      },
+      "setpoint": {
+        "name": "Setpoint"
+      },
+      "t_min_day": {
+        "name": "Laagste temperatuur overdag"
+      },
+      "t_min_night": {
+        "name": "Laagste temperatuur 's nachts"
+      },
+      "heat_max": {
+        "name": "Warmtevermogen"
+      },
+      "cop": {
+        "name": "COP"
+      },
+      "ambient": {
+        "name": "Omgevingstemperatuur"
+      },
+      "legionella_days": {
+        "name": "Legionella-interval"
+      },
+      "legionella_band": {
+        "name": "Legionella-bandbreedte"
+      },
+      "max_power": {
+        "name": "Elektrisch vermogen"
+      },
+      "volume": {
+        "name": "Inhoud"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Start"
+      },
+      "stop": {
+        "name": "Stop"
+      },
+      "skip": {
+        "name": "Overslaan"
+      },
+      "detect_phases": {
+        "name": "Fasen bepalen"
+      },
+      "export_replay": {
+        "name": "Replay-data exporteren"
+      }
+    }
+  },
+  "config_panel": {
+    "field": {
+      "temp_entity": {
+        "name": "Temperatuursensor",
+        "description": "De sensor die de temperatuur van deze buffer meet."
+      },
+      "power_entity": {
+        "name": "Vermogensmeting",
+        "description": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
+      },
+      "switch_entity": {
+        "name": "Vrijgave",
+        "description": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+      },
+      "control_entity": {
+        "name": "Sturing",
+        "description": "Number of climate waarnaar het plan elk kwartier geschreven wordt, in het type dat bij Stuurtype gekozen is."
+      },
+      "control": {
+        "name": "Stuurtype",
+        "description": "Wat er naar de gekoppelde entiteit geschreven wordt: de temp delta (offset in K), het opgenomen vermogen, de capaciteit in procenten of de temperatuur."
+      },
+      "setpoint_entity": {
+        "name": "Setpoint",
+        "description": "Number met de gewenste temperatuur in graden."
+      },
+      "ambient_entity": {
+        "name": "Omgevingssensor",
+        "description": "Sensor in de ruimte waar de tank staat. Leeg gebruikt de ingevulde omgevingstemperatuur."
+      },
+      "t_min": {
+        "name": "Ondergrens",
+        "description": "Laagste temperatuur die de solver toestaat."
+      },
+      "t_max": {
+        "name": "Bovengrens",
+        "description": "Hoogste temperatuur waarnaar de solver mag opladen. Hoger betekent meer buffer."
+      },
+      "legionella": {
+        "name": "Legionellarun",
+        "description": "Deze boiler heeft periodiek een thermische desinfectie naar de bovengrens nodig."
+      },
+      "legionella_days": {
+        "name": "Legionella-interval",
+        "description": "Aantal dagen tussen twee legionellaruns. NEN 1006 vraagt om wekelijks."
+      },
+      "legionella_band": {
+        "name": "Legionella-bandbreedte",
+        "description": "Aantal dagen voor en na dat interval waaruit de goedkoopste dag gekozen wordt."
+      },
+      "sensor_height": {
+        "name": "Sensorhoogte",
+        "description": "Waar de temperatuursensor in de tank zit."
+      },
+      "bottom_entity": {
+        "name": "Bodemsensor",
+        "description": "Optionele sensor onderin de tank. Het model volgt dan ook de bodem."
+      },
+      "top_entity": {
+        "name": "Topsensor",
+        "description": "Optionele sensor bovenin de tank. Het model volgt dan ook de top."
+      },
+      "setpoint": {
+        "name": "Setpoint",
+        "description": "Temperatuur die de solver wil bereiken. Tussen 17:00 en 23:00 wordt hij altijd gehaald."
+      },
+      "t_min_day": {
+        "name": "Laagste temperatuur overdag",
+        "description": "Tot hier mag de solver tussen 07:00 en 17:00 onder het setpoint zakken als dat iets oplevert."
+      },
+      "t_min_night": {
+        "name": "Laagste temperatuur 's nachts",
+        "description": "Tot hier mag de solver tussen 23:00 en 07:00 onder het setpoint zakken als dat iets oplevert."
+      },
+      "ambient": {
+        "name": "Omgevingstemperatuur",
+        "description": "Temperatuur van de ruimte waaraan deze buffer zijn warmte verliest."
+      },
+      "heat_max": {
+        "name": "Warmtevermogen",
+        "description": "Maximaal warmtevermogen van de warmtepomp in kW."
+      },
+      "cop": {
+        "name": "COP",
+        "description": "Rendement waarmee het warmtevermogen naar elektrisch vermogen wordt gerekend."
+      },
+      "phase": {
+        "name": "Fase",
+        "description": "Op welke fase dit apparaat is aangesloten. Wordt elke nacht uit de historie bepaald."
+      },
+      "max_power": {
+        "name": "Elektrisch vermogen",
+        "description": "Maximaal elektrisch vermogen in kW dat de solver mag inplannen."
+      },
+      "volume": {
+        "name": "Inhoud",
+        "description": "Waterinhoud van de tank in liters. Daaruit volgt hoeveel graden een kWh oplevert, dus dit vervangt een kalibratie."
+      },
+      "name": {
+        "name": "Naam",
+        "description": "Naam; HA noemt het apparaat en zijn entiteiten ernaar."
+      },
+      "kind": {
+        "name": "Soort",
+        "description": "Soort apparaat, alleen een label; het gedrag is voor alle soorten gelijk."
+      },
+      "latest_start_time": {
+        "name": "Uiterlijke starttijd",
+        "description": "Tijd (UU:MM) waarop de cyclus uiterlijk moet starten; leeg laat de standaardregel gelden."
+      },
+      "manage": {
+        "name": "Beheren",
+        "description": "Uit: ZenMaster armt dit apparaat niet en raakt de schakelaar niet aan."
+      },
+      "power_rating": {
+        "name": "Vermogen",
+        "description": "Vermogen van een cyclus in kW, gebruikt zolang er geen profiel uit de historie is geleerd."
+      },
+      "cycle_duration_slots": {
+        "name": "Cyclusduur",
+        "description": "Duur van een cyclus in kwartieren, gebruikt zolang er geen profiel is geleerd."
+      },
+      "charge_power_entity": {
+        "name": "Laadvermogen instellen",
+        "description": "Number-entiteit waarmee het laadvermogen van de lader wordt gezet."
+      },
+      "soc_entity": {
+        "name": "Laadtoestand",
+        "description": "Sensor met de laadtoestand van de auto in procenten."
+      },
+      "connected_entity": {
+        "name": "Aangesloten",
+        "description": "Binary sensor die aangeeft of de kabel is aangesloten."
+      },
+      "departure_time": {
+        "name": "Vertrektijd",
+        "description": "Tijd (UU:MM) waarop de auto vol moet zijn."
+      },
+      "ev_max_soc": {
+        "name": "Doel-laadtoestand",
+        "description": "Laadtoestand (0-1) tot waar geladen wordt."
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Prijsgrens",
+        "description": "Prijs per kWh waaronder laden loont; op zon alleen onder een derde ervan."
+      },
+      "capacity_kwh": {
+        "name": "Accucapaciteit",
+        "description": "Capaciteit van de autoaccu in kWh."
+      },
+      "max_power_kw": {
+        "name": "Maximaal laadvermogen",
+        "description": "Maximaal laadvermogen van de lader in kW."
+      },
+      "derate_entity": {
+        "name": "Begrenzing",
+        "description": "Number-entiteit waarmee de omvormer begrensd wordt; leeg betekent niet begrenzen."
+      },
+      "solver": {
+        "name": "Solver",
+        "description": "Plant de accu en de verbruikers op prijzen en de zonverwachting. Uit: de vloot regelt zelf en de planningstabs zijn verborgen."
+      }
+    },
+    "section": {
+      "price": "Dynamische prijs",
+      "link": "Koppeling",
+      "behaviour": "Gedrag",
+      "plate": "Typeplaatje",
+      "expert": "Expert",
+      "cloud": "Cloud",
+      "local_broker": "Lokale broker",
+      "wifi": "Wifi"
+    },
+    "action": {
+      "arm_off": "Niet armen",
+      "arm_on": "Weer beheren",
+      "pause": "Pauze",
+      "skip": "Overslaan",
+      "start": "Start",
+      "stop": "Stop"
+    },
+    "button": {
+      "detect_phase": "Bepaal fase uit de historie",
+      "request_code": "Vraag code aan"
+    },
+    "option": {
+      "kind": {
+        "custom": "Overig",
+        "dishwasher": "Vaatwasser",
+        "dryer": "Droger",
+        "washingmachine": "Wasmachine"
+      },
+      "phase": {
+        "0": "Alle fasen"
+      },
+      "control": {
+        "delta": "Temp delta",
+        "power": "Opgenomen vermogen",
+        "capacity": "Capaciteit %",
+        "temperature": "Temperatuur"
+      },
+      "provider": {
+        "none": "Geen",
+        "wholesale": "Groothandel (spot, kaal)"
+      },
+      "sensor_height": {
+        "boven": "Boven",
+        "midden": "Midden",
+        "onder": "Onder"
+      }
+    },
+    "ui": {
+      "app": {
+        "consumers": "Verbruikers",
+        "export": "export",
+        "import": "import",
+        "solar_groups": "Zonnegroepen · nu",
+        "load_failed": "Laden mislukt: {error}",
+        "loading": "laden…",
+        "now": "nu",
+        "power": "Vermogen",
+        "retry": "Opnieuw",
+        "savings": "Besparing",
+        "solar": "Zon",
+        "system_active": "Systeem actief, klik om te pauzeren",
+        "system_paused": "Systeem gepauzeerd, klik om te activeren",
+        "theme_dark": "Donker thema",
+        "theme_light": "Licht thema",
+        "today": "vandaag"
+      },
+      "ble": {
+        "busy": "Bezig…",
+        "cloud": "Cloud",
+        "connect": "Verbinden",
+        "empty": "(leeg)",
+        "local": "Lokaal",
+        "log_broker": "Broker ({mode}): {url}",
+        "log_connected": "Verbonden: {name}",
+        "log_connecting": "Verbinden… (kies het apparaat in de browser)",
+        "log_done": "Klaar: het apparaat verschijnt zodra het zich op de broker meldt.",
+        "log_error": "Fout: {error}",
+        "log_provisioned": "Provisioning verstuurd; 25 s wachten terwijl het apparaat omschakelt…",
+        "log_reconnect": "Herverbinden…",
+        "log_reconnect_station": "Herverbinden voor station…",
+        "log_station": "Station-command versturen…",
+        "log_wait": "Wacht op herverbinding… ({error})",
+        "no_info": "geen device-info ontvangen",
+        "no_url": "(niet beschikbaar, cloud-sync nog niet gedraaid)",
+        "title": "Apparaat koppelen via Bluetooth",
+        "unavailable": "Web Bluetooth is hier niet beschikbaar. Vereist HTTPS (of localhost) en Chrome/Edge.",
+        "log_device": "Apparaat: {id}",
+        "broker": "Broker"
+      },
+      "chart": {
+        "battery": "Accu",
+        "consumers": "Verbruikers",
+        "export": "Teruglevering",
+        "grid": "Net",
+        "import": "Netinkoop",
+        "load": "Huislast",
+        "price": "Prijs",
+        "price_buy": "Inkoopprijs",
+        "price_dayahead": "Prijs (day-ahead)",
+        "price_extrapolated": "Prijs (extrapolatie)",
+        "price_sell": "Verkoopprijs",
+        "solar": "Zon",
+        "solar_forecast": "Zon-forecast",
+        "soc_min": "min SoC",
+        "soc_max": "max SoC",
+        "dayahead": "day-ahead"
+      },
+      "common": {
+        "close": "Sluiten",
+        "cancel": "Annuleren",
+        "delete": "Verwijderen",
+        "edit": "Bewerken",
+        "no_plan": "Geen plan geladen.",
+        "save": "Opslaan",
+        "unknown_error": "onbekende fout"
+      },
+      "consumer_type": {
+        "appliance": "Apparaat",
+        "boiler_electric": "Boiler",
+        "boiler_hp": "Boiler",
+        "dishwasher": "Vaatwasser",
+        "dryer": "Droger",
+        "ev": "EV-lader",
+        "heatpump": "Warmtepomp",
+        "pool": "Zwembad",
+        "washingmachine": "Wasmachine"
+      },
+      "consumers": {
+        "add": "Verbruiker toevoegen",
+        "next": "Volgende",
+        "today": "Vandaag",
+        "until": "{state} tot {time}"
+      },
+      "devices": {
+        "controls": "Controls",
+        "name": "Naam",
+        "open_ha": "Openen in Home Assistant",
+        "show_active": "Actieve apparaten",
+        "show_all": "Alle apparaten",
+        "steering": "sturing",
+        "ble_pair": "BLE koppelen",
+        "correction": "Correctie",
+        "empty": "Geen Zendure-devices in de config.",
+        "manual": "Handmatig",
+        "max_grid": "Max net",
+        "mode": "Modus",
+        "pair": "Koppelen",
+        "tile_in": "In",
+        "tile_out": "Uit",
+        "tile_solar": "Zon",
+        "tile_temp": "Temp"
+      },
+      "forecast": {
+        "d7": "7 dagen",
+        "groups": "Zonnegroepen",
+        "groups_hint": "per dakvlak · oriëntatie & bijdrage",
+        "h48": "48 uur",
+        "hint": "zon als staaf · prijs als lijn",
+        "note": "Prijs voorbij day-ahead is een verwachting uit het prijsmodel.",
+        "per_day": "Verwachte zonopbrengst per dag",
+        "per_day_hint": "kWh · uit de 7-daagse forecast",
+        "title": "Zon & prijs · vooruitblik"
+      },
+      "group": {
+        "command_failed": "{cmd}: mislukt",
+        "confirm_delete": "{name} verwijderen?",
+        "distribution": {
+          "tag": "sturing",
+          "title": "ZenMaster"
+        },
+        "not_saved": "niet opgeslagen:",
+        "price": {
+          "tag": "solver",
+          "title": "Prijzen"
+        },
+        "zendure": {
+          "tag": "driver",
+          "title": "Zendure"
+        }
+      },
+      "kind": {
+        "boiler": "Boiler",
+        "boiler_electric": "Boiler",
+        "boiler_heat_pump": "Boiler",
+        "consumer": "Verbruiker",
+        "dishwasher": "Vaatwasser",
+        "dryer": "Droger",
+        "electric_vehicle": "Laadpaal",
+        "heating_heat_pump": "Warmtepomp",
+        "house": "Warmtepomp",
+        "pool": "Zwembad",
+        "pool_heat_pump": "Zwembad",
+        "washingmachine": "Wasmachine"
+      },
+      "settings": {
+        "empty": "Geen instellingen in het schema.",
+        "loading": "Schema laden…"
+      },
+      "solar": {
+        "actual": "Actueel",
+        "add": "Zonnepaneel toevoegen",
+        "confirm_delete": "\"{name}\" verwijderen?",
+        "empty": "geen zonnegroepen in de config",
+        "name": "Naam",
+        "new_group": "Nieuwe groep"
+      },
+      "state": {
+        "aborted": "Gestopt",
+        "armed": "Wacht",
+        "none": "Uit",
+        "planned": "Gepland",
+        "ready": "Klaar",
+        "running": "Draait",
+        "unmanaged": "Niet beheerd"
+      },
+      "tab": {
+        "solar": {
+          "label": "Solar"
+        },
+        "cijfers": {
+          "label": "History",
+          "subtitle": "Prestaties van vandaag en de afgelopen 30 dagen.",
+          "title": "Trend"
+        },
+        "consumers": {
+          "subtitle": "Inzet per apparaat en directe bediening.",
+          "title": "Verbruikers"
+        },
+        "dashboard": {
+          "label": "Planning",
+          "subtitle": "Slim plannen rond zon, dynamische prijzen en je Zendure-accu.",
+          "title": "Energie-optimalisatie"
+        },
+        "devices": {
+          "label": "Apparaten",
+          "subtitle": "Je Zendure-fleet, live.",
+          "title": "Apparaten"
+        },
+        "forecast": {
+          "subtitle": "Zon en prijs voor de komende uren en dagen.",
+          "title": "Vooruitblik"
+        },
+        "settings": {
+          "label": "Settings",
+          "subtitle": "Systeem, prijs, forecast en fleet configureren.",
+          "title": "Instellingen"
+        }
+      },
+      "trend": {
+        "accuracy": "Forecast-acc.",
+        "autarky": "Zelfvoorziening",
+        "battery": "Accu → huis",
+        "cumulative": "Cumulatief",
+        "day": "Dag {n}",
+        "day_short": "d{n}",
+        "hint": "elke rij op dezelfde datum-as · hover voor één dag",
+        "mix": "Energiemix",
+        "per_day": "{unit}/dag",
+        "share": "aandeel/dag",
+        "solar": "Zonopbrengst",
+        "tip_kpi": "Zelfvoorziening {autarky}% · Besparing €{savings} · Forecast {accuracy}%",
+        "tip_kwh": "Zon {solar} · Accu {battery} · Net {grid} kWh",
+        "tip_mix": "Mix · zon {solar}% · accu {battery}% · net {grid}%",
+        "title": "30-daagse historie"
+      },
+      "weekdays": "zo,ma,di,wo,do,vr,za"
+    }
+  }
+}

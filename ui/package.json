@@ -1,0 +1,25 @@
+{
+  "name": "ZenMaster-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w"
+  },
+  "dependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.62.2",
+    "echarts": "^5.5.0",
+    "lit": "^3.2.0"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-replace": "^6.0.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.0",
+    "@types/web-bluetooth": "^0.0.21",
+    "rollup": "^4.21.0",
+    "tslib": "^2.7.0",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="nl" data-zm-theme="light" data-zm-lead="teal">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZenMaster</title>
+    <style>
+      /* Self-hosted fonts: no external fetch, so the offline preview and the HA
+         panel never hang on the network. */
+      @font-face { font-family: 'Fredoka'; font-style: normal; font-weight: 400; font-display: swap; src: url('/ui/fonts/fredoka-400.woff2') format('woff2'); }
+      @font-face { font-family: 'Fredoka'; font-style: normal; font-weight: 500; font-display: swap; src: url('/ui/fonts/fredoka-500.woff2') format('woff2'); }
+      @font-face { font-family: 'Fredoka'; font-style: normal; font-weight: 600; font-display: swap; src: url('/ui/fonts/fredoka-600.woff2') format('woff2'); }
+      @font-face { font-family: 'Fredoka'; font-style: normal; font-weight: 700; font-display: swap; src: url('/ui/fonts/fredoka-700.woff2') format('woff2'); }
+      @font-face { font-family: 'Nunito Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('/ui/fonts/nunito-sans-400.woff2') format('woff2'); }
+      @font-face { font-family: 'Nunito Sans'; font-style: normal; font-weight: 600; font-display: swap; src: url('/ui/fonts/nunito-sans-600.woff2') format('woff2'); }
+      @font-face { font-family: 'Nunito Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('/ui/fonts/nunito-sans-700.woff2') format('woff2'); }
+
+      /* Theme surfaces follow the Home Assistant theme when embedded; the warm
+         values here are the standalone fallback. Brand orange/teal are fixed.
+         These custom properties inherit into every component's shadow root. */
+      html[data-zm-theme="light"] {
+        --zm-bg: var(--primary-background-color, #f4f1ea);
+        --zm-card: var(--card-background-color, #ffffff);
+        --zm-card-2: #fbf9f4; --zm-border: #ece6db; --zm-border-2: #f1ece3;
+        --zm-text: var(--primary-text-color, #34322d);
+        --zm-text-dim: var(--secondary-text-color, #8d877b);
+        --zm-text-faint: #b3ada1;
+        --zm-orange-soft: #fceadb; --zm-teal-soft: #dff3ee; --zm-amber-soft: #fdf0d9; --zm-blue-soft: #e1f1f8;
+        --zm-tabbar: #f5f1e8; --zm-zebra: #f8f5ef; --zm-zebra-tile: #f1ebe0; --zm-scheme: light;
+        --zm-ctl-a: #eaf7f3; --zm-ctl-b: #d4efe6; --zm-ctl-border: #c9e9df;
+        --zm-shadow: 0 1px 2px rgba(70,52,24,0.05), 0 10px 30px rgba(70,52,24,0.07);
+        --zm-shadow-sm: 0 1px 2px rgba(70,52,24,0.05), 0 4px 14px rgba(70,52,24,0.05);
+      }
+      html[data-zm-theme="dark"] {
+        --zm-bg: var(--primary-background-color, #1b1916);
+        --zm-card: var(--card-background-color, #262320);
+        --zm-card-2: #2d2925; --zm-border: rgba(255,255,255,0.075); --zm-border-2: rgba(255,255,255,0.05);
+        --zm-text: var(--primary-text-color, #f2eee7);
+        --zm-text-dim: var(--secondary-text-color, #a79e90);
+        --zm-text-faint: #6d655a;
+        --zm-orange-soft: rgba(244,122,32,0.16); --zm-teal-soft: rgba(31,184,154,0.16); --zm-amber-soft: rgba(245,166,35,0.15); --zm-blue-soft: rgba(58,160,201,0.16);
+        --zm-tabbar: #221f1c; --zm-zebra: #2b2824; --zm-zebra-tile: #34302b; --zm-scheme: dark;
+        --zm-ctl-a: #1f302c; --zm-ctl-b: #1b3a33; --zm-ctl-border: rgba(31,184,154,0.3);
+        --zm-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 30px rgba(0,0,0,0.4);
+        --zm-shadow-sm: 0 1px 2px rgba(0,0,0,0.25), 0 5px 16px rgba(0,0,0,0.3);
+      }
+      html[data-zm-lead="balanced"] { --zm-primary: #f47a20; --zm-primary-soft: var(--zm-orange-soft); --zm-secondary: #1fb89a; --zm-secondary-soft: var(--zm-teal-soft); }
+      html[data-zm-lead="orange"] { --zm-primary: #f47a20; --zm-primary-soft: var(--zm-orange-soft); --zm-secondary: #e8964a; --zm-secondary-soft: var(--zm-amber-soft); }
+      html[data-zm-lead="teal"] { --zm-primary: #1fb89a; --zm-primary-soft: var(--zm-teal-soft); --zm-secondary: #f47a20; --zm-secondary-soft: var(--zm-orange-soft); }
+
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: var(--zm-bg);
+        color: var(--zm-text);
+        font-family: 'Nunito Sans', system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      ::selection { background: rgba(244,122,32,0.2); }
+      *::-webkit-scrollbar { width: 10px; height: 10px; }
+      *::-webkit-scrollbar-thumb { background: var(--zm-border); border-radius: 8px; border: 2px solid var(--zm-bg); }
+      *::-webkit-scrollbar-track { background: transparent; }
+    </style>
+  </head>
+  <body>
+    <div id="zm-boot" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:'Nunito Sans',system-ui,sans-serif;font-size:14px;color:var(--zm-text-dim);line-height:1.7">
+      Laden&hellip;
+    </div>
+    <zm-app></zm-app>
+    <script type="module" src="/ui/dist/zm-app.js"></script>
+    <script>
+      (function () {
+        var boot = document.getElementById('zm-boot');
+        var msg =
+          'Open de app via de dev-server, niet als los bestand.<br><br>' +
+          '<span style="color:#f47a20">python tools/ui_server.py</span><br>' +
+          'en open <span style="color:#f47a20">http://127.0.0.1:8131/</span>';
+        if (location.protocol === 'file:') { boot.innerHTML = msg; return; }
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            if (customElements.get('zm-app')) { boot.remove(); }
+            else { boot.innerHTML = 'Kon de app niet laden.<br><br>' + msg; }
+          }, 1500);
+        });
+      })();
+    </script>
+  </body>
+</html>

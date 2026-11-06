@@ -1,0 +1,14 @@
+{
+  "domain": "zenmaster",
+  "name": "ZenMaster",
+  "version": "0.1.0",
+  "documentation": "https://github.com/FireSon/ZenMaster",
+  "codeowners": ["@FireSon"],
+  "config_flow": true,
+  "iot_class": "local_polling",
+  "single_config_entry": true,
+  "dependencies": ["http", "frontend", "panel_custom", "websocket_api", "recorder", "bluetooth", "zeroconf"],
+  "requirements": ["paho-mqtt", "bleak-retry-connector>=3.9.0", "highspy", "numpy"],
+  "zeroconf": [{"type": "_http._tcp.local.", "name": "zendure-*"}, {"type": "_zendure._tcp.local.", "name": "zendure-*"}],
+  "bluetooth": [{"local_name": "Zen*", "connectable": true}]
+}

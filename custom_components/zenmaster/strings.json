@@ -1,0 +1,650 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "ZenMaster",
+        "description": "Set up ZenMaster. All configuration (drivers, solar panels, consumers, P1 meter) is done afterwards in the ZenMaster panel."
+      }
+    },
+    "abort": {
+      "already_configured": "ZenMaster is already configured"
+    }
+  },
+  "config_subentries": {
+    "appliance": {
+      "entry_type": "Appliance",
+      "initiate_flow": {
+        "user": "Add appliance",
+        "reconfigure": "Reconfigure appliance"
+      },
+      "step": {
+        "user": {
+          "title": "Add appliance",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "switch_entity": "switch_entity",
+                "power_entity": "power_entity"
+              },
+              "data_description": {}
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure appliance",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "switch_entity": "switch_entity",
+                "power_entity": "power_entity"
+              },
+              "data_description": {}
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "electric_vehicle": {
+      "entry_type": "EV charger",
+      "initiate_flow": {
+        "user": "Add EV charger",
+        "reconfigure": "Reconfigure EV charger"
+      },
+      "step": {
+        "user": {
+          "title": "Add EV charger",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "charge_power_entity": "Charge power setting",
+                "soc_entity": "State of charge",
+                "connected_entity": "Connected",
+                "power_entity": "power_entity"
+              },
+              "data_description": {
+                "charge_power_entity": "Number entity that sets the charger's power.",
+                "soc_entity": "Sensor with the car's state of charge in percent.",
+                "connected_entity": "Binary sensor that tells whether the cable is connected."
+              }
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure EV charger",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "charge_power_entity": "Charge power setting",
+                "soc_entity": "State of charge",
+                "connected_entity": "Connected",
+                "power_entity": "power_entity"
+              },
+              "data_description": {
+                "charge_power_entity": "Number entity that sets the charger's power.",
+                "soc_entity": "Sensor with the car's state of charge in percent.",
+                "connected_entity": "Binary sensor that tells whether the cable is connected."
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "heating_heat_pump": {
+      "entry_type": "Heat pump",
+      "initiate_flow": {
+        "user": "Add heat pump",
+        "reconfigure": "Reconfigure heat pump"
+      },
+      "step": {
+        "user": {
+          "title": "Add heat pump",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity",
+                "control_entity": "control_entity"
+              },
+              "data_description": {}
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure heat pump",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity",
+                "control_entity": "control_entity"
+              },
+              "data_description": {}
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "boiler_heat_pump": {
+      "entry_type": "Boiler (heat pump)",
+      "initiate_flow": {
+        "user": "Add boiler (heat pump)",
+        "reconfigure": "Reconfigure boiler (heat pump)"
+      },
+      "step": {
+        "user": {
+          "title": "Add boiler (heat pump)",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity",
+                "setpoint_entity": "setpoint_entity"
+              },
+              "data_description": {}
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure boiler (heat pump)",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity",
+                "setpoint_entity": "setpoint_entity"
+              },
+              "data_description": {}
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "boiler_electric": {
+      "entry_type": "Boiler (electric)",
+      "initiate_flow": {
+        "user": "Add boiler (electric)",
+        "reconfigure": "Reconfigure boiler (electric)"
+      },
+      "step": {
+        "user": {
+          "title": "Add boiler (electric)",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity"
+              },
+              "data_description": {}
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure boiler (electric)",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity"
+              },
+              "data_description": {}
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "pool_heat_pump": {
+      "entry_type": "Pool (heat pump)",
+      "initiate_flow": {
+        "user": "Add pool (heat pump)",
+        "reconfigure": "Reconfigure pool (heat pump)"
+      },
+      "step": {
+        "user": {
+          "title": "Add pool (heat pump)",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity"
+              },
+              "data_description": {}
+            }
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure pool (heat pump)",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it."
+          },
+          "sections": {
+            "link": {
+              "name": "link",
+              "data": {
+                "temp_entity": "temp_entity",
+                "power_entity": "power_entity",
+                "switch_entity": "switch_entity"
+              },
+              "data_description": {}
+            }
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    },
+    "solar_panel": {
+      "entry_type": "Solar group",
+      "initiate_flow": {
+        "user": "Add solar group",
+        "reconfigure": "Reconfigure solar group"
+      },
+      "step": {
+        "user": {
+          "title": "Add solar group",
+          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
+          "data": {
+            "name": "Name",
+            "power_entity": "power_entity",
+            "derate_entity": "Curtailment"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it.",
+            "derate_entity": "Number entity that throttles the inverter; empty means it cannot curtail."
+          }
+        },
+        "reconfigure": {
+          "title": "Reconfigure solar group",
+          "description": "Adjust the settings. The panel shows the same fields.",
+          "data": {
+            "name": "Name",
+            "power_entity": "power_entity",
+            "derate_entity": "Curtailment"
+          },
+          "data_description": {
+            "name": "Name; HA names the device and its entities after it.",
+            "derate_entity": "Number entity that throttles the inverter; empty means it cannot curtail."
+          }
+        }
+      },
+      "error": {
+        "name_exists": "This name is already in use",
+        "name_required": "Enter a name"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "connection": {
+        "state": {
+          "0": "Discovered",
+          "1": "Offline",
+          "2": "MQTT (cloud)",
+          "3": "MQTT (local)",
+          "4": "Modbus",
+          "5": "HTTP",
+          "6": "Bluetooth"
+        }
+      },
+      "state": {
+        "name": "Status"
+      }
+    },
+    "switch": {
+      "manage": {
+        "name": "Manage"
+      },
+      "legionella": {
+        "name": "legionella"
+      }
+    },
+    "time": {
+      "latest_start_time": {
+        "name": "Latest start time"
+      },
+      "departure_time": {
+        "name": "Departure time"
+      }
+    },
+    "number": {
+      "power_rating": {
+        "name": "Power rating"
+      },
+      "cycle_duration_slots": {
+        "name": "Cycle duration"
+      },
+      "ev_max_soc": {
+        "name": "Target state of charge"
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Price limit"
+      },
+      "capacity_kwh": {
+        "name": "Battery capacity"
+      },
+      "max_power_kw": {
+        "name": "Maximum charge power"
+      },
+      "t_min": {
+        "name": "t_min"
+      },
+      "t_max": {
+        "name": "t_max"
+      },
+      "setpoint": {
+        "name": "setpoint"
+      },
+      "t_min_day": {
+        "name": "t_min_day"
+      },
+      "t_min_night": {
+        "name": "t_min_night"
+      },
+      "heat_max": {
+        "name": "heat_max"
+      },
+      "cop": {
+        "name": "cop"
+      },
+      "ambient": {
+        "name": "ambient"
+      },
+      "legionella_days": {
+        "name": "legionella_days"
+      },
+      "legionella_band": {
+        "name": "legionella_band"
+      },
+      "max_power": {
+        "name": "max_power"
+      },
+      "volume": {
+        "name": "volume"
+      }
+    },
+    "select": {
+      "power_phase": {
+        "name": "Phase"
+      },
+      "phase": {
+        "name": "phase"
+      },
+      "sensor_height": {
+        "name": "sensor_height"
+      }
+    },
+    "button": {
+      "start": {
+        "name": "Start"
+      },
+      "stop": {
+        "name": "Stop"
+      },
+      "skip": {
+        "name": "Skip"
+      }
+    },
+    "button": {
+      "detect_phases": {
+        "name": "Detect phases"
+      },
+      "export_replay": {
+        "name": "Export replay data"
+      }
+    }
+  },
+  "config_subentries": {
+    "zendure": {
+      "entry_type": "Zendure device",
+      "initiate_flow": {
+        "user": "Add Zendure device",
+        "reconfigure": "Reconfigure device"
+      },
+      "step": {
+        "user": {
+          "title": "Add Zendure device",
+          "description": "Devices are normally found automatically. Add one by hand only when it never shows up.",
+          "data": {
+            "prodkey": "Product key",
+            "device_id": "Device key",
+            "sn": "Serial number",
+            "ip": "IP address",
+            "blemac": "Bluetooth address"
+          },
+          "data_description": {
+            "prodkey": "The productKey the Zendure cloud reports for the device.",
+            "device_id": "The deviceKey the Zendure cloud reports for the device.",
+            "sn": "The serial number on the device label.",
+            "ip": "Fixed address for the local API; learned automatically when empty.",
+            "blemac": "Learned automatically from the Bluetooth advertisement when empty."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "The name of a device never changes; its addresses can.",
+          "data": {
+            "ip": "IP address",
+            "blemac": "Bluetooth address"
+          },
+          "data_description": {
+            "ip": "Fixed address for the local API; learned automatically when empty.",
+            "blemac": "Learned automatically from the Bluetooth advertisement when empty."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "This device is already configured",
+        "unknown_prodkey": "Unknown product key"
+      },
+      "abort": {
+        "reconfigure_successful": "Settings saved"
+      }
+    }
+  },
+  "config_panel": {
+    "field": {
+      "name": {
+        "name": "Name",
+        "description": "Name; HA names the device and its entities after it."
+      },
+      "kind": {
+        "name": "Kind",
+        "description": "Kind of appliance, a label only; the behaviour is the same for every kind."
+      },
+      "latest_start_time": {
+        "name": "Latest start time",
+        "description": "Time (HH:MM) by which the cycle must have started; empty applies the default rule."
+      },
+      "manage": {
+        "name": "Manage",
+        "description": "Off: ZenMaster never arms this appliance and never touches its switch."
+      },
+      "power_rating": {
+        "name": "Power rating",
+        "description": "Power of a cycle in kW, used until a profile has been learned from history."
+      },
+      "cycle_duration_slots": {
+        "name": "Cycle duration",
+        "description": "Duration of a cycle in quarters of an hour, used until a profile has been learned."
+      },
+      "charge_power_entity": {
+        "name": "Charge power setting",
+        "description": "Number entity that sets the charger's power."
+      },
+      "soc_entity": {
+        "name": "State of charge",
+        "description": "Sensor with the car's state of charge in percent."
+      },
+      "connected_entity": {
+        "name": "Connected",
+        "description": "Binary sensor that tells whether the cable is connected."
+      },
+      "departure_time": {
+        "name": "Departure time",
+        "description": "Time (HH:MM) by which the car must be charged."
+      },
+      "ev_max_soc": {
+        "name": "Target state of charge",
+        "description": "State of charge (0-1) to charge up to."
+      },
+      "charge_compensation_eur_kwh": {
+        "name": "Price limit",
+        "description": "Price per kWh under which charging pays; on solar only under a third of it."
+      },
+      "capacity_kwh": {
+        "name": "Battery capacity",
+        "description": "Capacity of the car battery in kWh."
+      },
+      "max_power_kw": {
+        "name": "Maximum charge power",
+        "description": "Maximum power of the charger in kW."
+      },
+      "derate_entity": {
+        "name": "Curtailment",
+        "description": "Number entity that throttles the inverter; empty means it cannot curtail."
+      }
+    },
+    "section": {}
+  }
+}
