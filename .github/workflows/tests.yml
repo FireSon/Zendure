@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - run: pip install pytest numpy highspy paho-mqtt amqtt bleak bleak-retry-connector aiohttp
+      - run: pip install pytest numpy highspy paho-mqtt amqtt bleak bleak-retry-connector aiohttp zeroconf
       # a pull request skips the slow simulations; they run again before anything lands on main
       - run: python -m pytest tests/ --ignore=tests/simulation --ignore=tests/integration --ignore=tests/lag --ignore=tests/compare -q
         if: github.event_name == 'pull_request'
