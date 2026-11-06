@@ -590,12 +590,6 @@
       "setpoint": {
         "name": "Nastawa"
       },
-      "t_min_day": {
-        "name": "Najniższa temperatura w dzień"
-      },
-      "t_min_night": {
-        "name": "Najniższa temperatura w nocy"
-      },
       "heat_max": {
         "name": "Moc grzewcza"
       },
@@ -616,6 +610,15 @@
       },
       "volume": {
         "name": "Objętość"
+      },
+      "day_drop": {
+        "name": "Obniżenie w dzień"
+      },
+      "night_drop": {
+        "name": "Obniżenie w nocy"
+      },
+      "headroom": {
+        "name": "Zapas powyżej nastawy"
       }
     },
     "button": {
@@ -659,8 +662,8 @@
         "description": "Co jest zapisywane do powiązanej encji: delta temperatury (przesunięcie w K), pobierana moc, wydajność w procentach lub temperatura."
       },
       "setpoint_entity": {
-        "name": "Wartość zadana",
-        "description": "Encja number z żądaną temperaturą w stopniach."
+        "name": "Nastawa z encji",
+        "description": "Termostat (climate), liczba lub czujnik, który ustala nastawę. Puste: nastawa powyżej."
       },
       "ambient_entity": {
         "name": "Czujnik otoczenia",
@@ -701,14 +704,6 @@
       "setpoint": {
         "name": "Nastawa",
         "description": "Temperatura, do której dąży solver. Między 17:00 a 23:00 jest zawsze osiągana."
-      },
-      "t_min_day": {
-        "name": "Najniższa temperatura w dzień",
-        "description": "Do tej wartości solver może zejść poniżej nastawy między 07:00 a 17:00, gdy to się opłaca."
-      },
-      "t_min_night": {
-        "name": "Najniższa temperatura w nocy",
-        "description": "Do tej wartości solver może zejść poniżej nastawy między 23:00 a 07:00, gdy to się opłaca."
       },
       "ambient": {
         "name": "Temperatura otoczenia",
@@ -797,6 +792,18 @@
       "solver": {
         "name": "Solver",
         "description": "Planuje akumulator i odbiorniki według cen i prognozy PV. Wyłączony: flota steruje się sama, a karty planowania są ukryte."
+      },
+      "day_drop": {
+        "name": "Obniżenie w dzień",
+        "description": "O tyle stopni solver może zejść poniżej nastawy między 07:00 a 17:00, gdy to się opłaca."
+      },
+      "night_drop": {
+        "name": "Obniżenie w nocy",
+        "description": "O tyle stopni solver może zejść poniżej nastawy między 23:00 a 07:00, gdy to się opłaca."
+      },
+      "headroom": {
+        "name": "Zapas powyżej nastawy",
+        "description": "O tyle stopni powyżej nastawy solver może ogrzać dom, aby zmagazynować ciepło."
       }
     },
     "section": {

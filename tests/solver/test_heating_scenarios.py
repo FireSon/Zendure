@@ -34,8 +34,7 @@ def _house() -> Heating:
     h.temp_entity = ""
     h.max_power = 3.0
     h.t_min = 20.0
-    h.t_max = 22.0
-    h.t_min_night = 18.0
+    h.day_drop, h.night_drop, h.headroom = 1.5, 2.0, 2.0  # day 18.5, night 18.0, ceiling 22.0
     h._temp0 = 20.5
     return h
 

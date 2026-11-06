@@ -590,12 +590,6 @@
       "setpoint": {
         "name": "Sollwert"
       },
-      "t_min_day": {
-        "name": "Niedrigste Temperatur tagsüber"
-      },
-      "t_min_night": {
-        "name": "Niedrigste Temperatur nachts"
-      },
       "heat_max": {
         "name": "Wärmeleistung"
       },
@@ -616,6 +610,15 @@
       },
       "volume": {
         "name": "Volumen"
+      },
+      "day_drop": {
+        "name": "Absenkung tagsüber"
+      },
+      "night_drop": {
+        "name": "Absenkung nachts"
+      },
+      "headroom": {
+        "name": "Spielraum über Sollwert"
       }
     },
     "button": {
@@ -659,8 +662,8 @@
         "description": "Was in die gekoppelte Entität geschrieben wird: das Temperaturdelta (Offset in K), die aufgenommene Leistung, die Kapazität in Prozent oder die Temperatur."
       },
       "setpoint_entity": {
-        "name": "Sollwert",
-        "description": "Number mit der gewünschten Temperatur in Grad."
+        "name": "Sollwert aus Entität",
+        "description": "Ein Thermostat (climate), eine Zahl oder ein Sensor, der den Sollwert bestimmt. Leer: der Sollwert oben."
       },
       "ambient_entity": {
         "name": "Umgebungssensor",
@@ -701,14 +704,6 @@
       "setpoint": {
         "name": "Sollwert",
         "description": "Temperatur, die der Solver anstrebt. Zwischen 17:00 und 23:00 wird sie immer erreicht."
-      },
-      "t_min_day": {
-        "name": "Niedrigste Temperatur tagsüber",
-        "description": "So weit darf der Solver zwischen 07:00 und 17:00 unter den Sollwert fallen, wenn es sich lohnt."
-      },
-      "t_min_night": {
-        "name": "Niedrigste Temperatur nachts",
-        "description": "So weit darf der Solver zwischen 23:00 und 07:00 unter den Sollwert fallen, wenn es sich lohnt."
       },
       "ambient": {
         "name": "Umgebungstemperatur",
@@ -797,6 +792,18 @@
       "solver": {
         "name": "Solver",
         "description": "Plant den Akku und die Verbraucher anhand von Preisen und Solarprognose. Aus: die Flotte regelt selbst und die Planungs-Tabs sind ausgeblendet."
+      },
+      "day_drop": {
+        "name": "Absenkung tagsüber",
+        "description": "So viele Grad darf der Solver zwischen 07:00 und 17:00 unter den Sollwert fallen, wenn es sich lohnt."
+      },
+      "night_drop": {
+        "name": "Absenkung nachts",
+        "description": "So viele Grad darf der Solver zwischen 23:00 und 07:00 unter den Sollwert fallen, wenn es sich lohnt."
+      },
+      "headroom": {
+        "name": "Spielraum über Sollwert",
+        "description": "So viele Grad über dem Sollwert darf der Solver das Haus heizen, um Wärme zu speichern."
       }
     },
     "section": {

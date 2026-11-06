@@ -590,12 +590,6 @@
       "setpoint": {
         "name": "Setpoint"
       },
-      "t_min_day": {
-        "name": "Laagste temperatuur overdag"
-      },
-      "t_min_night": {
-        "name": "Laagste temperatuur 's nachts"
-      },
       "heat_max": {
         "name": "Warmtevermogen"
       },
@@ -616,6 +610,15 @@
       },
       "volume": {
         "name": "Inhoud"
+      },
+      "day_drop": {
+        "name": "Verlaging overdag"
+      },
+      "night_drop": {
+        "name": "Verlaging 's nachts"
+      },
+      "headroom": {
+        "name": "Ruimte boven setpoint"
       }
     },
     "button": {
@@ -659,8 +662,8 @@
         "description": "Wat er naar de gekoppelde entiteit geschreven wordt: de temp delta (offset in K), het opgenomen vermogen, de capaciteit in procenten of de temperatuur."
       },
       "setpoint_entity": {
-        "name": "Setpoint",
-        "description": "Number met de gewenste temperatuur in graden."
+        "name": "Setpoint uit entiteit",
+        "description": "Een thermostaat (climate), number of sensor die het setpoint bepaalt. Leeg: het setpoint hierboven."
       },
       "ambient_entity": {
         "name": "Omgevingssensor",
@@ -701,14 +704,6 @@
       "setpoint": {
         "name": "Setpoint",
         "description": "Temperatuur die de solver wil bereiken. Tussen 17:00 en 23:00 wordt hij altijd gehaald."
-      },
-      "t_min_day": {
-        "name": "Laagste temperatuur overdag",
-        "description": "Tot hier mag de solver tussen 07:00 en 17:00 onder het setpoint zakken als dat iets oplevert."
-      },
-      "t_min_night": {
-        "name": "Laagste temperatuur 's nachts",
-        "description": "Tot hier mag de solver tussen 23:00 en 07:00 onder het setpoint zakken als dat iets oplevert."
       },
       "ambient": {
         "name": "Omgevingstemperatuur",
@@ -797,6 +792,18 @@
       "solver": {
         "name": "Solver",
         "description": "Plant de accu en de verbruikers op prijzen en de zonverwachting. Uit: de vloot regelt zelf en de planningstabs zijn verborgen."
+      },
+      "day_drop": {
+        "name": "Verlaging overdag",
+        "description": "Zoveel graden mag de solver tussen 07:00 en 17:00 onder het setpoint zakken als dat iets oplevert."
+      },
+      "night_drop": {
+        "name": "Verlaging 's nachts",
+        "description": "Zoveel graden mag de solver tussen 23:00 en 07:00 onder het setpoint zakken als dat iets oplevert."
+      },
+      "headroom": {
+        "name": "Ruimte boven setpoint",
+        "description": "Zoveel graden boven het setpoint mag de solver het huis verwarmen om warmte op te slaan."
       }
     },
     "section": {
