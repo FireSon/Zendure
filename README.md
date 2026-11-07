@@ -2,6 +2,8 @@
 
 ZenMaster is a Home Assistant integration that plans and steers a home battery fleet, heat pumps and other large loads against the dynamic energy price, the solar forecast and the house's own load. Every quarter of an hour it solves a linear optimisation (LP, with the HiGHS solver) over the next 48 hours and sends each device its setpoint.
 
+[![hacs][hacsbadge]][hacs] [![releasebadge]][release] [![License][license-shield]](LICENSE) [![hainstall][hainstallbadge]][hainstall]
+
 ![The planning tab](docs/planning.png)
 
 ## The panel
@@ -73,6 +75,11 @@ Under the chart each battery and each consumer has its own lane with its plan pe
 - **Solar forecast** from Open-Meteo, per solar group, calibrated against its own meter.
 - **Base load** per phase from the last four weeks of the P1 meter, with the managed consumers taken out.
 
+## Support
+
+If you find this project helpful and want to support its development, consider buying me a coffee!
+[![Buy Me a Coffee][buymecoffeebadge]][buymecoffee]
+
 ## Installation
 
 1. Copy `custom_components/zenmaster` into the `custom_components` folder of your Home Assistant configuration.
@@ -89,3 +96,13 @@ The panel and the settings are available in Dutch, English, German, French and P
 ## License
 
 ZenMaster is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+[buymecoffee]: https://www.buymeacoffee.com/fireson
+[buymecoffeebadge]: https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png
+[license-shield]: https://img.shields.io/github/license/FireSon/ZenMaster.svg?style=for-the-badge
+[hacs]: https://github.com/FireSon/ZenMaster
+[hacsbadge]: https://img.shields.io/badge/HACS-Custom-orange.svg?style=for-the-badge
+[release]: https://github.com/FireSon/ZenMaster/releases
+[releasebadge]: https://img.shields.io/github/v/release/FireSon/ZenMaster?style=for-the-badge
+[hainstall]: https://my.home-assistant.io/redirect/config_flow_start/?domain=zenmaster
+[hainstallbadge]: https://img.shields.io/badge/dynamic/json?style=for-the-badge&logo=home-assistant&logoColor=ccc&label=usage&suffix=%20installs&cacheSeconds=15600&url=https://analytics.home-assistant.io/custom_integrations.json&query=$.zenmaster.total
