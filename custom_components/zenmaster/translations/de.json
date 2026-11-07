@@ -165,13 +165,11 @@
               "data": {
                 "temp_entity": "Temperatursensor",
                 "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe",
                 "control_entity": "Steuerung"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
                 "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen.",
                 "control_entity": "Number oder Climate, in die der Plan jede Viertelstunde geschrieben wird, im unter Steuerart gewählten Typ."
               }
             }
@@ -192,13 +190,11 @@
               "data": {
                 "temp_entity": "Temperatursensor",
                 "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe",
                 "control_entity": "Steuerung"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
                 "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen.",
                 "control_entity": "Number oder Climate, in die der Plan jede Viertelstunde geschrieben wird, im unter Steuerart gewählten Typ."
               }
             }
@@ -235,13 +231,11 @@
               "data": {
                 "temp_entity": "Temperatursensor",
                 "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe",
                 "setpoint_entity": "Sollwert"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
                 "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen.",
                 "setpoint_entity": "Number mit der gewünschten Temperatur in Grad."
               }
             }
@@ -262,13 +256,11 @@
               "data": {
                 "temp_entity": "Temperatursensor",
                 "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe",
                 "setpoint_entity": "Sollwert"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
                 "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen.",
                 "setpoint_entity": "Number mit der gewünschten Temperatur in Grad."
               }
             }
@@ -304,13 +296,11 @@
               "name": "Verknüpfung",
               "data": {
                 "temp_entity": "Temperatursensor",
-                "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe"
+                "power_entity": "Leistungsmessung"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
-                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen."
+                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet."
               }
             }
           }
@@ -329,13 +319,11 @@
               "name": "Verknüpfung",
               "data": {
                 "temp_entity": "Temperatursensor",
-                "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe"
+                "power_entity": "Leistungsmessung"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
-                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen."
+                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet."
               }
             }
           }
@@ -370,13 +358,11 @@
               "name": "Verknüpfung",
               "data": {
                 "temp_entity": "Temperatursensor",
-                "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe"
+                "power_entity": "Leistungsmessung"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
-                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen."
+                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet."
               }
             }
           }
@@ -395,13 +381,11 @@
               "name": "Verknüpfung",
               "data": {
                 "temp_entity": "Temperatursensor",
-                "power_entity": "Leistungsmessung",
-                "switch_entity": "Freigabe"
+                "power_entity": "Leistungsmessung"
               },
               "data_description": {
                 "temp_entity": "Der Sensor, der die Temperatur dieses Speichers misst.",
-                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-                "switch_entity": "Solange dies an ist, darf der Solver dieses Gerät einplanen."
+                "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet."
               }
             }
           }
@@ -552,6 +536,9 @@
       },
       "legionella": {
         "name": "Legionellenschaltung"
+      },
+      "direct": {
+        "name": "Sofortstart"
       }
     },
     "time": {
@@ -589,12 +576,6 @@
       },
       "setpoint": {
         "name": "Sollwert"
-      },
-      "heat_max": {
-        "name": "Wärmeleistung"
-      },
-      "cop": {
-        "name": "COP"
       },
       "ambient": {
         "name": "Umgebungstemperatur"
@@ -708,14 +689,6 @@
       "ambient": {
         "name": "Umgebungstemperatur",
         "description": "Temperatur des Raums, an den dieser Speicher seine Wärme verliert."
-      },
-      "heat_max": {
-        "name": "Wärmeleistung",
-        "description": "Maximale Wärmeleistung der Wärmepumpe in kW."
-      },
-      "cop": {
-        "name": "COP",
-        "description": "Wirkungsgrad, mit dem die Wärmeleistung in elektrische Leistung umgerechnet wird."
       },
       "phase": {
         "name": "Phase",
@@ -898,17 +871,17 @@
       },
       "chart": {
         "battery": "Batterie",
-        "consumers": "Verbraucher",
-        "export": "Einspeisung",
+        "consumers": "Geräte",
+        "export": "Export",
         "grid": "Netz",
-        "import": "Netzbezug",
-        "load": "Hausverbrauch",
-        "outside_temp": "Außentemperatur",
+        "import": "Netz",
+        "load": "Haus",
+        "outside_temp": "Außen",
         "price": "Preis",
-        "price_buy": "Bezugspreis",
+        "price_buy": "Kauf",
         "price_dayahead": "Preis (Day-Ahead)",
         "price_extrapolated": "Preis (extrapoliert)",
-        "price_sell": "Verkaufspreis",
+        "price_sell": "Verkauf",
         "solar": "Solar",
         "solar_forecast": "Solarprognose",
         "soc_min": "min. SoC",
@@ -1064,6 +1037,7 @@
         "day": "Tag {n}",
         "day_short": "T{n}",
         "hint": "jede Zeile auf derselben Datumsachse · Hover für einen Tag",
+        "import": "Netzbezug",
         "mix": "Energiemix",
         "per_day": "{unit}/Tag",
         "share": "Anteil/Tag",

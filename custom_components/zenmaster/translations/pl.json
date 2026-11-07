@@ -165,13 +165,11 @@
               "data": {
                 "temp_entity": "Czujnik temperatury",
                 "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie",
                 "control_entity": "Sterowanie"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
                 "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
                 "control_entity": "Number lub climate, do którego plan jest zapisywany co kwadrans, w typie wybranym w Typ sterowania."
               }
             }
@@ -192,13 +190,11 @@
               "data": {
                 "temp_entity": "Czujnik temperatury",
                 "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie",
                 "control_entity": "Sterowanie"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
                 "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
                 "control_entity": "Number lub climate, do którego plan jest zapisywany co kwadrans, w typie wybranym w Typ sterowania."
               }
             }
@@ -235,13 +231,11 @@
               "data": {
                 "temp_entity": "Czujnik temperatury",
                 "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie",
                 "setpoint_entity": "Wartość zadana"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
                 "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
                 "setpoint_entity": "Encja number z żądaną temperaturą w stopniach."
               }
             }
@@ -262,13 +256,11 @@
               "data": {
                 "temp_entity": "Czujnik temperatury",
                 "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie",
                 "setpoint_entity": "Wartość zadana"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
                 "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie.",
                 "setpoint_entity": "Encja number z żądaną temperaturą w stopniach."
               }
             }
@@ -304,13 +296,11 @@
               "name": "Powiązania",
               "data": {
                 "temp_entity": "Czujnik temperatury",
-                "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie"
+                "power_entity": "Pomiar mocy"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
-                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
               }
             }
           }
@@ -329,13 +319,11 @@
               "name": "Powiązania",
               "data": {
                 "temp_entity": "Czujnik temperatury",
-                "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie"
+                "power_entity": "Pomiar mocy"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
-                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
               }
             }
           }
@@ -370,13 +358,11 @@
               "name": "Powiązania",
               "data": {
                 "temp_entity": "Czujnik temperatury",
-                "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie"
+                "power_entity": "Pomiar mocy"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
-                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
               }
             }
           }
@@ -395,13 +381,11 @@
               "name": "Powiązania",
               "data": {
                 "temp_entity": "Czujnik temperatury",
-                "power_entity": "Pomiar mocy",
-                "switch_entity": "Zezwolenie"
+                "power_entity": "Pomiar mocy"
               },
               "data_description": {
                 "temp_entity": "Czujnik mierzący temperaturę tego zasobnika.",
-                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-                "switch_entity": "Gdy jest włączone, solver może planować to urządzenie."
+                "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy."
               }
             }
           }
@@ -552,6 +536,9 @@
       },
       "legionella": {
         "name": "Cykl antylegionella"
+      },
+      "direct": {
+        "name": "Start natychmiastowy"
       }
     },
     "time": {
@@ -589,12 +576,6 @@
       },
       "setpoint": {
         "name": "Nastawa"
-      },
-      "heat_max": {
-        "name": "Moc grzewcza"
-      },
-      "cop": {
-        "name": "COP"
       },
       "ambient": {
         "name": "Temperatura otoczenia"
@@ -708,14 +689,6 @@
       "ambient": {
         "name": "Temperatura otoczenia",
         "description": "Temperatura pomieszczenia, do którego ten zasobnik traci ciepło."
-      },
-      "heat_max": {
-        "name": "Moc grzewcza",
-        "description": "Maksymalna moc grzewcza pompy ciepła w kW."
-      },
-      "cop": {
-        "name": "COP",
-        "description": "Sprawność, z jaką moc grzewcza jest przeliczana na moc elektryczną."
       },
       "phase": {
         "name": "Faza",
@@ -898,17 +871,17 @@
       },
       "chart": {
         "battery": "Bateria",
-        "consumers": "Odbiorniki",
-        "export": "Oddawanie do sieci",
+        "consumers": "Urządzenia",
+        "export": "Eksport",
         "grid": "Sieć",
-        "import": "Pobór z sieci",
-        "load": "Zużycie domu",
-        "outside_temp": "Temperatura zewnętrzna",
+        "import": "Sieć",
+        "load": "Dom",
+        "outside_temp": "Zewn.",
         "price": "Cena",
-        "price_buy": "Cena zakupu",
+        "price_buy": "Zakup",
         "price_dayahead": "Cena (day-ahead)",
         "price_extrapolated": "Cena (ekstrapolacja)",
-        "price_sell": "Cena sprzedaży",
+        "price_sell": "Sprzedaż",
         "solar": "PV",
         "solar_forecast": "Prognoza PV",
         "soc_min": "min. SoC",
@@ -1064,6 +1037,7 @@
         "day": "Dzień {n}",
         "day_short": "d{n}",
         "hint": "każdy wiersz na tej samej osi dat · najedź, by zobaczyć dzień",
+        "import": "Pobór z sieci",
         "mix": "Miks energii",
         "per_day": "{unit}/dzień",
         "share": "udział/dzień",

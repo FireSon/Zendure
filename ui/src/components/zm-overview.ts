@@ -5,7 +5,8 @@ import { tokens } from '../tokens.js';
 import { api } from '../service/api.js';
 import type { Schema, Theme } from '../types.js';
 import { chartColors, flowOption } from '../charts.js';
-import { consumerCards, nl } from '../derive.js';
+import { chartData, consumerCards, nl } from '../derive.js';
+import { loadDay } from '../service/loader.js';
 import { byKind, fleetDevices } from '../service/drivers.js';
 import { ZendureBle } from '../service/ble.js';
 import { t } from '../service/i18n.js';
@@ -45,7 +46,7 @@ interface DevRow {
   net: number; wattColor: string; socPct: number; dim: boolean;
   kwhAvail: number | null; kwhCap: number;
   inAggr: number | null; outAggr: number | null; rte: number | null;
-  solar: number | null; temp: number | null; tempColor: string; conn: number; phase: string;
+  solar: number | null; temp: number | null; tempColor: string; conn: number; online: boolean; phase: string;
 }
 
 export class ZmOverview extends LitElement {
@@ -67,6 +68,9 @@ export class ZmOverview extends LitElement {
   @state() private _busy = false;
   @state() private _onboardName: string | null = null;
   @state() private _narrow = NARROW.matches;
+  @state() private _day: string | null = null;  // the past day shown, null for the live plan
+  @state() private _dayD: any = null;
+  private get _shown() { return this._day ? this._dayD : this.d; }
   private _option: any = null;  // the chart option, rebuilt only when the plan or the theme changes, not on every hass update
   private _onNarrow = () => { this._narrow = NARROW.matches; };
   private get _lbl() { return this._narrow ? LBL_NARROW : LBL; }
@@ -77,7 +81,23 @@ export class ZmOverview extends LitElement {
 
   willUpdate(changed: Map<string, unknown>) {
     // a new option object resets the chart and drops its tooltip; hass changes several times a second
-    if (changed.has('d') || changed.has('theme') || changed.has('_narrow')) this._option = this.d ? flowOption(this.d, chartColors(this.theme), this._lbl) : null;
+    if (changed.has('d') || changed.has('_dayD') || changed.has('_day') || changed.has('theme') || changed.has('_narrow')) this._option = this._shown ? flowOption(this._shown, chartColors(this.theme), this._lbl) : null;
+  }
+
+  // a step through the days: the live plan for today, the recorder for a day before it
+  private async _step(days: number | null) {
+    const now = new Date(), cur = this._day ? new Date(this._day + 'T12:00') : now;
+    const to = days === null ? now : new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + days, 12);
+    if (to.toDateString() === now.toDateString() || to > now) { this._day = null; return; }
+    const iso = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
+    this._dayD = chartData(await loadDay(iso, this.config));
+    this._day = iso;
+  }
+
+  // previous, the day shown (a click goes back to today) and next, above the controls
+  private _nav(inline: boolean) {
+    const label = this._day ? new Date(this._day + 'T12:00').toLocaleDateString(this.hass?.locale?.language, { weekday: 'short', day: 'numeric', month: 'short' }) : t('ui.consumers.today', 'Vandaag');
+    return html`<div class="nav ${inline ? 'inline' : ''}"><button @click=${() => this._step(-1)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></button><button class="d" ?disabled=${!this._day} @click=${() => this._step(null)}>${label}</button><button ?disabled=${!this._day} @click=${() => this._step(1)}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg></button></div>`;
   }
 
   static styles = [
@@ -87,7 +107,13 @@ export class ZmOverview extends LitElement {
       .top { position: relative; }
       .flow { display: block; width: 100%; height: 276px; }
       /* the steering of the distribution, in the chart's left margin */
-      .ctl { position: absolute; left: 0; top: 0; bottom: 30px; width: ${LBL - 46}px; display: flex; flex-direction: column; gap: 16px; padding: 16px 16px 18px; border-radius: 18px; background: linear-gradient(160deg, var(--zm-ctl-a), var(--zm-ctl-b)); border: 1px solid var(--zm-ctl-border); box-shadow: var(--zm-shadow-sm); }
+      .nav { position: absolute; left: 0; top: 0; width: ${LBL - 46}px; height: 32px; display: flex; gap: 6px; }
+      .nav.inline { position: static; width: 100%; max-width: 520px; margin-bottom: 8px; }
+      .nav button { height: 34px; min-width: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--zm-ctl-border); border-radius: 10px; background: linear-gradient(160deg, var(--zm-ctl-a), var(--zm-ctl-b)); color: #1fb89a; cursor: pointer; }
+      .nav .d { flex: 1 1 auto; color: var(--zm-text); font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 800; }
+      .nav button:hover:not(:disabled) { border-color: #1fb89a; }
+      .nav button:disabled { opacity: 0.35; cursor: default; }
+      .ctl { position: absolute; left: 0; top: 40px; bottom: 6px; width: ${LBL - 46}px; display: flex; flex-direction: column; gap: 16px; padding: 16px 16px 18px; border-radius: 18px; background: linear-gradient(160deg, var(--zm-ctl-a), var(--zm-ctl-b)); border: 1px solid var(--zm-ctl-border); box-shadow: var(--zm-shadow-sm); }
       .ctl.inline { position: static; width: 100%; max-width: 520px; margin-bottom: 14px; }
       .ctl .h { display: flex; align-items: center; gap: 7px; font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 800; color: var(--zm-text-dim); }
       .ctl .i { flex: none; width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: var(--zm-card); color: #1fb89a; }
@@ -122,7 +148,7 @@ export class ZmOverview extends LitElement {
       .nm .n { display: flex; align-items: center; gap: 3px; min-width: 0; font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 800; color: var(--zm-text); }
       .nm .n a, .nm .n span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; text-underline-offset: 3px; }
       .nm .n a:hover { text-decoration: underline; color: #13967d; }
-      .nm .n .ph { flex: none; margin-left: 4px; font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-dim); }
+      .nm .m .ph { flex: none; font-weight: 700; color: var(--zm-text-dim); }
       .nm .m { display: flex; align-items: center; gap: 5px; font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .nm .m i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
       .w { flex: none; width: 68px; text-align: right; font-family: var(--zm-font-display); font-weight: 600; font-size: var(--zm-fs-l); line-height: 1; }
@@ -142,8 +168,10 @@ export class ZmOverview extends LitElement {
       .dtile .v { font-family: var(--zm-font-display); font-weight: 600; font-size: var(--zm-fs-m); line-height: 1; }
       .dtile .v .u { font-size: var(--zm-fs-s); color: var(--zm-text-dim); }
       .acts { display: flex; gap: 6px; margin-left: auto; padding-right: 8px; }
-      .edit { flex: none; width: 20px; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: transparent; color: var(--zm-text-faint); cursor: pointer; }
+      .edit { flex: none; width: 20px; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: transparent; color: var(--zm-text-faint); cursor: pointer; opacity: 0; }
+      .row:hover .edit, .edit:focus-visible { opacity: 1; }
       .lbl:hover .edit, .edit:hover, .edit:focus-visible { color: #13967d; background: var(--zm-teal-soft); }
+      .narrow .edit { opacity: 1; }
       .foot { display: flex; gap: 8px; padding: 12px 6px 0; }
       .addbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--zm-border); background: var(--zm-card); color: var(--zm-text-dim); border-radius: 999px; padding: 6px 12px; font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 700; cursor: pointer; }
       .addbtn:hover { color: var(--zm-text); border-color: var(--zm-text-faint); }
@@ -200,15 +228,15 @@ export class ZmOverview extends LitElement {
       const rated = net < 0 ? Math.abs(Number(e.power_charge) || 0) : Number(e.power_discharge) || 0;
       const load = net !== 0 && rated > 0 ? Math.abs(net) / rated : 0;
       const temp = this._optNum(e.temp);
-      const bypass = e.bypass ? this._ent(e.bypass)?.state === 'on' : false;
+      const gridOff = e.grid_state ? this._ent(e.grid_state)?.state === 'off' : false;  // no grid on the AC side: shown as offline
       return {
         id, name: e.name || id, model: e.model ?? '', eid: e.home_output ?? '', hasPack: kwhCap > 0,
         net, wattColor: net === 0 ? 'var(--zm-text-dim)' : load >= 0.97 ? '#e8645a' : load >= 0.85 ? '#f5a623' : '#13967d',
-        socPct, dim: net === 0 && !bypass,
+        socPct, dim: Number(e.connection ?? 0) === 0 || gridOff,
         kwhAvail: kwhCap > 0 ? kwhCap * socPct / 100 : null, kwhCap,
         inAggr: this._optNum(e.home_input_aggr), outAggr: this._optNum(e.home_output_aggr), rte: this._optNum(e.rte),
         solar: this._optNum(e.solar), temp, tempColor: temp != null && temp >= 58 ? '#e8645a' : temp != null && temp >= 50 ? '#f5a623' : 'var(--zm-text)',
-        conn: Number(e.connection ?? 0), phase: this._phase(e.power_phase),
+        conn: gridOff ? 0 : Number(e.connection ?? 0), online: Number(e.connection ?? 0) !== 0, phase: this._phase(e.power_phase),
       };
     }).sort((a, b) => PHASE_ORDER.indexOf(a.phase) - PHASE_ORDER.indexOf(b.phase));
   }
@@ -242,11 +270,11 @@ export class ZmOverview extends LitElement {
   };
 
   // the name links to the HA device, the pencil next to it opens the row's edit popup
-  private _haName(name: string, eid: string, id: string, consumer: boolean, phase = '') {
+  private _haName(name: string, eid: string, id: string, consumer: boolean) {
     const href = this._haHref(eid);
     const open = () => { this._edit = { id, consumer }; this._draftName = name; this._nameErr = null; };
     return html`
-      ${href ? html`<a href=${href} title=${t('ui.devices.open_ha', 'Open in Home Assistant')} @click=${this._go}>${name}</a>` : html`<span>${name}</span>`}${phase ? html`<span class="ph">${phase}</span>` : nothing}
+      ${href ? html`<a href=${href} title=${t('ui.devices.open_ha', 'Open in Home Assistant')} @click=${this._go}>${name}</a>` : html`<span>${name}</span>`}
       <button class="edit" title=${t('ui.common.edit', 'Bewerken')} @click=${open}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg></button>`;
   }
 
@@ -254,7 +282,7 @@ export class ZmOverview extends LitElement {
     return html`
       <div class="row ${d.dim ? 'dim' : ''}">
         <div class="lbl">
-          <div class="nm"><div class="n">${this._haName(d.name, d.eid, d.id, false, d.phase)}</div><div class="m"><i style="background:${CONN_COLOR[d.conn] ?? 'var(--zm-text-faint)'}"></i>${d.model}</div></div>
+          <div class="nm"><div class="n">${this._haName(d.name, d.eid, d.id, false)}</div><div class="m"><i style="background:${CONN_COLOR[d.conn] ?? 'var(--zm-text-faint)'}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
           <div class="w" style="color:${d.wattColor}">${d.net > 0 ? '+' : ''}${d.net}<span class="u"> W</span></div>
           <div class="bat">${d.hasPack ? html`<i style="width:${d.socPct}%"></i>` : nothing}</div>
           ${this.view === 'plan' ? html`<div class="dpop">${this._devTiles(d)}</div>` : nothing}
@@ -284,20 +312,20 @@ export class ZmOverview extends LitElement {
 
   // a battery's plan in this lane: discharge up in teal, charging (over AC and from its own panels) in blue, scaled to its own peak; each bar shows its quarter and power on hover
   private _devLane(id: string) {
-    const s = this.d?.series ?? {};
+    const s = this._shown?.series ?? {};
     const out: number[] = s[`${id}_discharge`] ?? [], ac: number[] = s[`${id}_charge`] ?? [], dc: number[] = s[`${id}_solar_in`] ?? [];
     return this._lane(out.map((v, i) => v - (ac[i] ?? 0) - (dc[i] ?? 0)), (v) => (v > 0 ? '#1fb89a' : '#3aa0c9'));
   }
 
   // one bar per quarter scaled to the lane's peak, with the power under the mouse as its tooltip
   private _lane(values: number[], color: (v: number) => string) {
-    const times: string[] = this.d?.times ?? [], peak = Math.max(0.001, ...values.map(Math.abs));
+    const times: string[] = this._shown?.times ?? [], peak = Math.max(0.001, ...values.map(Math.abs));
     return values.map((v, i) => html`<i title=${Math.abs(v) < 0.02 ? nothing : `${times[i]} · ${nl(v, 2)} kW`} style="height:${Math.abs(v) < 0.02 ? 0 : Math.max(3, Math.round(Math.abs(v) / peak * 30))}px;background:${color(v)}"></i>`);
   }
 
   // a consumer's plan in this lane: its power per quarter, scaled to its own peak like a battery's lane; each bar shows its quarter and power on hover
   private _consLane(c: any) {
-    return this._lane(this.d?.consumers?.find((x: any) => x.id === c.id)?.power ?? [], () => c.color);
+    return this._lane(this._shown?.consumers?.find((x: any) => x.id === c.id)?.power ?? [], () => c.color);
   }
 
   private _consRow(c: any) {
@@ -307,7 +335,7 @@ export class ZmOverview extends LitElement {
     return html`
       <div class="row">
         <div class="lbl">
-          <div class="nm"><div class="n">${this._haName(c.label, eid, c.id, true, this._consPhase(c.id))}</div><div class="m">${c.sub}</div></div>
+          <div class="nm"><div class="n">${this._haName(c.label, eid, c.id, true)}</div><div class="m">${(ph => ph ? html`<span class="ph">${ph}</span>` : nothing)(this._consPhase(c.id))}${c.sub}</div></div>
           <div class="w" style="color:${c.iconColor}">${c.powerW}<span class="u"> W</span></div>
           <div class="st" style="color:${c.statusColor}">${c.statusLabel}</div>
           ${this.view === 'plan' ? html`<div class="dpop">${tiles.map((x: any) => this._dtile(x.k, x.v, x.u))}</div>` : nothing}
@@ -441,21 +469,22 @@ export class ZmOverview extends LitElement {
   }
 
   render() {
-    const d = this.d;
+    const d = this._shown;
     const devs = this._devices();
     const cards = d ? consumerCards(d, this.config?.consumers ?? [], this.hass, this.actions, this.tiles).sort((a: any, b: any) => PHASE_ORDER.indexOf(this._consPhase(a.id)) - PHASE_ORDER.indexOf(this._consPhase(b.id))) : [];
     // the now line runs from the chart through the rows, in the middle of the current quarter
     const frac = d ? (d.NOW + 0.5) / d.N : 0;
     // on the phone the controls sit above the chart instead of in its left margin
     return html`
+      ${this._narrow && this.view === 'plan' ? this._nav(true) : nothing}
       ${!d || this._narrow ? this._controls(true) : nothing}
       <div class=${this._narrow ? 'narrow' : ''} style="--lbl:${this._lbl}px"><div class="wide">
-      ${d ? html`<div class="top"><zm-chart class="flow" .option=${this._option}></zm-chart>${this._narrow ? nothing : this._controls(false)}</div>` : nothing}
+      ${d ? html`<div class="top"><zm-chart class="flow" .option=${this._option}></zm-chart>${this._narrow || this.view !== 'plan' ? nothing : this._nav(false)}${this._narrow ? nothing : this._controls(false)}</div>` : nothing}
       ${!devs.length && !cards.length
         ? html`<div class="empty">${t('ui.devices.empty', 'Geen Zendure-devices in de config.')}</div>`
         : html`<div class="rowsw">
-            <div>${devs.filter((x) => !this._activeOnly || x.conn !== 0).map((x) => this._devRow(x))}${cards.map((c: any) => this._consRow(c))}</div>
-            ${d && this.view === 'plan' ? html`<div class="now" style="left:calc(${this._lbl}px + (100% - ${this._lbl + RSP}px) * ${frac})"></div>` : nothing}
+            <div>${devs.filter((x) => !this._activeOnly || x.online).map((x) => this._devRow(x))}${cards.map((c: any) => this._consRow(c))}</div>
+            ${d && this.view === 'plan' && d.NOW >= 0 ? html`<div class="now" style="left:calc(${this._lbl}px + (100% - ${this._lbl + RSP}px) * ${frac})"></div>` : nothing}
           </div>`}
       </div></div>
       <div class="foot">

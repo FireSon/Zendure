@@ -41,7 +41,6 @@ _LINK = [
     ConfigField("name", {"text": {}}),  # the subentry title: HA names the device and its entities after it
     ConfigField("temp_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "temperature"}]}}, cast=str, section_key="link"),
     ConfigField("power_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "power"}, {"domain": "sensor", "device_class": "current"}]}}, cast=str, section_key="link"),
-    ConfigField("switch_entity", {"entity": {"filter": [{"domain": "switch"}, {"domain": "binary_sensor"}]}}, cast=str, required=False, section_key="link"),
 ]
 # settings have no cast: they are entities on the consumer's device, HA keeps their value (see ConsumerDevice)
 _MANAGE = ConfigField("manage", {"boolean": {}}, section_key="behaviour")
@@ -51,8 +50,6 @@ _BAND = [
 ]
 _AMBIENT = ConfigField("ambient", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour")
 _AMBIENT_ENTITY = ConfigField("ambient_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "temperature"}]}}, cast=str, required=False, section_key="link")
-_HEAT_MAX = ConfigField("heat_max", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, required=False, section_key="plate")
-_COP = ConfigField("cop", {"number": {"mode": "box", "step": 0.1}}, required=False, section_key="plate")
 _MAX_POWER = ConfigField("max_power", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, required=False, section_key="plate")
 _VOLUME = ConfigField("volume", {"number": {"mode": "box", "step": 10, "unit_of_measurement": "l"}}, required=False, section_key="plate")
 _TAIL = [
@@ -72,11 +69,7 @@ class Heating(SolverEntry, ConsumerDevice):
         self.id = ""
         self.phase = Phase.all
         self.temp_entity = ""
-        self.switch_entity = ""  # on/off of the machine
         self.max_power = 2.5  # electrical source cap (kW)
-        # off the nameplate: the heat range and the COP. The electrical range follows from it; empty keeps max_power
-        self.heat_max = 0.0
-        self.cop = 0.0
         self.t_min = 19.0  # floor: soft for house, hard for boiler/pool
         self.t_max = 22.0
         self.t_min_night = 18.0  # night setback of the soft house floor
@@ -115,12 +108,10 @@ class Heating(SolverEntry, ConsumerDevice):
             self._temp0 = float(state.state)
         lp.track(self.power_entity, self.on_power, phase=self.phase)  # measured energy, for the realised saving
 
-        # electrical draw column, tagged on its phase so the solver's phase-limit row includes it. The cap comes
-        # from the nameplate when it is filled in (heat divided by COP), otherwise from max_power as before.
-        if self.volume:  # a known volume gives the rise per kWh of heat exactly; the COP turns that into electrical
-            self.slope = self.volume / (_TANK_K * self.tau * (self.cop or 1.0))
-        self.max_kw = self.heat_max / self.cop if self.heat_max and self.cop else self.max_power
-        self.power = lp.column(hi=self.max_kw, tags=("draw",), dest=lp.data(f"{self.id}_power", "kW", name=self.name), phase=self.phase)
+        # electrical draw column, tagged on its phase so the solver's phase-limit row includes it, capped at max_power
+        if self.volume:  # a known volume gives the rise per kWh of heat exactly: a resistive element turns every kWh into heat
+            self.slope = self.volume / (_TANK_K * self.tau)
+        self.power = lp.column(hi=self.max_power, tags=("draw",), dest=lp.data(f"{self.id}_power", "kW", name=self.name), phase=self.phase)
         # temperature state. House has no hard upper bound: with no cooling path a ceiling is infeasible in summer, so it gets a soft one below.
         # Boiler/pool keep the hard band [hard_min, t_max]. Slot 0 is pinned to the live temp in prerun.
         self.temp = lp.column(lo=hard_min, dest=lp.data(f"{self.id}_temp", "C", name=self.name)) if soft else lp.column(lo=hard_min, hi=self.t_max, dest=lp.data(f"{self.id}_temp", "C", name=self.name))
@@ -219,7 +210,7 @@ class Heating(SolverEntry, ConsumerDevice):
             if res[2] is not None:
                 self.tau = res[2]
             # with a known volume the slope follows from tau, as in entry_config; otherwise from the fit
-            self.slope = self.volume / (_TANK_K * self.tau * (self.cop or 1.0)) if self.volume else res[0]
+            self.slope = self.volume / (_TANK_K * self.tau) if self.volume else res[0]
             self._rebuild_model()  # push the new parameters into the LP rows
             if (request_solve := lp.globals.get("request_solve")) is not None:
                 request_solve()  # the standing plan was built with the old model: solve again right away
@@ -235,7 +226,7 @@ class HeatingHeatPump(Heating):
               ConfigField("setpoint_entity", {"entity": {"filter": [{"domain": "climate"}, {"domain": "number"}, {"domain": "input_number"}, {"domain": "sensor"}]}}, cast=str, required=False, section_key="link"),
               ConfigField("control", {"select": {"options": _CONTROLS}}, cast=str, section_key="behaviour"), _MANAGE, ConfigField("setpoint", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"),
               ConfigField("day_drop", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), ConfigField("night_drop", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"),
-              ConfigField("headroom", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), _HEAT_MAX, _COP, *_TAIL]
+              ConfigField("headroom", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), _MAX_POWER, *_TAIL]
     # the house calls its comfort target the setpoint, like a thermostat; the shared code reads the target of this quarter as t_min
     t_min = property(lambda self: self._target, lambda self, v: setattr(self, "setpoint", v))
     _target = 19.5  # the setpoint of this quarter; the shared __init__ reads t_min before this class sets it
@@ -278,7 +269,7 @@ class HeatingHeatPump(Heating):
         if self.control_entity and lp.hass is not None and (state := lp.hass.states.get(self.control_entity)) is not None:
             a, p, floor = state.attributes, float(self.power.dest.data[12]), self._tmin[0]
             delta = max(0.0, float(self.temp.dest.data[13]) - floor) if p else 0.0  # the room the plan heats to by the end of this quarter; none in a quarter _runs dropped
-            value = {"power": p * (1000.0 if a.get("unit_of_measurement") == "W" else 1.0), "capacity": 100.0 * p / self.max_kw, "delta": delta, "temperature": floor + delta}[self.control]
+            value = {"power": p * (1000.0 if a.get("unit_of_measurement") == "W" else 1.0), "capacity": 100.0 * p / self.max_power, "delta": delta, "temperature": floor + delta}[self.control]
             step = a.get("step") or a.get("target_temp_step") or 0.5
             value = round(round(value / step) * step, 3)
             value = min(max(value, a.get("min", a.get("min_temp", value))), a.get("max", a.get("max_temp", value)))
@@ -299,7 +290,7 @@ class HeatingHeatPump(Heating):
 
 class PoolHeatPump(Heating):
     # pool water from a heat pump: hard band, loses heat to the outside air around the pool
-    CONFIG = [*_LINK, _MANAGE, *_BAND, _AMBIENT, _HEAT_MAX, _COP, *_TAIL]
+    CONFIG = [*_LINK, _MANAGE, *_BAND, _AMBIENT, _MAX_POWER, *_TAIL]
 
     def __init__(self) -> None:
         super().__init__()

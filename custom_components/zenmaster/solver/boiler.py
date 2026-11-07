@@ -349,7 +349,6 @@ class BoilerElectric(Heating):
         super().__init__()
         self.t_min, self.t_max = 40.0, 60.0
         self.tau = 110.0  # a tank coasts far longer than a house: about 28 hours
-        self.cop = 1.0
 
 
 def mix(T: np.ndarray) -> np.ndarray:

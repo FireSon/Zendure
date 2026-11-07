@@ -157,7 +157,6 @@
               "data": {
                 "temp_entity": "temp_entity",
                 "power_entity": "power_entity",
-                "switch_entity": "switch_entity",
                 "control_entity": "control_entity"
               },
               "data_description": {}
@@ -179,7 +178,6 @@
               "data": {
                 "temp_entity": "temp_entity",
                 "power_entity": "power_entity",
-                "switch_entity": "switch_entity",
                 "control_entity": "control_entity"
               },
               "data_description": {}
@@ -217,7 +215,6 @@
               "data": {
                 "temp_entity": "temp_entity",
                 "power_entity": "power_entity",
-                "switch_entity": "switch_entity",
                 "setpoint_entity": "setpoint_entity"
               },
               "data_description": {}
@@ -239,7 +236,6 @@
               "data": {
                 "temp_entity": "temp_entity",
                 "power_entity": "power_entity",
-                "switch_entity": "switch_entity",
                 "setpoint_entity": "setpoint_entity"
               },
               "data_description": {}
@@ -276,8 +272,7 @@
               "name": "link",
               "data": {
                 "temp_entity": "temp_entity",
-                "power_entity": "power_entity",
-                "switch_entity": "switch_entity"
+                "power_entity": "power_entity"
               },
               "data_description": {}
             }
@@ -297,8 +292,7 @@
               "name": "link",
               "data": {
                 "temp_entity": "temp_entity",
-                "power_entity": "power_entity",
-                "switch_entity": "switch_entity"
+                "power_entity": "power_entity"
               },
               "data_description": {}
             }
@@ -334,8 +328,7 @@
               "name": "link",
               "data": {
                 "temp_entity": "temp_entity",
-                "power_entity": "power_entity",
-                "switch_entity": "switch_entity"
+                "power_entity": "power_entity"
               },
               "data_description": {}
             }
@@ -355,8 +348,7 @@
               "name": "link",
               "data": {
                 "temp_entity": "temp_entity",
-                "power_entity": "power_entity",
-                "switch_entity": "switch_entity"
+                "power_entity": "power_entity"
               },
               "data_description": {}
             }
@@ -437,6 +429,9 @@
       },
       "legionella": {
         "name": "legionella"
+      },
+      "direct": {
+        "name": "Direct start"
       }
     },
     "time": {
@@ -483,12 +478,6 @@
       },
       "headroom": {
         "name": "headroom"
-      },
-      "heat_max": {
-        "name": "heat_max"
-      },
-      "cop": {
-        "name": "cop"
       },
       "ambient": {
         "name": "ambient"
