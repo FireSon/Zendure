@@ -85,3 +85,7 @@ ZenMaster needs the Home Assistant recorder for its calibrations and uses `paho-
 ## Languages
 
 The panel and the settings are available in Dutch, English, German, French and Polish.
+
+## License
+
+ZenMaster is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE).
