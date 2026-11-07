@@ -903,6 +903,7 @@
         "grid": "Netz",
         "import": "Netzbezug",
         "load": "Hausverbrauch",
+        "outside_temp": "Außentemperatur",
         "price": "Preis",
         "price_buy": "Bezugspreis",
         "price_dayahead": "Preis (Day-Ahead)",

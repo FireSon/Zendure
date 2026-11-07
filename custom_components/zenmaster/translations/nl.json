@@ -903,6 +903,7 @@
         "grid": "Net",
         "import": "Netinkoop",
         "load": "Huislast",
+        "outside_temp": "Buitentemperatuur",
         "price": "Prijs",
         "price_buy": "Inkoopprijs",
         "price_dayahead": "Prijs (day-ahead)",

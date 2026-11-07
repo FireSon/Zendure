@@ -903,6 +903,7 @@
         "grid": "Réseau",
         "import": "Soutirage réseau",
         "load": "Consommation maison",
+        "outside_temp": "Température extérieure",
         "price": "Prix",
         "price_buy": "Prix d'achat",
         "price_dayahead": "Prix (day-ahead)",
