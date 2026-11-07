@@ -488,6 +488,48 @@
       "abort": {
         "reconfigure_successful": "Einstellungen gespeichert"
       }
+    },
+    "marstek": {
+      "entry_type": "Marstek-Gerät",
+      "initiate_flow": {
+        "user": "Marstek-Gerät hinzufügen",
+        "reconfigure": "Gerät neu konfigurieren"
+      },
+      "step": {
+        "user": {
+          "title": "Marstek-Gerät hinzufügen",
+          "description": "Eine Marstek Venus wird über Modbus TCP gesteuert: direkt über Ethernet (Venus E v3, A, D) oder über ein RS485-Gateway (Venus E v1/v2). Modbus findet nichts von selbst, daher wird jedes Gerät hier hinzugefügt.",
+          "data": {
+            "product": "Registergeneration",
+            "ip": "IP-Adresse",
+            "port": "Port"
+          },
+          "data_description": {
+            "product": "v2: Venus E v1/v2 (über ein RS485-Gateway), v3: Venus E v3, vA: Venus A, vD: Venus D.",
+            "ip": "Die Adresse der Batterie oder ihres RS485-Gateways; sie identifiziert auch das Gerät.",
+            "port": "Der Modbus-TCP-Port, standardmäßig 502."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "Der Name eines Geräts ändert sich nie, seine Adresse schon.",
+          "data": {
+            "ip": "IP-Adresse",
+            "port": "Port"
+          },
+          "data_description": {
+            "ip": "Die Adresse der Batterie oder ihres RS485-Gateways; sie identifiziert auch das Gerät.",
+            "port": "Der Modbus-TCP-Port, standardmäßig 502."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "Dieses Gerät ist bereits eingerichtet",
+        "unknown_product": "Unbekannte Registergeneration"
+      },
+      "abort": {
+        "reconfigure_successful": "Einstellungen gespeichert"
+      }
     }
   },
   "entity": {

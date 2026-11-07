@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from .device import DistributionDevice
 from .distribution import Distribution
+from .marstek.driver import MarstekDriver
+from .marstek.venus import MarstekVenus
 from .zendure.driver import ZendureDriver
 from .zendure.smartmeter import ZendureSmartMeter
 from .zendure.solarflow import ZendureSolarFlow
@@ -103,6 +105,28 @@ FIELDS: dict[type, list[ConfigField]] = {
         ConfigField("phase1_current", {"entity": {}}, readonly=True),
         ConfigField("phase2_current", {"entity": {}}, readonly=True),
         ConfigField("phase3_current", {"entity": {}}, readonly=True),
+    ],
+    MarstekDriver: [
+        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True),
+    ],
+    MarstekVenus: [
+        ConfigField("device_id", {"text": {}}, cast=str, is_key=True, readonly=True),
+        ConfigField("name", {"text": {}}, cast=str, readonly=True),
+        ConfigField("model", {"text": {}}, cast=str, readonly=True),
+        ConfigField("sn", {"text": {}}, cast=str, readonly=True),
+        ConfigField("ip", {"text": {}}, cast=str, readonly=True),
+        ConfigField("port", {"number": {}}, cast=int, readonly=True),
+        ConfigField("kwh", {"number": {"step": 0.1, "unit_of_measurement": "kWh"}}, cast=float, readonly=True),
+        ConfigField("soc", {"entity": {}}, readonly=True),
+        ConfigField("soc_min", {"entity": {}}, readonly=True),
+        ConfigField("soc_max", {"entity": {}}, readonly=True),
+        ConfigField("home_input", {"entity": {}}, readonly=True),
+        ConfigField("home_output", {"entity": {}}, readonly=True),
+        ConfigField("home_input_aggr", {"entity": {}}, readonly=True),
+        ConfigField("home_output_aggr", {"entity": {}}, readonly=True),
+        ConfigField("rte", {"entity": {}}, readonly=True),
+        ConfigField("power_phase", {"entity": {}}, readonly=True),
+        ConfigField("temp", {"entity": {}}, readonly=True),
     ],
 }
 
