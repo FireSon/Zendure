@@ -17,6 +17,7 @@ _QUIET_S = 2700.0  # rest before a rise counts as a start; measured: pauses insi
 _QUIET_MAX_S = 5400.0  # ceiling for the learned value, so one outlier cannot block arming altogether
 _EVENING_MIN = 17 * 60  # armed at or after this, or before _MORNING_MIN: the cycle must be done by 08:00
 _MORNING_MIN = 8 * 60  # armed after this: done within four hours and never past 17:00, so it stays clear of dinner
+_DEFAULTS = {"dishwasher": (0.9, 7), "washingmachine": (0.3, 7), "dryer": (1.6, 7)}  # kW and quarters per kind, measured here and rounded: used while power_rating or cycle_duration_slots is not set
 
 
 def _time_to_slot(time_str: str) -> int | None:
@@ -153,7 +154,9 @@ class Appliance(SolverEntry, ConsumerDevice):
         # plan this cycle in its cheapest window when armed; baseload has already seeded the phase loads
         self.data.data[12:] = 0.0
         if self.armed:
-            profile = self._profile or [self.power_rating] * self.cycle_duration_slots
+            # without a learned profile a flat cycle; a rating or duration that is not set takes the default of its kind
+            kw, slots = _DEFAULTS.get(self.kind, (0.0, 0))
+            profile = self._profile or [self.power_rating if self.power_rating > 0 else kw] * (self.cycle_duration_slots if self.cycle_duration_slots > 0 else slots)
             slot = _time_to_slot(self.latest_start_time) if self.latest_start_time else None
             if slot is not None:
                 latest = (slot - (now.hour * 60 + now.minute) // 15) % 96 or 96  # wall-clock slot -> slots from now
