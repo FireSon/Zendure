@@ -27,6 +27,9 @@ The chart shows the plan for the coming 48 hours per quarter:
 - **Solar**, **Export**, **House load**, **Consumers** and **Grid import** as bars, in kW.
 - **Buy price** and **Sell price** as lines, in EUR/kWh, with the current price marked. Where the day-ahead prices end, the line continues dashed on the price model.
 - **SoC** of the fleet as a dotted line, between its min and max.
+- **Outside temperature** as a line, on the axis on the left in °C.
+
+With the arrows above the controls you step back through earlier days. The chart and the lanes then show what really happened that day, per quarter, from the Home Assistant recorder: solar, export, house load, consumers, grid import, the prices, the SoC of the fleet and every battery and consumer on its own, with the outside temperature from Open-Meteo. **Today** brings back the live plan. The recorder keeps 5-minute values for about ten days; older days show hourly values.
 
 ### Controls
 
@@ -37,7 +40,7 @@ The chart shows the plan for the coming 48 hours per quarter:
 
 ### Device and consumer lanes
 
-Under the chart each battery and each consumer has its own lane with its plan per quarter. Hover a bar to see its time and power. Each row shows its phase, its power now and, for a battery, its state of charge. **Add consumer** adds an appliance, a heat pump, a boiler or an EV charger; **All devices** toggles between all and only the online devices; **Pair** connects a new Zendure battery over Bluetooth.
+Under the chart each battery and each consumer has its own lane with its plan per quarter, or on an earlier day what it really did. Hover a bar to see its time and power. Each row shows its phase, its power now and, for a battery, its state of charge. **Add consumer** adds an appliance, a heat pump, a boiler or an EV charger; **All devices** toggles between all and only the online devices; **Pair** connects a new Zendure battery over Bluetooth.
 
 ## What ZenMaster plans
 
