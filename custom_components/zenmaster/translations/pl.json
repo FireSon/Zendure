@@ -903,6 +903,7 @@
         "grid": "Sieć",
         "import": "Pobór z sieci",
         "load": "Zużycie domu",
+        "outside_temp": "Temperatura zewnętrzna",
         "price": "Cena",
         "price_buy": "Cena zakupu",
         "price_dayahead": "Cena (day-ahead)",

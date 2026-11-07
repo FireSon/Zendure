@@ -903,6 +903,7 @@
         "grid": "Grid",
         "import": "Grid import",
         "load": "House load",
+        "outside_temp": "Outside temperature",
         "price": "Price",
         "price_buy": "Buy price",
         "price_dayahead": "Price (day-ahead)",

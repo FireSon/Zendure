@@ -11,6 +11,7 @@ export function chartColors(theme: Theme) {
     solar: '#f5a623', consumers: '#f47a20', load: dark ? '#5f594e' : '#d8d0c1',
     import: '#e8645a', export: '#8ad2c0', charge: '#3aa0c9', discharge: '#1fb89a',
     soc: '#1fb89a', priceBuy: '#f47a20', priceSell: '#1fb89a',
+    temp: dark ? '#8fa3e8' : '#5468c4',
     text: dark ? '#f2eee7' : '#34322d', textDim: dark ? '#a79e90' : '#8d877b',
     line: dark ? 'rgba(255,255,255,0.07)' : '#ece6db', grid: dark ? 'rgba(255,255,255,0.05)' : 'rgba(70,52,24,0.05)',
     tipBg: dark ? '#262320' : '#ffffff', tipBorder: dark ? 'rgba(255,255,255,0.1)' : '#ece6db', tipText: dark ? '#f2eee7' : '#34322d',
@@ -34,7 +35,7 @@ export function flowOption(d: any, C: ChartColors, left = 104) {
   const consSum = new Array(d.N).fill(0);
   for (const cc of d.consumers) cc.power.forEach((v: number, i: number) => (consSum[i] += v));
   // the series names are the legend and the tooltip match, so they are looked up once
-  const solar = t('ui.chart.solar', 'Zon'), exp = t('ui.chart.export', 'Teruglevering'), load = t('ui.chart.load', 'Huislast'), cons = t('ui.chart.consumers', 'Verbruikers'), imp = t('ui.chart.import', 'Netinkoop'), buy = t('ui.chart.price_buy', 'Inkoopprijs'), sell = t('ui.chart.price_sell', 'Verkoopprijs');
+  const solar = t('ui.chart.solar', 'Zon'), exp = t('ui.chart.export', 'Teruglevering'), load = t('ui.chart.load', 'Huislast'), cons = t('ui.chart.consumers', 'Verbruikers'), imp = t('ui.chart.import', 'Netinkoop'), buy = t('ui.chart.price_buy', 'Inkoopprijs'), sell = t('ui.chart.price_sell', 'Verkoopprijs'), temp = t('ui.chart.outside_temp', 'Buitentemperatuur');
   const bars = [
     { name: solar, stack: 'pos', color: C.solar, data: d.solar }, { name: exp, stack: 'pos', color: C.export, data: d.grid_sell },
     { name: load, stack: 'neg', color: C.load, data: neg(d.load) }, { name: cons, stack: 'neg', color: C.consumers, data: neg(consSum) }, { name: imp, stack: 'neg', color: C.import, data: neg(d.grid_buy) },
@@ -45,10 +46,12 @@ export function flowOption(d: any, C: ChartColors, left = 104) {
   lines[0].lineStyle = { color: C.priceBuy, width: 3.5, shadowColor: C.tipBg, shadowBlur: 6 };
   lines[0].markPoint = { symbol: 'roundRect', symbolSize: [50, 20], symbolOffset: [30, -14], itemStyle: { color: C.priceBuy }, label: { color: '#fff', fontFamily: 'Fredoka', fontWeight: 600, fontSize: 13, formatter: (p: any) => '€' + Number(p.value).toFixed(2).replace('.', ',') }, data: [{ coord: [d.NOW, d.price_buy[d.NOW]], value: d.price_buy[d.NOW] }] };
   const soc = { name: 'SoC', type: 'line', xAxisIndex: 0, yAxisIndex: 2, data: d.soc.map((v: number) => v * 100), symbol: 'none', smooth: true, lineStyle: { color: C.soc, width: 2.4, type: 'dotted' }, markLine: { silent: true, symbol: 'none', data: [{ yAxis: 0, lineStyle: { color: C.import, type: 'dashed', width: 1 }, label: { formatter: t('ui.chart.soc_min', 'min SoC'), color: C.import, fontFamily: F, fontSize: 10, position: 'insideEndTop' } }, { yAxis: 100, lineStyle: { color: C.textDim, type: 'dashed', width: 1 }, label: { formatter: t('ui.chart.soc_max', 'max SoC'), color: C.textDim, fontFamily: F, fontSize: 10, position: 'insideEndTop' } }] } };
+  // the outside temperature from the forecast: a plain line, more contrast than the bars, less than the buy price
+  const outside = { name: temp, type: 'line', xAxisIndex: 0, yAxisIndex: 3, data: d.series.temp ?? [], symbol: 'none', smooth: true, itemStyle: { color: C.temp }, lineStyle: { color: C.temp, width: 2.2 }, z: 4 };
   return {
     backgroundColor: 'transparent', animation: false, textStyle: { fontFamily: F, color: C.textDim },
-    tooltip: { trigger: 'axis', axisPointer: { type: 'cross', lineStyle: { color: C.line } }, ...tip(C), formatter: (ps: any) => { if (!ps || !ps.length) return ''; const t = ps[0].axisValue; const rows: string[] = []; ps.forEach((p: any) => { const nm = p.seriesName || ''; let val = Array.isArray(p.value) ? p.value[1] : p.value; if (val == null) return; let txt; if (nm === buy || nm === sell) txt = '€' + Number(val).toFixed(3); else if (nm === 'SoC') txt = Number(val).toFixed(0) + '%'; else txt = Number(val).toFixed(2) + ' kW'; rows.push(p.marker + nm + ': ' + txt); }); return '<b>' + t + '</b><br/>' + rows.join('<br/>'); } },
-    legend: { top: 0, left: left + 28, icon: 'roundRect', itemWidth: 11, itemHeight: 7, data: [solar, exp, load, cons, imp, buy, sell, 'SoC'], textStyle: { color: C.textDim, fontSize: 13, fontFamily: F } },  // clear of the kW axis name above the plot's left edge
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross', lineStyle: { color: C.line } }, ...tip(C), formatter: (ps: any) => { if (!ps || !ps.length) return ''; const t = ps[0].axisValue; const rows: string[] = []; ps.forEach((p: any) => { const nm = p.seriesName || ''; let val = Array.isArray(p.value) ? p.value[1] : p.value; if (val == null) return; let txt; if (nm === buy || nm === sell) txt = '€' + Number(val).toFixed(3); else if (nm === 'SoC') txt = Number(val).toFixed(0) + '%'; else if (nm === temp) txt = Number(val).toFixed(1) + ' °C'; else txt = Number(val).toFixed(2) + ' kW'; rows.push(p.marker + nm + ': ' + txt); }); return '<b>' + t + '</b><br/>' + rows.join('<br/>'); } },
+    legend: { top: 0, left: left + 28, icon: 'roundRect', itemWidth: 11, itemHeight: 7, data: [solar, exp, load, cons, imp, buy, sell, 'SoC', temp], textStyle: { color: C.textDim, fontSize: 13, fontFamily: F } },  // clear of the kW axis name above the plot's left edge
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
     // one grid with the time axis right under it
     grid: [{ left, right: 54, top: 30, bottom: 26 }],
@@ -60,8 +63,9 @@ export function flowOption(d: any, C: ChartColors, left = 104) {
       { type: 'value', gridIndex: 0, name: '€/kWh', position: 'right', nameTextStyle: { color: C.textDim, fontFamily: F, fontSize: 10 }, axisLine: { lineStyle: { color: C.line } }, axisLabel: { color: C.priceBuy, fontFamily: F, fontWeight: 700, fontSize: 10, formatter: (v: number) => v.toFixed(2) }, axisPointer: { label: { formatter: (p: any) => '€' + Number(p.value).toFixed(2) } }, splitLine: { show: false } },
       // the hidden SoC axis gives the cross pointer no label of its own; the price axis carries it
       { type: 'value', gridIndex: 0, name: 'SoC %', position: 'right', offset: 46, min: 0, max: 100, show: false, nameTextStyle: { color: C.soc, fontFamily: F, fontSize: 10 }, axisLine: { show: false }, axisLabel: { show: false }, axisPointer: { label: { show: false } }, splitLine: { show: false } },
+      { type: 'value', gridIndex: 0, scale: true, show: false, axisPointer: { label: { show: false } }, splitLine: { show: false } },
     ],
-    series: [...bars, ...lines, soc],
+    series: [...bars, ...lines, soc, outside],
   };
 }
 
