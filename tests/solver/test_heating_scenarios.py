@@ -79,18 +79,18 @@ def test_house_night_setback() -> None:
     assert h._tmin[92] == pytest.approx(18.0)  # 23:00 -> night floor
 
 
-def test_the_nameplate_sets_the_electrical_range() -> None:
-    # FDC100VNA-W: 4,0 to 12,5 kW heat at COP 3,88, so the solver may draw 1,03 to 3,22 kW
-    h = PoolHeatPump()  # the nameplate lives on the pool and the house; a tank is capped by max_power
+def test_max_power_caps_the_draw() -> None:
+    # every heat store is capped by its electrical max_power
+    h = PoolHeatPump()
     h.name = h.id = "pool"
     h.phase = Phase.l1
     h.temp_entity = ""
-    h.heat_max, h.cop = 12.5, 3.88
+    h.max_power = 3.22
     lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
     lp.hass = None
     lp.init([_Grid([0.1] * 96), h])
 
-    assert h.power.hi == pytest.approx(12.5 / 3.88, abs=0.01)  # heat divided by COP is the electrical cap
+    assert h.power.hi == pytest.approx(3.22)
 
 
 class _Prices(SolverEntry):
@@ -357,7 +357,7 @@ def test_heat_pump_writes_the_plan_in_its_control_type() -> None:
     # 1.2 kW of 2.4 and a room planned 1.5 K over the floor: as percent, as watts, as the delta and as the setpoint inside the entity's range
     lp, grid, h, x = _house_lp([0.3] * 96, 5.0, datetime(2026, 6, 28, 12, 0))
     h.control_entity, lp.hass = "number.heat_pump", _Hass("0")
-    h.power.dest.data[12:108], h.temp.dest.data[13], h.max_kw, h._tmin[0] = 0.0, 20.5, 2.4, 19.0
+    h.power.dest.data[12:108], h.temp.dest.data[13], h.max_power, h._tmin[0] = 0.0, 20.5, 2.4, 19.0
     h.power.dest.data[12:14] = 1.2  # a run of half an hour, the shortest the MHI makes
     for control, attributes, want in (("capacity", {"step": 1}, 50.0), ("power", {"step": 1, "unit_of_measurement": "W"}, 1200.0), ("delta", {"step": 0.5}, 1.5), ("temperature", {"step": 0.5, "max": 20.0}, 20.0)):
         h.control, lp.hass.calls = control, []

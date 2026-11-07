@@ -55,6 +55,7 @@ export const api = {
   getSchema: () => call<SchemaBundle>('get_schema'),
   getPlan: () => call<PlanSeries[]>('get_plan'),
   getHistory: () => call<{ days: HistoryDay[] }>('get_history'),
+  getDay: (day: string) => call<PlanSeries[]>('get_day', { day }),
   // The settings tab (distribution, price, zendure): one singleton edit at a time.
   saveSchema: (action: SchemaAction, section: string, payload?: Record<string, unknown>) =>
     call<SaveResult>('save_schema', { action, section, payload }),

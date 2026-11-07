@@ -1,22 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict
-from datetime import timedelta
+from datetime import date, timedelta
 from types import MappingProxyType
 
+import aiohttp
 import voluptuous as vol
+from aiohttp import ClientTimeout
 
 from uuid import uuid4
 
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, SchemaAction
+from .const import DOMAIN, SchemaAction, watt_factor
 from .coordinator import SUBENTRY_TYPES, title_taken
-from .solver.forecast import SolarPanel
+from .solver.forecast import SolarPanel, _OPEN_METEO_URL
 
 
 HISTORY_DAYS = 30  # calendar days in the trend view
@@ -320,9 +324,65 @@ def _history_days(daily, hourly, ids, panels):
     return out[-HISTORY_DAYS:]
 
 
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_day", vol.Required("day"): str})
+@websocket_api.async_response
+async def ws_get_day(hass, connection, msg):
+    # one past calendar day as it really went, in the shape of get_plan: 96 quarters per series, from the recorder and the weather of that day
+    from homeassistant.components.recorder import get_instance
+    from homeassistant.components.recorder.statistics import statistics_during_period
+
+    coord = _coordinator(hass)
+    if coord is None:
+        connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
+        return
+    start = dt_util.start_of_local_day(date.fromisoformat(msg["day"]))
+    end = start + timedelta(days=1)
+
+    # the fleet sensors by plan series with the factor to the plan's unit, and every consumer's own meter in kW
+    dist = coord.distribution
+    keys = {"solar": ("house_solar", 0.001), "grid_buy": ("grid_import", 0.001), "grid_sell": ("grid_export", 0.001), "load": ("house_load", 0.001), "bat_charge": ("charge_power", 0.001), "bat_discharge": ("discharge_power", 0.001), "bat_soc": ("soc", 0.01), "price_buy": ("price_buy", 1.0), "price_sell": ("price_sell", 1.0)}
+    ids = {sid: (eid, f) for sid, (key, f) in keys.items() if (eid := getattr(dist.entities.get(key), "entity_id", None))}
+    cons = {f"{c.id}_power": (c.power_entity, watt_factor(hass.states.get(c.power_entity), c.phase) / 1000.0) for c in coord.consumers if c.power_entity}
+    ids |= cons
+    # every battery's own AC meters, delivery and charging, in kW: its lane is the one difference of the two
+    for d in dist.devices:
+        for suffix, key in (("discharge", "home_output"), ("charge", "home_input")):
+            if (eid := getattr(d.entities.get(key), "entity_id", None)):
+                ids[f"{d.device_id}_{suffix}"] = (eid, watt_factor(hass.states.get(eid)) / 1000.0)
+
+    # the 5-minute means while the recorder keeps them, otherwise the hour means on all four quarters of the hour
+    wanted, period, span = {eid for eid, _ in ids.values()}, "5minute", 1
+    stats = await get_instance(hass).async_add_executor_job(statistics_during_period, hass, start, end, wanted, period, None, {"mean"})
+    if not any(stats.values()):
+        period, span = "hour", 4
+        stats = await get_instance(hass).async_add_executor_job(statistics_during_period, hass, start, end, wanted, period, None, {"mean"})
+    series = {}
+    for sid, (eid, factor) in ids.items():
+        sums, counts = [0.0] * 96, [0] * 96
+        for row in stats.get(eid, []):
+            if (mean := row.get("mean")) is None:
+                continue
+            stamp = dt_util.utc_from_timestamp(row["start"]) if isinstance(row["start"], (int, float)) else row["start"]
+            for q in range(i := int((stamp - start).total_seconds() // 900), min(96, i + span)):
+                sums[q], counts[q] = sums[q] + mean * factor, counts[q] + 1
+        series[sid] = [s / n if n else 0.0 for s, n in zip(sums, counts)]
+    # the plan's house load is the base without the consumers, as the baseload takes it
+    if "load" in series:
+        series["load"] = [max(0.0, v - sum(series[k][q] for k in cons)) for q, v in enumerate(series["load"])]
+
+    # the outside temperature per quarter of that day; the Open-Meteo forecast API also serves the recent past
+    params = {"latitude": hass.config.latitude, "longitude": hass.config.longitude, "minutely_15": "temperature_2m", "timezone": hass.config.time_zone, "start_date": msg["day"], "end_date": msg["day"]}
+    try:
+        async with async_get_clientsession(hass).get(_OPEN_METEO_URL, params=params, timeout=ClientTimeout(total=20)) as resp:
+            series["temp"] = (await resp.json())["minutely_15"]["temperature_2m"][:96]
+    except (aiohttp.ClientError, asyncio.TimeoutError, KeyError):
+        pass
+    connection.send_result(msg["id"], [{"id": sid, "uom": "", "source": "recorder", "known": None, "values": v} for sid, v in series.items()])
+
+
 def async_register_ws(hass: HomeAssistant) -> None:
     if hass.data.get(f"{DOMAIN}_ws"):
         return
     hass.data[f"{DOMAIN}_ws"] = True
-    for handler in (ws_get_schema, ws_get_plan, ws_get_history, ws_price_auth, ws_consumer_action, ws_save_schema, ws_subentry_add, ws_subentry_update, ws_subentry_delete, ws_subscribe_plan):
+    for handler in (ws_get_schema, ws_get_plan, ws_get_history, ws_get_day, ws_price_auth, ws_consumer_action, ws_save_schema, ws_subentry_add, ws_subentry_update, ws_subentry_delete, ws_subscribe_plan):
         websocket_api.async_register_command(hass, handler)

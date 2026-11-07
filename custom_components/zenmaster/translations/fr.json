@@ -165,13 +165,11 @@
               "data": {
                 "temp_entity": "Capteur de température",
                 "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation",
                 "control_entity": "Pilotage"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
                 "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil.",
                 "control_entity": "Number ou climate dans lequel le plan est écrit chaque quart d'heure, dans le type choisi sous Type de pilotage."
               }
             }
@@ -192,13 +190,11 @@
               "data": {
                 "temp_entity": "Capteur de température",
                 "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation",
                 "control_entity": "Pilotage"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
                 "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil.",
                 "control_entity": "Number ou climate dans lequel le plan est écrit chaque quart d'heure, dans le type choisi sous Type de pilotage."
               }
             }
@@ -235,13 +231,11 @@
               "data": {
                 "temp_entity": "Capteur de température",
                 "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation",
                 "setpoint_entity": "Consigne"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
                 "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil.",
                 "setpoint_entity": "Nombre contenant la température souhaitée en degrés."
               }
             }
@@ -262,13 +256,11 @@
               "data": {
                 "temp_entity": "Capteur de température",
                 "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation",
                 "setpoint_entity": "Consigne"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
                 "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil.",
                 "setpoint_entity": "Nombre contenant la température souhaitée en degrés."
               }
             }
@@ -304,13 +296,11 @@
               "name": "Liaison",
               "data": {
                 "temp_entity": "Capteur de température",
-                "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation"
+                "power_entity": "Mesure de puissance"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
-                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil."
+                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase."
               }
             }
           }
@@ -329,13 +319,11 @@
               "name": "Liaison",
               "data": {
                 "temp_entity": "Capteur de température",
-                "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation"
+                "power_entity": "Mesure de puissance"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
-                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil."
+                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase."
               }
             }
           }
@@ -370,13 +358,11 @@
               "name": "Liaison",
               "data": {
                 "temp_entity": "Capteur de température",
-                "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation"
+                "power_entity": "Mesure de puissance"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
-                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil."
+                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase."
               }
             }
           }
@@ -395,13 +381,11 @@
               "name": "Liaison",
               "data": {
                 "temp_entity": "Capteur de température",
-                "power_entity": "Mesure de puissance",
-                "switch_entity": "Autorisation"
+                "power_entity": "Mesure de puissance"
               },
               "data_description": {
                 "temp_entity": "Le capteur qui mesure la température de ce stockage.",
-                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-                "switch_entity": "Tant qu'elle est active, le solveur peut planifier cet appareil."
+                "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase."
               }
             }
           }
@@ -552,6 +536,9 @@
       },
       "legionella": {
         "name": "Cycle anti-légionelle"
+      },
+      "direct": {
+        "name": "Démarrage direct"
       }
     },
     "time": {
@@ -589,12 +576,6 @@
       },
       "setpoint": {
         "name": "Consigne"
-      },
-      "heat_max": {
-        "name": "Puissance thermique"
-      },
-      "cop": {
-        "name": "COP"
       },
       "ambient": {
         "name": "Température ambiante"
@@ -708,14 +689,6 @@
       "ambient": {
         "name": "Température ambiante",
         "description": "Température de la pièce vers laquelle ce stockage perd sa chaleur."
-      },
-      "heat_max": {
-        "name": "Puissance thermique",
-        "description": "Puissance thermique maximale de la pompe à chaleur en kW."
-      },
-      "cop": {
-        "name": "COP",
-        "description": "Rendement utilisé pour convertir la puissance thermique en puissance électrique."
       },
       "phase": {
         "name": "Phase",
@@ -898,17 +871,17 @@
       },
       "chart": {
         "battery": "Batterie",
-        "consumers": "Consommateurs",
+        "consumers": "Appareils",
         "export": "Injection",
         "grid": "Réseau",
-        "import": "Soutirage réseau",
-        "load": "Consommation maison",
-        "outside_temp": "Température extérieure",
+        "import": "Réseau",
+        "load": "Maison",
+        "outside_temp": "Extérieur",
         "price": "Prix",
-        "price_buy": "Prix d'achat",
+        "price_buy": "Achat",
         "price_dayahead": "Prix (day-ahead)",
         "price_extrapolated": "Prix (extrapolé)",
-        "price_sell": "Prix de vente",
+        "price_sell": "Vente",
         "solar": "Solaire",
         "solar_forecast": "Prévision solaire",
         "soc_min": "SoC min",
@@ -1064,6 +1037,7 @@
         "day": "Jour {n}",
         "day_short": "J{n}",
         "hint": "chaque ligne sur le même axe de dates · survol pour un jour",
+        "import": "Soutirage réseau",
         "mix": "Mix énergétique",
         "per_day": "{unit}/jour",
         "share": "part/jour",

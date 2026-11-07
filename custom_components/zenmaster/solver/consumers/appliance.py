@@ -9,6 +9,7 @@ from ..solver import Action, EntryStatus, LpSolver, SolverEntry
 from ...config import ConfigField
 from ...const import Phase, watt_factor
 from ...consumer import ConsumerDevice
+from ...switch import HaSwitch
 
 _ON_THRESHOLD_W = 10.0  # consumption above this = the appliance is running
 _INTERRUPT_WINDOW_S = 120.0  # only interrupt within this many seconds of a witnessed start
@@ -17,6 +18,7 @@ _QUIET_S = 2700.0  # rest before a rise counts as a start; measured: pauses insi
 _QUIET_MAX_S = 5400.0  # ceiling for the learned value, so one outlier cannot block arming altogether
 _EVENING_MIN = 17 * 60  # armed at or after this, or before _MORNING_MIN: the cycle must be done by 08:00
 _MORNING_MIN = 8 * 60  # armed after this: done within four hours and never past 17:00, so it stays clear of dinner
+_DIRECT_S = 900.0  # a short click on the room button: what is armed starts, and a new start runs at once, for this long
 _DEFAULTS = {"dishwasher": (0.9, 7), "washingmachine": (0.3, 7), "dryer": (1.6, 7)}  # kW and quarters per kind, measured here and rounded: used while power_rating or cycle_duration_slots is not set
 
 
@@ -76,6 +78,19 @@ class Appliance(SolverEntry, ConsumerDevice):
         self._arm_price: float | None = None  # price of the quarter this cycle was armed in
         self._cycle_kwh = 0.0  # measured energy of the running cycle
         self._cycle_cost = 0.0  # that energy priced at the quarter it was used in
+        self._direct_until = 0.0  # until when a start runs at once instead of waiting for its window
+
+    def entity_create(self) -> None:
+        # the direct-start switch beside the settings; it ends on its own after _DIRECT_S
+        super().entity_create()
+        HaSwitch(self, "direct", on_changed=self._set_direct)
+        self.entity_update("direct", False)
+
+    async def _set_direct(self, _entity, on) -> None:
+        # on: what is armed starts now and a new start is not held back; off: back to the plan, what runs keeps running
+        self._direct_until = time.time() + _DIRECT_S if on else 0.0
+        if on and self.armed and not self.busy:
+            await self.on_action(self, "start")
 
     def release(self) -> None:
         self.armed = False  # hands off: nothing waits for a cheap window any more
@@ -106,7 +121,7 @@ class Appliance(SolverEntry, ConsumerDevice):
             return
         if rested >= self._quiet_s:             # below -> above after a real rest: witnessed start
             self._running_since = now
-        if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S:
+        if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S or now < self._direct_until:
             if self.status is EntryStatus.none:
                 self.status = EntryStatus.running  # it draws while we plan nothing: say so instead of "off"
             return                              # hands off / busy / a pause inside a cycle / past the 2-min window
@@ -115,8 +130,16 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.status = EntryStatus.armed
         if self.switch_entity:
             self.hass.async_create_task(self.hass.services.async_call("homeassistant", "turn_off", {"entity_id": self.switch_entity}, blocking=False))
+        # armed: kept at once, so a restart does not forget it, and planned at once, so the user sees the window now
+        if self.on_action is not None:
+            self.hass.async_create_task(self.on_action(self, "armed"))
 
     async def entry_prerun(self, lp: LpSolver, now: datetime) -> None:
+        # the direct start ends after its quarter of an hour; what started in it runs on
+        if self._direct_until and time.time() >= self._direct_until:
+            self._direct_until = 0.0
+            self.entity_update("direct", False)
+
         # weekly (and cold-start) recalibration of the cycle's power profile from history
         if lp.hass is not None and (self._last_cal is None or (now - self._last_cal).days >= 7):
             self._last_cal = now

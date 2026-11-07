@@ -165,13 +165,11 @@
               "data": {
                 "temp_entity": "Temperature sensor",
                 "power_entity": "Power measurement",
-                "switch_entity": "Release",
                 "control_entity": "Control"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
                 "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device.",
                 "control_entity": "Number or climate the plan is written to every quarter, in the type chosen under Control type."
               }
             }
@@ -192,13 +190,11 @@
               "data": {
                 "temp_entity": "Temperature sensor",
                 "power_entity": "Power measurement",
-                "switch_entity": "Release",
                 "control_entity": "Control"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
                 "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device.",
                 "control_entity": "Number or climate the plan is written to every quarter, in the type chosen under Control type."
               }
             }
@@ -235,13 +231,11 @@
               "data": {
                 "temp_entity": "Temperature sensor",
                 "power_entity": "Power measurement",
-                "switch_entity": "Release",
                 "setpoint_entity": "Setpoint"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
                 "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device.",
                 "setpoint_entity": "Number holding the wanted temperature in degrees."
               }
             }
@@ -262,13 +256,11 @@
               "data": {
                 "temp_entity": "Temperature sensor",
                 "power_entity": "Power measurement",
-                "switch_entity": "Release",
                 "setpoint_entity": "Setpoint"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
                 "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device.",
                 "setpoint_entity": "Number holding the wanted temperature in degrees."
               }
             }
@@ -304,13 +296,11 @@
               "name": "Linking",
               "data": {
                 "temp_entity": "Temperature sensor",
-                "power_entity": "Power measurement",
-                "switch_entity": "Release"
+                "power_entity": "Power measurement"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
-                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device."
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
               }
             }
           }
@@ -329,13 +319,11 @@
               "name": "Linking",
               "data": {
                 "temp_entity": "Temperature sensor",
-                "power_entity": "Power measurement",
-                "switch_entity": "Release"
+                "power_entity": "Power measurement"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
-                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device."
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
               }
             }
           }
@@ -370,13 +358,11 @@
               "name": "Linking",
               "data": {
                 "temp_entity": "Temperature sensor",
-                "power_entity": "Power measurement",
-                "switch_entity": "Release"
+                "power_entity": "Power measurement"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
-                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device."
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
               }
             }
           }
@@ -395,13 +381,11 @@
               "name": "Linking",
               "data": {
                 "temp_entity": "Temperature sensor",
-                "power_entity": "Power measurement",
-                "switch_entity": "Release"
+                "power_entity": "Power measurement"
               },
               "data_description": {
                 "temp_entity": "The sensor that measures the temperature of this store.",
-                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-                "switch_entity": "While this is on the solver may schedule this device."
+                "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase."
               }
             }
           }
@@ -552,6 +536,9 @@
       },
       "legionella": {
         "name": "Legionella run"
+      },
+      "direct": {
+        "name": "Direct start"
       }
     },
     "time": {
@@ -589,12 +576,6 @@
       },
       "setpoint": {
         "name": "Setpoint"
-      },
-      "heat_max": {
-        "name": "Heat output"
-      },
-      "cop": {
-        "name": "COP"
       },
       "ambient": {
         "name": "Ambient temperature"
@@ -708,14 +689,6 @@
       "ambient": {
         "name": "Ambient temperature",
         "description": "Temperature of the room this store loses its heat to."
-      },
-      "heat_max": {
-        "name": "Heat output",
-        "description": "Maximum heat output of the heat pump in kW."
-      },
-      "cop": {
-        "name": "COP",
-        "description": "Efficiency used to turn the heat output into electrical power."
       },
       "phase": {
         "name": "Phase",
@@ -898,17 +871,17 @@
       },
       "chart": {
         "battery": "Battery",
-        "consumers": "Consumers",
+        "consumers": "Appliances",
         "export": "Export",
         "grid": "Grid",
-        "import": "Grid import",
-        "load": "House load",
-        "outside_temp": "Outside temperature",
+        "import": "Grid",
+        "load": "House",
+        "outside_temp": "Outside",
         "price": "Price",
-        "price_buy": "Buy price",
+        "price_buy": "Buy",
         "price_dayahead": "Price (day-ahead)",
         "price_extrapolated": "Price (extrapolated)",
-        "price_sell": "Sell price",
+        "price_sell": "Sell",
         "solar": "Solar",
         "solar_forecast": "Solar forecast",
         "soc_min": "min SoC",
@@ -1064,6 +1037,7 @@
         "day": "Day {n}",
         "day_short": "d{n}",
         "hint": "every row on the same date axis · hover for one day",
+        "import": "Grid import",
         "mix": "Energy mix",
         "per_day": "{unit}/day",
         "share": "share/day",

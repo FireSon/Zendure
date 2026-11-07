@@ -85,3 +85,11 @@ export function sliceLive(start: number, end: number, config: any): Plan {
   }
   return { ...buildPlan(series, windowTimes(start, count), Math.max(0, HISTORY - start), config), priceKnown: _known };
 }
+
+// one past day as it really went (get_day): 96 quarters from midnight, without a now
+export async function loadDay(day: string, config: any): Promise<Plan> {
+  const series: Record<string, number[]> = {};
+  for (const item of await api.getDay(day)) series[item.id] = item.values;
+  const times = Array.from({ length: 96 }, (_, i) => `${String(i >> 2).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}`);
+  return buildPlan(series, times, -1, config);
+}

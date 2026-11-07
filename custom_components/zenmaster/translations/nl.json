@@ -165,13 +165,11 @@
               "data": {
                 "temp_entity": "Temperatuursensor",
                 "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave",
                 "control_entity": "Sturing"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
                 "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
                 "control_entity": "Number of climate waarnaar het plan elk kwartier geschreven wordt, in het type dat bij Stuurtype gekozen is."
               }
             }
@@ -192,13 +190,11 @@
               "data": {
                 "temp_entity": "Temperatuursensor",
                 "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave",
                 "control_entity": "Sturing"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
                 "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
                 "control_entity": "Number of climate waarnaar het plan elk kwartier geschreven wordt, in het type dat bij Stuurtype gekozen is."
               }
             }
@@ -235,13 +231,11 @@
               "data": {
                 "temp_entity": "Temperatuursensor",
                 "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave",
                 "setpoint_entity": "Setpoint"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
                 "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
                 "setpoint_entity": "Number met de gewenste temperatuur in graden."
               }
             }
@@ -262,13 +256,11 @@
               "data": {
                 "temp_entity": "Temperatuursensor",
                 "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave",
                 "setpoint_entity": "Setpoint"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
                 "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen.",
                 "setpoint_entity": "Number met de gewenste temperatuur in graden."
               }
             }
@@ -304,13 +296,11 @@
               "name": "Koppeling",
               "data": {
                 "temp_entity": "Temperatuursensor",
-                "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave"
+                "power_entity": "Vermogensmeting"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
-                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
               }
             }
           }
@@ -329,13 +319,11 @@
               "name": "Koppeling",
               "data": {
                 "temp_entity": "Temperatuursensor",
-                "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave"
+                "power_entity": "Vermogensmeting"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
-                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
               }
             }
           }
@@ -370,13 +358,11 @@
               "name": "Koppeling",
               "data": {
                 "temp_entity": "Temperatuursensor",
-                "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave"
+                "power_entity": "Vermogensmeting"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
-                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
               }
             }
           }
@@ -395,13 +381,11 @@
               "name": "Koppeling",
               "data": {
                 "temp_entity": "Temperatuursensor",
-                "power_entity": "Vermogensmeting",
-                "switch_entity": "Vrijgave"
+                "power_entity": "Vermogensmeting"
               },
               "data_description": {
                 "temp_entity": "De sensor die de temperatuur van deze buffer meet.",
-                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-                "switch_entity": "Zolang deze aan staat mag de solver dit apparaat inplannen."
+                "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend."
               }
             }
           }
@@ -552,6 +536,9 @@
       },
       "legionella": {
         "name": "Legionellarun"
+      },
+      "direct": {
+        "name": "Direct starten"
       }
     },
     "time": {
@@ -589,12 +576,6 @@
       },
       "setpoint": {
         "name": "Setpoint"
-      },
-      "heat_max": {
-        "name": "Warmtevermogen"
-      },
-      "cop": {
-        "name": "COP"
       },
       "ambient": {
         "name": "Omgevingstemperatuur"
@@ -708,14 +689,6 @@
       "ambient": {
         "name": "Omgevingstemperatuur",
         "description": "Temperatuur van de ruimte waaraan deze buffer zijn warmte verliest."
-      },
-      "heat_max": {
-        "name": "Warmtevermogen",
-        "description": "Maximaal warmtevermogen van de warmtepomp in kW."
-      },
-      "cop": {
-        "name": "COP",
-        "description": "Rendement waarmee het warmtevermogen naar elektrisch vermogen wordt gerekend."
       },
       "phase": {
         "name": "Fase",
@@ -898,17 +871,17 @@
       },
       "chart": {
         "battery": "Accu",
-        "consumers": "Verbruikers",
-        "export": "Teruglevering",
+        "consumers": "Apparaten",
+        "export": "Terug",
         "grid": "Net",
-        "import": "Netinkoop",
-        "load": "Huislast",
-        "outside_temp": "Buitentemperatuur",
+        "import": "Net",
+        "load": "Huis",
+        "outside_temp": "Buiten",
         "price": "Prijs",
-        "price_buy": "Inkoopprijs",
+        "price_buy": "Inkoop",
         "price_dayahead": "Prijs (day-ahead)",
         "price_extrapolated": "Prijs (extrapolatie)",
-        "price_sell": "Verkoopprijs",
+        "price_sell": "Verkoop",
         "solar": "Zon",
         "solar_forecast": "Zon-forecast",
         "soc_min": "min SoC",
@@ -1064,6 +1037,7 @@
         "day": "Dag {n}",
         "day_short": "d{n}",
         "hint": "elke rij op dezelfde datum-as · hover voor één dag",
+        "import": "Netinkoop",
         "mix": "Energiemix",
         "per_day": "{unit}/dag",
         "share": "aandeel/dag",

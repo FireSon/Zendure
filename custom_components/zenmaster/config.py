@@ -85,6 +85,7 @@ FIELDS: dict[type, list[ConfigField]] = {
         ConfigField("home_output_aggr", {"entity": {}}, readonly=True),
         ConfigField("rte", {"entity": {}}, readonly=True),
         ConfigField("bypass", {"entity": {}}, readonly=True),
+        ConfigField("grid_state", {"entity": {}}, readonly=True),
         ConfigField("solar", {"entity": {}}, readonly=True),
         ConfigField("power_phase", {"entity": {}}, readonly=True),
         ConfigField("temp", {"entity": {}}, readonly=True),
