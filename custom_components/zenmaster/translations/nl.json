@@ -488,6 +488,48 @@
       "abort": {
         "reconfigure_successful": "Instellingen opgeslagen"
       }
+    },
+    "marstek": {
+      "entry_type": "Marstek-apparaat",
+      "initiate_flow": {
+        "user": "Marstek-apparaat toevoegen",
+        "reconfigure": "Apparaat herconfigureren"
+      },
+      "step": {
+        "user": {
+          "title": "Marstek-apparaat toevoegen",
+          "description": "Een Marstek Venus wordt aangestuurd via Modbus TCP: rechtstreeks over ethernet (Venus E v3, A, D) of via een RS485-gateway (Venus E v1/v2). Modbus vindt zelf niets, dus elk apparaat wordt hier toegevoegd.",
+          "data": {
+            "product": "Registergeneratie",
+            "ip": "IP-adres",
+            "port": "Poort"
+          },
+          "data_description": {
+            "product": "v2: Venus E v1/v2 (via een RS485-gateway), v3: Venus E v3, vA: Venus A, vD: Venus D.",
+            "ip": "Het adres van de accu of van zijn RS485-gateway; het identificeert ook het apparaat.",
+            "port": "De Modbus TCP-poort, standaard 502."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "De naam van een apparaat verandert nooit, het adres wel.",
+          "data": {
+            "ip": "IP-adres",
+            "port": "Poort"
+          },
+          "data_description": {
+            "ip": "Het adres van de accu of van zijn RS485-gateway; het identificeert ook het apparaat.",
+            "port": "De Modbus TCP-poort, standaard 502."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "Dit apparaat is al geconfigureerd",
+        "unknown_product": "Onbekende registergeneratie"
+      },
+      "abort": {
+        "reconfigure_successful": "Instellingen opgeslagen"
+      }
     }
   },
   "entity": {

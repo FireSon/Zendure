@@ -48,7 +48,7 @@ async def ws_get_schema(hass, connection, msg):
         coord.config.serialize_poly(device, config, schema)
 
     # the settings tab: a hand-picked list, not a collection the coordinator keeps
-    for item in (coord.distribution, coord.zendure, coord.prices):
+    for item in (coord.distribution, *coord.drivers.values(), coord.prices):
         coord.config.serialize_poly(item, config, schema)
 
     # consumers and solar panels: keyed on their subentry id, named after their subentry title
@@ -103,12 +103,12 @@ def ws_subscribe_plan(hass, connection, msg):
 })
 @websocket_api.async_response
 async def ws_save_schema(hass, connection, msg):
-    # the settings tab: distribution, Zendure driver and prices. Consumers and solar panels go through the subentry commands.
+    # the settings tab: distribution, the vendor drivers and prices. Consumers and solar panels go through the subentry commands.
     coord = _coordinator(hass)
     if coord is None:
         connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
         return
-    if (device := coord.config.deserialize_poly([*coord.devices, coord.zendure, coord.prices], msg.get("payload") or {})) is None:
+    if (device := coord.config.deserialize_poly([*coord.devices, *coord.drivers.values(), coord.prices], msg.get("payload") or {})) is None:
         connection.send_error(msg["id"], "not_found", msg["section"])
         return
     if msg["action"] != SchemaAction.edit:
@@ -116,8 +116,8 @@ async def ws_save_schema(hass, connection, msg):
         return
     coord.config.serialize(device, msg["section"], coord.config.payload)
     await coord.config.save()
-    if device is coord.zendure:
-        await coord.zendure.connect()
+    if device in coord.drivers.values():
+        await device.connect()
     if device is coord.prices and (otp := str((msg.get("payload") or {}).get("otp") or "")):
         hass.async_create_task(coord.prices.authorise(hass, otp))  # the code rides along with this save and is never stored
     coord.rebuild_solver()  # a changed setting only reaches the LP through a rebuild

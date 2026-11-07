@@ -4,6 +4,7 @@ import asyncio
 import time
 from collections.abc import Callable
 from datetime import timedelta
+from functools import partial
 from types import MappingProxyType
 from typing import Any
 
@@ -27,6 +28,7 @@ from .solver.dynamicprice import DynamicPrice
 from .solver.forecast import Forecast, SolarPanel
 from .solver.heating import HeatingHeatPump, PoolHeatPump
 from .solver.solver import LpSolver
+from .marstek.driver import MarstekDriver
 from .zendure.driver import ZendureDriver
 from .const import DOMAIN, PANEL_TITLE, Phase, watt_factor
 from .entity import EntityDevice, snakecase, unique_name
@@ -97,8 +99,11 @@ class Coordinator:
         self.distribution.on_capacity = self.capacity_changed
         self.config = Config(store=Store(hass, version=1, key=f"{DOMAIN}.devices", atomic_writes=True))
         self.zendure = ZendureDriver(hass, self.entry_id, self.devices, self.distribution)
-        self.zendure.on_discovered = self.discovered
         self.zendure.on_zeroconf = self.zeroconf
+        # one driver per brand, keyed on its subentry type; each hands its finds to discovered under its own type
+        self.drivers = {d.id: d for d in (self.zendure, MarstekDriver(hass, self.entry_id, self.devices, self.distribution))}
+        for driver in self.drivers.values():
+            driver.on_discovered = partial(self.discovered, kind=driver.id)
         self.battery = DistributionEntry(self.distribution)  # the fleet in the LP; owns the plan-driven mode and the savings
         self.zeroconf_ip: dict[str, str] = {}  # serial -> ip from mDNS for devices that are not built yet
         self.prices = DynamicPrice()
@@ -127,7 +132,8 @@ class Coordinator:
         self.distribution.device_load(self.config.section("devices", self.distribution.device_id))
         self.battery.load(self.config.section("devices", "solver"))
         self.config.deserialize(self.distribution, FIELDS[Distribution])
-        self.config.deserialize(self.zendure, FIELDS[ZendureDriver])
+        for driver in self.drivers.values():
+            self.config.deserialize(driver, FIELDS[type(driver)])
         self.sync_devices()
         if self.entry is not None:
             self.entry.async_on_unload(self.entry.add_update_listener(self._entry_updated))
@@ -139,7 +145,8 @@ class Coordinator:
 
         # consumers and solar panels live in the config entry's subentries; HA's own dialogs change those too
         await self.sync_subentries()
-        await self.zendure.connect()
+        for driver in self.drivers.values():
+            await driver.connect()
 
         # periodic dump: without it the kWh counters only reach the Store when a user happens to move a knob
         self._unsubs.append(async_track_time_interval(self.hass, self.timer_elapsed, timedelta(minutes=15)))
@@ -157,16 +164,16 @@ class Coordinator:
         await self.resync(self.sync_devices())
 
     def sync_devices(self) -> bool:
-        # the Zendure devices mirror the entry's subentries: build what is new, drop what is gone. A subentry's data is the driver's business.
+        # the vendor devices mirror the entry's subentries: build what is new, drop what is gone. A subentry's data is its driver's business.
         # True when the set changed: every battery is its own unit in the LP, so the structure has to follow
         if self.entry is None:
             return False
         changed = False
         built = {d.subentry_id: d for d in self.devices if d.subentry_id}
         for sid, sub in self.entry.subentries.items():
-            if sid in built or sub.subentry_type != ZendureDriver.id:
+            if sid in built or (driver := self.drivers.get(sub.subentry_type)) is None:
                 continue
-            if (device := self.zendure.init_device(sid, sub.title, dict(sub.data))) is None:
+            if (device := driver.init_device(sid, sub.title, dict(sub.data))) is None:
                 continue
             changed = True
             if isinstance(device, DistributionDevice):
@@ -178,11 +185,11 @@ class Coordinator:
                 self.persist_device(device)
         for sid, device in built.items():
             if sid not in self.entry.subentries:
-                self.zendure.remove_device(device)  # HA already cleared its registry device and entities along with the subentry
+                device.driver.remove_device(device)  # HA already cleared its registry device and entities along with the subentry
                 changed = True
         return changed
 
-    def discovered(self, data: dict[str, Any]) -> None:
+    def discovered(self, data: dict[str, Any], kind: str) -> None:
         # the driver found a device: it becomes a subentry with a name that never changes again; the update listener builds it from there
         sn = data["sn"]
         if self.entry is None or any(s.data.get("sn") == sn for s in self.entry.subentries.values()):
@@ -193,7 +200,7 @@ class Coordinator:
         if (ip := self.zeroconf_ip.pop(sn, None)) and not data.get("ip"):
             data["ip"] = ip
         self.hass.config_entries.async_add_subentry(
-            self.entry, ConfigSubentry(data=MappingProxyType(data), subentry_type=ZendureDriver.id, title=name, unique_id=f"{ZendureDriver.id}_{sn}")
+            self.entry, ConfigSubentry(data=MappingProxyType(data), subentry_type=kind, title=name, unique_id=f"{kind}_{sn}")
         )
 
     def persist_device(self, device: EntityDevice) -> None:
@@ -395,7 +402,8 @@ class Coordinator:
             d.power_off()
         for d in self.devices:
             d.unload()
-        await self.zendure.unload()
+        for driver in self.drivers.values():
+            await driver.unload()
 
     async def timer_elapsed(self, _now=None) -> None:
         await self._store_save()

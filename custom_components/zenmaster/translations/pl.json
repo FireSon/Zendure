@@ -488,6 +488,48 @@
       "abort": {
         "reconfigure_successful": "Ustawienia zapisane"
       }
+    },
+    "marstek": {
+      "entry_type": "Urządzenie Marstek",
+      "initiate_flow": {
+        "user": "Dodaj urządzenie Marstek",
+        "reconfigure": "Zmień konfigurację urządzenia"
+      },
+      "step": {
+        "user": {
+          "title": "Dodaj urządzenie Marstek",
+          "description": "Marstek Venus jest sterowany przez Modbus TCP: bezpośrednio przez Ethernet (Venus E v3, A, D) lub przez bramkę RS485 (Venus E v1/v2). Modbus niczego nie wykrywa sam, więc każde urządzenie dodaje się tutaj.",
+          "data": {
+            "product": "Generacja rejestrów",
+            "ip": "Adres IP",
+            "port": "Port"
+          },
+          "data_description": {
+            "product": "v2: Venus E v1/v2 (przez bramkę RS485), v3: Venus E v3, vA: Venus A, vD: Venus D.",
+            "ip": "Adres baterii lub jej bramki RS485; identyfikuje też urządzenie.",
+            "port": "Port Modbus TCP, domyślnie 502."
+          }
+        },
+        "reconfigure": {
+          "title": "{name}",
+          "description": "Nazwa urządzenia nigdy się nie zmienia, jego adres może.",
+          "data": {
+            "ip": "Adres IP",
+            "port": "Port"
+          },
+          "data_description": {
+            "ip": "Adres baterii lub jej bramki RS485; identyfikuje też urządzenie.",
+            "port": "Port Modbus TCP, domyślnie 502."
+          }
+        }
+      },
+      "error": {
+        "device_exists": "To urządzenie jest już skonfigurowane",
+        "unknown_product": "Nieznana generacja rejestrów"
+      },
+      "abort": {
+        "reconfigure_successful": "Ustawienia zapisane"
+      }
     }
   },
   "entity": {
