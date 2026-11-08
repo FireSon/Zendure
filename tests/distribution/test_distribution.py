@@ -31,9 +31,11 @@ class FakeDevice(DistributionDevice):
         self.soc = soc
         self.kwh = self.kwh = kwh
         self.state = DeviceState.ACTIVE  # under our control; EXTERNAL is excluded from the order
+        self.heard: DistributionMode | None = None  # the fleet mode of the last power call
 
-    def power(self, watts: int) -> int:
+    def power(self, watts: int, mode: DistributionMode) -> int:
         self.power_setpoint = max(self.power_profile[1].power, min(self.power_profile[0].power, int(watts)))
+        self.heard = mode
         return self.power_actual
 
     def power_off(self) -> None:
@@ -47,7 +49,7 @@ def make_distribution(devices: list[FakeDevice], mode: DistributionMode = Distri
     dist.solver_entry = DistributionEntry(dist)  # the plan side of the fleet, wired the way the coordinator does it
     dist.devices = list(devices)
     dist.wear_date = float("inf")
-    dist.mode = mode.value
+    dist.mode = mode
     for e in dist.entities.values():
         e.hass = None
     return dist
@@ -451,7 +453,7 @@ def test_manual_follows_the_plan_only_while_optimize_is_on() -> None:
     dist.manual_power = 700
     _plan(dist, 2.0, 0.0, 2.0, 0.0)
     dist.solver_entry._apply_plan_mode()
-    assert int(dist.mode) == DistributionMode.INDIVIDUAL.value and dist.manual_power == 700, "met optimize aan neemt het plan per accu het over"
+    assert dist.mode == DistributionMode.INDIVIDUAL and dist.manual_power == 700, "met optimize aan neemt het plan per accu het over"
     d2 = FakeDevice("d2", 60.0)
     dist = make_distribution([d2], DistributionMode.MANUAL)
     dist.manual_power = 700
@@ -589,9 +591,10 @@ def _solve(dist: Distribution, buy: list[float], sell: list[float], meters: dict
     assert asyncio.run(lp.run(datetime(2026, 1, 1, 12, 0))) is not None and lp._last_lp_status == 0
 
 
-def test_a_solve_without_prices_turns_the_fleet_off_while_optimize_is_on() -> None:
-    # no buy prices: run gives no plan, the solver entry switches the fleet off and hands every battery back
+def test_a_solve_without_prices_holds_the_fleet_at_zero_while_optimize_is_on() -> None:
+    # no buy prices: run gives no plan, the solver entry switches the mode off and the next tick holds every battery at 0 W without handing it back
     d1 = FakeDevice("d1", 50.0)
+    d1.power_setpoint = 500
     dist = make_distribution([d1], DistributionMode.INDIVIDUAL)
     dist.optimize = True
     lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
@@ -602,7 +605,20 @@ def test_a_solve_without_prices_turns_the_fleet_off_while_optimize_is_on() -> No
 
     lp.init([_NoPrices(), dist.solver_entry])
     assert asyncio.run(lp.run(datetime(2026, 1, 1, 12, 0))) is None
-    assert int(dist.mode) == DistributionMode.OFF.value and d1.state is DeviceState.EXTERNAL
+    assert dist.mode == DistributionMode.OFF and d1.state is DeviceState.ACTIVE
+    tick(dist, 0, 1000.0)
+    assert d1.power_setpoint == 0 and d1.state is DeviceState.ACTIVE and d1.heard == DistributionMode.OFF
+
+
+def test_a_battery_without_a_setpoint_hears_the_mode() -> None:
+    # a battery that regulates itself (EXTERNAL, charging 1500 W) and one at rest hear SMART_CHARGING; one that is starting up is left alone
+    regulating, resting, starting = FakeDevice("r", 50.0), FakeDevice("s", 50.0), FakeDevice("u", 50.0)
+    regulating.state, regulating.power_actual = DeviceState.EXTERNAL, -1500
+    starting.power_setpoint = -100
+    dist = make_distribution([regulating, resting, starting], DistributionMode.SMART_CHARGING)
+    asyncio.run(dist._process_p1(0, [0.0, 0.0, 0.0, 0.0], 1000.0))
+    assert (regulating.heard, resting.heard, starting.heard) == (DistributionMode.SMART_CHARGING, DistributionMode.SMART_CHARGING, None)
+    assert starting.power_setpoint == -100, "the start-up command stands"
 
 
 def _unit(dist: Distribution, device: FakeDevice):
@@ -734,8 +750,17 @@ def test_individual_leaves_a_device_without_storage_to_update_order() -> None:
     assert bare.power_setpoint == 2400
 
 
+def test_an_offline_device_without_storage_is_no_plain_inverter() -> None:
+    # an offline battery reports no packs, so no kWh: it is not given rated power as if it were an inverter
+    bare = FakeDevice("bare", 0.0, kwh=0.0)
+    bare.state = DeviceState.OFFLINE
+    dist = make_distribution([bare], DistributionMode.INDIVIDUAL)
+    dist.update_order()
+    assert bare.power_setpoint == 0
+
+
 def test_individual_hands_a_phase_over_its_limit_to_the_phase_guard() -> None:
-    # L1 reads 6000 W, over its 5667: its battery stops charging and helps, L2 keeps its plan; back at 5000 W, 2 A under, the plan returns
+    # L1 reads 6000 W, over its 5667: its battery stops charging and helps, L2 keeps its plan; at 5000 W, 2 A under, the plan of 2000 W does not fit the 437 W room and is held at the room; at 3000 W it fits and returns
     d1, d2 = FakeDevice("d1", 50.0), FakeDevice("d2", 50.0)
     dist = _individual(d1, d2)
     dist.power[:] = [0, 6000, 1000, 1000]
@@ -743,7 +768,10 @@ def test_individual_hands_a_phase_over_its_limit_to_the_phase_guard() -> None:
     assert d1.power_setpoint >= 0 and d2.power_setpoint == 500, f"L1 taken over, L2 on plan: {d1.power_setpoint}, {d2.power_setpoint}"
     dist.power[:] = [0, 5000, 1000, 1000]
     run(dist, 0, 1010.0, 1)
-    assert d1.power_setpoint == -2000, "released 2 A under the limit, the plan is back"
+    assert -437 <= d1.power_setpoint < 0, f"released 2 A under the limit, held at the room: {d1.power_setpoint}"
+    dist.power[:] = [0, 3000, 1000, 1000]
+    run(dist, 0, 1020.0, 1)
+    assert d1.power_setpoint == -2000, "the plan fits the room, the plan is back"
 
 
 def test_individual_is_not_stopped_by_update_order() -> None:

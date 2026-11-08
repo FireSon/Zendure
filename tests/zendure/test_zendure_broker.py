@@ -18,6 +18,7 @@ from custom_components.zenmaster.sensor import HaSensor
 from custom_components.zenmaster.zendure.device import ConnectionType
 from custom_components.zenmaster.zendure.solarflow import ZendureHyper
 from custom_components.zenmaster.zendure.driver import ZendureDriver
+from custom_components.zenmaster.distribution import DistributionMode
 
 for cls in (HaSensor, HaNumber, HaBinarySensor, HaSelect):
     cls.add = staticmethod(lambda *a, **k: None)  # no HA platform in tests
@@ -116,7 +117,7 @@ def test_full_mqtt_loop() -> None:
             assert device.soc == 55 and device.temp == 40.0
 
             # power command travels over the broker; the firmware reply confirms it
-            device.power(600)
+            device.power(600, DistributionMode.MANUAL)
             assert device.power_setpoint == 600
             assert await wait_for(lambda: device.state == DeviceState.CONFIRM)
             firmware.report()
@@ -125,7 +126,7 @@ def test_full_mqtt_loop() -> None:
 
             # charging direction, once the hold after the last command has passed
             device.power_since = 0.0
-            device.power(-400)
+            device.power(-400, DistributionMode.MANUAL)
             assert await wait_for(lambda: firmware.target == -400)
             firmware.report()
             assert await wait_for(lambda: device.power_actual == -400)

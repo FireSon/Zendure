@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 import paho.mqtt.client as mqtt
 from homeassistant.core import HomeAssistant
 
+from ..config import IDENTITY, ConfigField
 from ..entity import EntityDevice
 from ..sensor import HaSensor
 from .device import ConnectionType, ZendureDevice, centi_convert
@@ -17,6 +18,8 @@ if TYPE_CHECKING:
 
 class ZendureSmartMeter(ZendureDevice, EntityDevice):
     """Zendure smart meter / CT clamp with per-phase monitoring."""
+
+    CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("totalPower", "phase1_power", "phase2_power", "phase3_power", "phase1_current", "phase2_current", "phase3_current"))]
 
     def __init__(self, hass: HomeAssistant, driver: ZendureDriver | None, subentry_id: str | None, name: str, data: dict[str, Any], model: str) -> None:
         ZendureDevice.__init__(self, hass, driver, subentry_id, name, data, model)

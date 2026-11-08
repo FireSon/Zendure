@@ -31,6 +31,10 @@ export class ZmGroup extends LitElement {
   // Key fields the save must always carry, even when they are filtered out of the display.
   @property({ attribute: false }) keyPatch: Record<string, unknown> = {};
   @property({ type: Boolean }) autoEdit = false;  // a row just added: open it and start editing right away
+  @property() newType = '';  // add mode: an empty form that files a new subentry of this type on save
+  @property({ attribute: false }) preset: Record<string, unknown> = {};  // what the tile presets (the appliance kind)
+  @property() newTitle = '';  // the name a consumer or solar group is filed under
+  @property() subentry = '';  // the subentry the entry is saved and removed through, when it is not the entry itself (a device, a solar group)
 
   @state() private _editing = false;
   @state() private _draft: Record<string, unknown> = {};
@@ -70,12 +74,13 @@ export class ZmGroup extends LitElement {
   private _startEdit() {
     const d: Record<string, unknown> = {};
     for (const f of this.fields) d[f.id] = readValue(this.config, f.entry ?? this.entry, f);
-    this._draft = d;
+    this._draft = this.newType ? { ...this.preset } : d;
     this._result = null;
     this._editing = true;
   }
 
   private _cancel() {
+    if (this.newType) this.dispatchEvent(new CustomEvent('zm-cancel', { bubbles: true, composed: true }));  // a new entry has nothing to fall back to
     this._editing = false;
     this._draft = {};
     this._result = null;
@@ -86,6 +91,7 @@ export class ZmGroup extends LitElement {
   }
 
   private async _save() {
+    if (this.newType) return this._add();
     // a patch per entry: a card can carry the fields of a second entry (the price in the ZenMaster card), each goes back where it came from
     const patches: Record<string, Record<string, unknown>> = {};
     for (const f of this.fields) {
@@ -101,10 +107,25 @@ export class ZmGroup extends LitElement {
       // a collection item is an HA subentry addressed by its id; a singleton goes through the settings save
       let res: SaveResult = { ok: true };
       for (const [entry, patch] of Object.entries(patches)) {
-        if (res.ok) res = this.collection ? await api.updateSubentry(entry, patch) : await api.saveSchema('edit', entry, patch);
+        if (res.ok) res = this.collection ? await api.updateSubentry(entry === this.entry && this.subentry ? this.subentry : entry, patch) : await api.saveSchema('edit', entry, patch);
       }
       this._result = res;
       if (res.ok) { this._editing = false; this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true })); }
+    } catch (e: any) {
+      this._result = { ok: false, errors: [e?.message ?? String(e)] };
+    } finally {
+      this._saving = false;
+    }
+  }
+
+  private async _add() {
+    // a new entry: the form and the tile's preset go to the backend, which files it and answers with its subentry id
+    this._saving = true;
+    this._result = null;
+    try {
+      const res = await api.addSubentry(this.newType, this.newTitle, { ...this.preset, ...this._draft });
+      this._result = res;
+      if (res.ok) this.dispatchEvent(new CustomEvent('zm-added', { detail: res.subentry_id, bubbles: true, composed: true }));
     } catch (e: any) {
       this._result = { ok: false, errors: [e?.message ?? String(e)] };
     } finally {
@@ -116,7 +137,7 @@ export class ZmGroup extends LitElement {
     if (!confirm(t('ui.group.confirm_delete', '{name} verwijderen?', { name: this.heading || this.entry }))) return;
     this._saving = true;
     try {
-      await api.deleteSubentry(this.entry);
+      await api.deleteSubentry(this.subentry || this.entry);
       this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));
     } catch { /* ignore */ }
     finally { this._saving = false; }
@@ -307,7 +328,7 @@ export class ZmGroup extends LitElement {
   private _headButtons() {
     return this._editing
       ? html`<div class="cluster" @click=${(e: Event) => e.stopPropagation()}>
-          ${this.collection ? html`<button class="iconbtn" title=${t('ui.common.delete', 'Verwijderen')} ?disabled=${this._saving} @click=${this._delete}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg></button>` : nothing}
+          ${this.collection || this.subentry ? html`<button class="iconbtn" title=${t('ui.common.delete', 'Verwijderen')} ?disabled=${this._saving} @click=${this._delete}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg></button>` : nothing}
           <button class="iconbtn" title=${t('ui.common.cancel', 'Annuleren')} ?disabled=${this._saving} @click=${this._cancel}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
           <button class="iconbtn primary" title=${t('ui.common.save', 'Opslaan')} ?disabled=${this._saving} @click=${this._save}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"></path></svg></button>
         </div>`
@@ -324,7 +345,7 @@ export class ZmGroup extends LitElement {
   render() {
     if (!this._visible.length) return nothing;
     const r = this._result;
-    const err = r && !r.ok ? html`<div class="result err">${t('ui.group.not_saved', 'niet opgeslagen:')}<ul>${(r.errors ?? []).map((e) => html`<li>${e}</li>`)}</ul></div>` : nothing;
+    const err = r && !r.ok ? html`<div class="result err">${t('ui.group.not_saved', 'niet opgeslagen:')}<ul>${(r.errors ?? []).map((e) => html`<li>${t(`ui.error.${e}`, e)}</li>`)}</ul></div>` : nothing;
     return html`
       <div class="card">
         <div class="head">

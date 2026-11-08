@@ -442,94 +442,6 @@
       "abort": {
         "reconfigure_successful": "Instellingen opgeslagen"
       }
-    },
-    "zendure": {
-      "entry_type": "Zendure-apparaat",
-      "initiate_flow": {
-        "user": "Zendure-apparaat toevoegen",
-        "reconfigure": "Apparaat opnieuw configureren"
-      },
-      "step": {
-        "user": {
-          "title": "Zendure-apparaat toevoegen",
-          "description": "Apparaten worden normaal automatisch gevonden. Voeg er alleen handmatig een toe als het nooit verschijnt.",
-          "data": {
-            "prodkey": "Productsleutel",
-            "device_id": "Apparaatsleutel",
-            "sn": "Serienummer",
-            "ip": "IP-adres",
-            "blemac": "Bluetooth-adres"
-          },
-          "data_description": {
-            "prodkey": "De productKey die de Zendure-cloud voor het apparaat meldt.",
-            "device_id": "De deviceKey die de Zendure-cloud voor het apparaat meldt.",
-            "sn": "Het serienummer op het typeplaatje.",
-            "ip": "Vast adres voor de lokale API; wordt automatisch geleerd als het leeg is.",
-            "blemac": "Wordt automatisch uit de Bluetooth-advertentie geleerd als het leeg is."
-          }
-        },
-        "reconfigure": {
-          "title": "{name}",
-          "description": "De naam van een apparaat verandert nooit; zijn adressen wel.",
-          "data": {
-            "ip": "IP-adres",
-            "blemac": "Bluetooth-adres"
-          },
-          "data_description": {
-            "ip": "Vast adres voor de lokale API; wordt automatisch geleerd als het leeg is.",
-            "blemac": "Wordt automatisch uit de Bluetooth-advertentie geleerd als het leeg is."
-          }
-        }
-      },
-      "error": {
-        "device_exists": "Dit apparaat is al geconfigureerd",
-        "unknown_prodkey": "Onbekende productsleutel"
-      },
-      "abort": {
-        "reconfigure_successful": "Instellingen opgeslagen"
-      }
-    },
-    "marstek": {
-      "entry_type": "Marstek-apparaat",
-      "initiate_flow": {
-        "user": "Marstek-apparaat toevoegen",
-        "reconfigure": "Apparaat herconfigureren"
-      },
-      "step": {
-        "user": {
-          "title": "Marstek-apparaat toevoegen",
-          "description": "Een Marstek Venus wordt aangestuurd via Modbus TCP: rechtstreeks over ethernet (Venus E v3, A, D) of via een RS485-gateway (Venus E v1/v2). Modbus vindt zelf niets, dus elk apparaat wordt hier toegevoegd.",
-          "data": {
-            "product": "Registergeneratie",
-            "ip": "IP-adres",
-            "port": "Poort"
-          },
-          "data_description": {
-            "product": "v2: Venus E v1/v2 (via een RS485-gateway), v3: Venus E v3, vA: Venus A, vD: Venus D.",
-            "ip": "Het adres van de accu of van zijn RS485-gateway; het identificeert ook het apparaat.",
-            "port": "De Modbus TCP-poort, standaard 502."
-          }
-        },
-        "reconfigure": {
-          "title": "{name}",
-          "description": "De naam van een apparaat verandert nooit, het adres wel.",
-          "data": {
-            "ip": "IP-adres",
-            "port": "Poort"
-          },
-          "data_description": {
-            "ip": "Het adres van de accu of van zijn RS485-gateway; het identificeert ook het apparaat.",
-            "port": "De Modbus TCP-poort, standaard 502."
-          }
-        }
-      },
-      "error": {
-        "device_exists": "Dit apparaat is al geconfigureerd",
-        "unknown_product": "Onbekende registergeneratie"
-      },
-      "abort": {
-        "reconfigure_successful": "Instellingen opgeslagen"
-      }
     }
   },
   "entity": {
@@ -874,7 +786,7 @@
         "consumers": "Verbruikers",
         "export": "export",
         "import": "import",
-        "solar_groups": "Zonnegroepen · nu",
+        "solar_groups": "Zonnepanelen · nu",
         "load_failed": "Laden mislukt: {error}",
         "loading": "laden…",
         "now": "nu",
@@ -937,7 +849,8 @@
         "edit": "Bewerken",
         "no_plan": "Geen plan geladen.",
         "save": "Opslaan",
-        "unknown_error": "onbekende fout"
+        "unknown_error": "onbekende fout",
+        "back": "Terug"
       },
       "consumer_type": {
         "appliance": "Apparaat",
@@ -977,7 +890,7 @@
       },
       "forecast": {
         "d7": "7 dagen",
-        "groups": "Zonnegroepen",
+        "groups": "Zonnepanelen",
         "groups_hint": "per dakvlak · oriëntatie & bijdrage",
         "h48": "48 uur",
         "hint": "zon als staaf · prijs als lijn",
@@ -1025,7 +938,7 @@
         "actual": "Actueel",
         "add": "Zonnepaneel toevoegen",
         "confirm_delete": "\"{name}\" verwijderen?",
-        "empty": "geen zonnegroepen in de config",
+        "empty": "geen zonnepanelen in de config",
         "name": "Naam",
         "new_group": "Nieuwe groep"
       },
@@ -1089,7 +1002,20 @@
         "tip_mix": "Mix · zon {solar}% · accu {battery}% · net {grid}%",
         "title": "30-daagse historie"
       },
-      "weekdays": "zo,ma,di,wo,do,vr,za"
+      "weekdays": "zo,ma,di,wo,do,vr,za",
+      "manage": {
+        "title": "Toevoegen",
+        "add": "Toevoegen",
+        "consumer": "Verbruikers",
+        "device": "Apparaten",
+        "solar": "Zonnepanelen"
+      },
+      "error": {
+        "device_exists": "Dit apparaat is al toegevoegd",
+        "unknown_product": "Onbekend model",
+        "cannot_connect": "Geen antwoord op dit adres",
+        "invalid_auth": "Gebruikersnaam of wachtwoord klopt niet"
+      }
     }
   }
 }

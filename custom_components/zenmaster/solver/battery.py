@@ -218,12 +218,8 @@ class DistributionEntry(SolverEntry):
         return DistributionMode.OFF
 
     def _apply_plan_mode(self) -> None:
-        d = self.distribution
-        mode = self._plan_direction()
-        if int(d.mode) != mode.value and mode == DistributionMode.OFF:
-            for x in d.devices:
-                x.power_off()
-        d.entities["mode"].update_value(mode.value)
+        # plan OFF only sets the mode: the P1 tick holds every battery at 0 W while optimize is on
+        self.distribution.entities["mode"].update_value(self._plan_direction())
 
     def _rank(self, lp: LpSolver, flow) -> dict[DistributionDevice, tuple[int, float]]:
         # planned now first, the largest first; then planned later, the earliest start first; a battery without a plan in this direction is left out
@@ -239,7 +235,7 @@ class DistributionEntry(SolverEntry):
     def entry_postfail(self, lp: LpSolver) -> None:
         # no plan this quarter: with optimize on the fleet stops instead of repeating the last plan
         if self.distribution.optimize:
-            self.distribution.power_off()
+            self.distribution.entities["mode"].update_value(DistributionMode.OFF)
 
     def entry_postrun(self, lp: LpSolver) -> None:
         d = self.distribution

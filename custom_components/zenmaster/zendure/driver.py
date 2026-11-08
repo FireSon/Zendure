@@ -19,11 +19,10 @@ import paho.mqtt.client as mqtt
 from aiohttp import ClientTimeout
 from bleak import BleakClient
 from bleak_retry_connector import establish_connection
-from homeassistant.components import bluetooth, zeroconf
+from homeassistant.components import bluetooth
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from zeroconf import ServiceStateChange
-from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo
 
+from ..config import ConfigField
 from ..const import DOMAIN
 from ..device import DeviceState, DistributionDevice
 from ..entity import EntityDevice
@@ -86,6 +85,23 @@ class ZendureDriver:
     manufacturer = "Zendure"
     ZEROCONF = [{"type": "_http._tcp.local.", "name": "zendure-*"}, {"type": "_zendure._tcp.local.", "name": "zendure-*"}]
     BLUETOOTH = [{"local_name": "Zen*", "connectable": True}]
+    CONFIG = [
+        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True),
+        ConfigField("apptoken", {"text": {"type": "password"}}, cast=str, required=False, section_key="cloud"),
+        ConfigField("cloud_url", {"text": {}}, cast=str, required=False, expert=True, section_key="cloud"),
+        ConfigField("mqtt_host", {"text": {}}, cast=str, required=False, section_key="local_broker"),
+        ConfigField("mqtt_port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False, section_key="local_broker"),
+        ConfigField("mqtt_user", {"text": {}}, cast=str, required=False, section_key="local_broker"),
+        ConfigField("mqtt_psw", {"text": {"type": "password"}}, cast=str, required=False, section_key="local_broker"),
+        ConfigField("mqtt_log", {"boolean": {}}, cast=bool, section_key="local_broker"),
+        ConfigField("wifi_ssid", {"text": {}}, cast=str, required=False, section_key="wifi"),
+        ConfigField("wifi_psw", {"text": {"type": "password"}}, cast=str, required=False, section_key="wifi"),
+    ]
+    ADD = [  # a device that is never found: its identity by hand, the addresses it is reached on
+        ConfigField("sn", {"text": {}}, cast=str),
+        ConfigField("product", {"text": {}}, cast=str),
+        *(ConfigField(k, {"text": {}}, cast=str, required=False) for k in ("device_id", "prodkey", "ip", "blemac")),
+    ]
 
     def __init__(self, hass, entry_id: str, all_devices: list[EntityDevice], distribution) -> None:
         self.hass = hass
@@ -94,12 +110,10 @@ class ZendureDriver:
         self.distribution = distribution
         self.devices: dict[str, ZendureSolarFlow | ZendureSmartMeter] = {}
         self.on_discovered: Callable[[dict[str, Any]], None] | None = None  # the coordinator: a new device's subentry data plus its "family"
-        self.on_zeroconf: Callable[[dict[str, Any]], None] | None = None  # the coordinator: an mDNS find (sn, ip), before or after its device exists
+        self._ips: dict[str, str] = {}  # serial or MQTT address -> ip from mDNS, for a device that is not built yet
         self._mqtt_clients: dict[ConnectionType, mqtt.Client] = {}
         self._mqtt_log = logging.getLogger(f"{DOMAIN}.mqtt")  # raw payload log; the file is opened on first use
         self.mqtt_log = False  # write every raw MQTT payload to zenmaster_mqtt.jsonl
-        self._ble_unsub: Any = None  # HA's bluetooth callback registration
-        self._zc_browser: AsyncServiceBrowser | None = None  # HA's zeroconf instance browsing our service types
         self._ble_probed: set[str] = set()  # addresses asked over Bluetooth who they are; once per run
         self._cloud_port = 1883
         self._bridges: dict[str, mqtt.Client] = {}  # per local device its own cloud client, logged in as the device
@@ -119,14 +133,6 @@ class ZendureDriver:
 
         # disconnect first
         await self.unload()
-
-        # after setup HA no longer starts discovery flows for us (single instance), so listen for the advertisements ourselves
-        try:
-            self._ble_unsub = bluetooth.async_register_callback(self.hass, self._on_bluetooth, self.BLUETOOTH[0], bluetooth.BluetoothScanningMode.ACTIVE)
-            aiozc = await zeroconf.async_get_async_instance(self.hass)
-            self._zc_browser = AsyncServiceBrowser(aiozc.zeroconf, [m["type"] for m in self.ZEROCONF], handlers=[self._on_zeroconf])
-        except Exception as err:
-            _LOGGER.debug("Discovery listeners not available: %s", err)
 
         # connect to local MQTT
         if self.mqtt_host != "":
@@ -171,13 +177,7 @@ class ZendureDriver:
             _LOGGER.warning("Cloud API failed for key %s... (%s)", self.apptoken[:10], err)
 
     async def unload(self) -> None:
-        """Disconnect all MQTT clients and the discovery listeners."""
-        if callable(self._ble_unsub):
-            self._ble_unsub()
-        self._ble_unsub = None
-        if self._zc_browser is not None:
-            await self._zc_browser.async_cancel()
-            self._zc_browser = None
+        """Disconnect all MQTT clients."""
         clients = [*self._mqtt_clients.values(), *self._bridges.values()]
         for client in clients:
             client.disconnect()
@@ -198,6 +198,7 @@ class ZendureDriver:
             _LOGGER.warning("Zendure: skipping %s: unknown product %s", sn, product)
             return
         _LOGGER.info("Found Zendure device: %s (%s)", sn, product)
+        ip = ip or self._ips.pop(sn, "") or self._ips.pop(device_id, "")  # an address mDNS saw before the cloud or the broker named the device
         self.on_discovered({"sn": sn, "product": product, "device_id": device_id, "prodkey": prodkey, "ip": ip, "blemac": blemac, "family": row.family})
 
     def init_device(self, subentry_id: str, name: str, data: dict[str, Any]) -> EntityDevice | None:
@@ -208,6 +209,9 @@ class ZendureDriver:
         if (old := self.devices.get(data["sn"])) is not None:
             self.remove_device(old)
 
+        # an address mDNS saw before the device was built; it reaches the subentry with the device's next config change
+        if not data.get("ip") and (ip := self._ips.pop(data["sn"], None) or self._ips.pop(data.get("device_id", ""), None)):
+            data = {**data, "ip": ip}
         powers = (row.pwr_max, row.pwr_min) if issubclass(row.cls, DistributionDevice) else ()
         device = row.cls(self.hass, self, subentry_id, name, data, data["product"], *powers)
         if isinstance(device, DistributionDevice):
@@ -237,7 +241,14 @@ class ZendureDriver:
             return None
         return {"sn": parts[-1], "model": "-".join(parts[1:-1]), "ip": str(info.host)}
 
-    def _on_bluetooth(self, info: Any, _change: Any) -> None:
+    @classmethod
+    async def first_find(cls, hass: Any, info: Any) -> dict[str, Any] | None:
+        # before the entry exists: a Bluetooth advertisement is asked over Bluetooth, an mDNS find over its local API
+        if hasattr(info, "address"):
+            return await cls.probe_ble(hass, str(info.address))
+        return await cls.probe(hass, match["ip"]) if (match := cls.match_zeroconf(info)) else None
+
+    def bluetooth_found(self, info: Any, _change: Any) -> None:
         # HA's callback for a Zen* advertisement: one of our devices learns its address; a stranger is asked who it is, once
         if (device := self.match_bluetooth(info)) is not None:
             device.blemac = str(info.address)
@@ -290,28 +301,26 @@ class ZendureDriver:
             return None
         return {"prodkey": found["productKey"], "product": PRODKEYS.get(found["productKey"].lower(), ""), "device_id": found["deviceId"], "sn": found["sn"], "blemac": address}
 
-    def _on_zeroconf(self, zeroconf: Any, service_type: str, name: str, state_change: Any) -> None:
-        # HA's zeroconf browser: resolve our services to an address on the loop, the coordinator files the ip
-        if state_change is ServiceStateChange.Removed or not name.lower().startswith("zendure-"):
-            return
-        self.hass.async_create_task(self._zeroconf_resolve(zeroconf, service_type, name))
-
-    async def _zeroconf_resolve(self, zc: Any, service_type: str, name: str) -> None:
-        info = AsyncServiceInfo(service_type, name)
-        if await info.async_request(zc, 3000) and (addresses := info.parsed_addresses()):
-            await self.zeroconf_found(name, addresses[0])
-
-    async def zeroconf_found(self, name: str, ip: str) -> None:
+    async def zeroconf_found(self, name: str, ip: str, _properties: dict | None = None) -> None:
         # the device tells us who it is over its local API; a meter reader reports the meter it reads, not itself
+        if not name.lower().startswith("zendure-"):
+            return  # _http._tcp carries every web server on the network
         if not (find := await self.probe(self.hass, ip)) or not (find["sn"] or find["device_id"]):
             if (host := self.match_zeroconf(SimpleNamespace(name=name, host=ip))) is None:
                 return
             find = {"prodkey": "", "device_id": "", "sn": host["sn"], "product": host["model"], "ip": ip}
         elif not find["sn"] and (host := self.match_zeroconf(SimpleNamespace(name=name, host=ip))) is not None:
             find["reader_sn"] = host["sn"]
+        # a device we know follows its address; one that is not built yet gets it when it is
+        for d in self.devices.values():
+            if d.sn == find["sn"] or (find["device_id"] and d.device_key == find["device_id"]):
+                if (reader := find.get("reader_sn")) and getattr(d, "reader_sn", "") != reader:
+                    d.reader_sn = reader
+                d.ip = ip
+                d.config_changed()  # a no-op for the subentry when nothing changed
+                return
+        self._ips[find["sn"] or find["device_id"]] = ip
         self.discover(find["sn"], find["product"], find["device_id"], find["prodkey"], ip)
-        if self.on_zeroconf is not None:
-            self.on_zeroconf(find)
 
     @classmethod
     async def probe(cls, hass: Any, ip: str) -> dict[str, Any] | None:

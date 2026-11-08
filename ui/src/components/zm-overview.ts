@@ -1,4 +1,4 @@
-import { LitElement, html, svg, css, nothing } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { property, state } from 'lit/decorators.js';
 import { live } from 'lit/directives/live.js';
 import { tokens } from '../tokens.js';
@@ -13,6 +13,7 @@ import { t } from '../service/i18n.js';
 import './zm-chart.js';
 import './zm-group.js';
 import './zm-ble-onboard.js';
+import './zm-manage.js';
 
 // "Grafiek" and "Apparaten": one card with the plan chart, the Controls tile left of it, and under it one row
 // per battery and per consumer on the chart's time axis. The plan view fills a row with its planning, the
@@ -26,20 +27,6 @@ const LBL_NARROW = 160;  // px: the name column on the phone
 // ConnectionType from device.py: 0 offline, 1 local broker, 2 cloud, 3 zensdk (http), 4 ble
 const CONN_COLOR: Record<number, string> = { 0: '#e8645a', 1: '#4a90d9', 2: '#1fb89a', 3: '#3aa0c9', 4: '#4a90d9' };
 const PHASE_ORDER = ['L1', 'L2', 'L3', 'L1-3', ''];  // the device rows by phase; an unknown phase last
-
-// Concrete add-types: each preset maps to a subentry type (the consumer class in the backend) plus the derived
-// subtype (kind); the label is also the proposed name of the new consumer.
-const CONSUMER_TYPES: Record<string, { label: string; type: string; kind?: string; color: string; icon: string }> = {
-  ev: { label: 'EV-lader', type: 'electric_vehicle', color: '#1fb89a', icon: 'ev' },
-  washingmachine: { label: 'Wasmachine', type: 'appliance', kind: 'washingmachine', color: '#3aa0c9', icon: 'washer' },
-  dryer: { label: 'Droger', type: 'appliance', kind: 'dryer', color: '#8f7ae5', icon: 'dryer' },
-  dishwasher: { label: 'Vaatwasser', type: 'appliance', kind: 'dishwasher', color: '#2fbf9f', icon: 'dish' },
-  appliance: { label: 'Apparaat', type: 'appliance', kind: 'custom', color: '#3aa0c9', icon: 'plug' },
-  heatpump: { label: 'Warmtepomp', type: 'heating_heat_pump', color: '#f47a20', icon: 'hp' },
-  boiler_hp: { label: 'Boiler', type: 'boiler_heat_pump', color: '#f5a623', icon: 'boiler' },
-  boiler_electric: { label: 'Boiler', type: 'boiler_electric', color: '#f5a623', icon: 'boiler_e' },
-  pool: { label: 'Zwembad', type: 'pool_heat_pump', color: '#4aa3df', icon: 'pool' },
-};
 
 interface DevRow {
   id: string; name: string; model: string; eid: string; hasPack: boolean;
@@ -58,14 +45,11 @@ export class ZmOverview extends LitElement {
   @property({ attribute: false }) hass: any = null;
   @property({ attribute: false }) actions: Record<string, any[]> = {};
   @property({ attribute: false }) tiles: Record<string, string[]> = {};
+  @property({ attribute: false }) add: any[] = [];  // the tile catalog of the add dialog
 
   @state() private _pendingMode: string | null = null;  // the option just picked, until the entity confirms it
-  @state() private _edit: { id: string; consumer: boolean } | null = null;  // the row whose popup is open
   @state() private _activeOnly = localStorage.getItem('zm-active-only') === '1';  // the device rows: all, or only the ones that are not offline; kept per browser like the tab
-  @state() private _draftName = '';
-  @state() private _nameErr: string | null = null;
-  @state() private _picker = false;
-  @state() private _busy = false;
+  @state() private _manage = false;  // the add and edit dialog is open
   @state() private _onboardName: string | null = null;
   @state() private _narrow = NARROW.matches;
   @state() private _day: string | null = null;  // the past day shown, null for the live plan
@@ -168,31 +152,10 @@ export class ZmOverview extends LitElement {
       .dtile .v { font-family: var(--zm-font-display); font-weight: 600; font-size: var(--zm-fs-m); line-height: 1; }
       .dtile .v .u { font-size: var(--zm-fs-s); color: var(--zm-text-dim); }
       .acts { display: flex; gap: 6px; margin-left: auto; padding-right: 8px; }
-      .edit { flex: none; width: 20px; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: transparent; color: var(--zm-text-faint); cursor: pointer; opacity: 0; }
-      .row:hover .edit, .edit:focus-visible { opacity: 1; }
-      .lbl:hover .edit, .edit:hover, .edit:focus-visible { color: #13967d; background: var(--zm-teal-soft); }
-      .narrow .edit { opacity: 1; }
       .foot { display: flex; gap: 8px; padding: 12px 6px 0; }
       .addbtn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--zm-border); background: var(--zm-card); color: var(--zm-text-dim); border-radius: 999px; padding: 6px 12px; font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 700; cursor: pointer; }
       .addbtn:hover { color: var(--zm-text); border-color: var(--zm-text-faint); }
       .addbtn:disabled { opacity: 0.5; cursor: default; }
-      /* the popups: the edit of one row, and the type picker for a new consumer */
-      .pop-bg { position: fixed; inset: 0; background: rgba(20,18,14,0.38); backdrop-filter: blur(2px); display: flex; align-items: flex-start; justify-content: center; z-index: 200; padding: 120px 20px 20px; overflow: auto; }
-      .pop { width: min(580px, 100%); background: var(--zm-card); border: 1px solid var(--zm-border); border-radius: 22px; box-shadow: 0 24px 60px rgba(0,0,0,0.28); overflow: hidden; }
-      .pop.wide { width: min(870px, 100%); }  /* the edit popup of a device or consumer: room for two columns of fields */
-      .poph { display: flex; align-items: center; gap: 10px; padding: 14px 18px; background: linear-gradient(160deg, var(--zm-ctl-a), var(--zm-ctl-b)); border-bottom: 1px solid var(--zm-ctl-border); }
-      .poph h3 { flex: 1 1 auto; min-width: 0; margin: 0; font-family: var(--zm-font-display); font-weight: 600; font-size: var(--zm-fs-l); color: var(--zm-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--zm-card); border: 1px solid var(--zm-ctl-border); color: #13967d; font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 800; text-decoration: none; cursor: pointer; }
-      .x { flex: none; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--zm-ctl-border); background: var(--zm-card); color: var(--zm-text-dim); display: flex; align-items: center; justify-content: center; cursor: pointer; }
-      .popb { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
-      .erow { display: flex; align-items: center; gap: 8px; }
-      .erow .box { flex: 1 1 auto; }
-      .err { font-family: var(--zm-font-body); font-size: var(--zm-fs-s); color: #e8645a; }
-      .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-      .type { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 12px 6px; border: 1px solid var(--zm-border); background: var(--zm-card-2); border-radius: 14px; cursor: pointer; }
-      .type:hover { border-color: var(--zm-text-faint); }
-      .type span { font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-dim); text-align: center; line-height: 1.25; }
-      .type .ic { width: 42px; height: 42px; border-radius: 999px; display: flex; align-items: center; justify-content: center; }
       .empty { padding: 48px; text-align: center; color: var(--zm-text-faint); font-family: var(--zm-font-body); }
     `,
   ];
@@ -264,25 +227,22 @@ export class ZmOverview extends LitElement {
 
   private _go = (e: Event) => {
     e.preventDefault();
-    this._edit = null;
     history.pushState(null, '', (e.currentTarget as HTMLAnchorElement).getAttribute('href') ?? '');
     window.dispatchEvent(new CustomEvent('location-changed'));
   };
 
-  // the name links to the HA device, the pencil next to it opens the row's edit popup
-  private _haName(name: string, eid: string, id: string, consumer: boolean) {
+  // the name links to the HA device; adding and editing go through the Toevoegen dialog
+  private _haName(name: string, eid: string) {
     const href = this._haHref(eid);
-    const open = () => { this._edit = { id, consumer }; this._draftName = name; this._nameErr = null; };
     return html`
-      ${href ? html`<a href=${href} title=${t('ui.devices.open_ha', 'Open in Home Assistant')} @click=${this._go}>${name}</a>` : html`<span>${name}</span>`}
-      <button class="edit" title=${t('ui.common.edit', 'Bewerken')} @click=${open}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg></button>`;
+      ${href ? html`<a href=${href} title=${t('ui.devices.open_ha', 'Open in Home Assistant')} @click=${this._go}>${name}</a>` : html`<span>${name}</span>`}`;
   }
 
   private _devRow(d: DevRow) {
     return html`
       <div class="row ${d.dim ? 'dim' : ''}">
         <div class="lbl">
-          <div class="nm"><div class="n">${this._haName(d.name, d.eid, d.id, false)}</div><div class="m"><i style="background:${CONN_COLOR[d.conn] ?? 'var(--zm-text-faint)'}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
+          <div class="nm"><div class="n">${this._haName(d.name, d.eid)}</div><div class="m"><i style="background:${CONN_COLOR[d.conn] ?? 'var(--zm-text-faint)'}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
           <div class="w" style="color:${d.wattColor}">${d.net > 0 ? '+' : ''}${d.net}<span class="u"> W</span></div>
           <div class="bat">${d.hasPack ? html`<i style="width:${d.socPct}%"></i>` : nothing}</div>
           ${this.view === 'plan' ? html`<div class="dpop">${this._devTiles(d)}</div>` : nothing}
@@ -335,7 +295,7 @@ export class ZmOverview extends LitElement {
     return html`
       <div class="row">
         <div class="lbl">
-          <div class="nm"><div class="n">${this._haName(c.label, eid, c.id, true)}</div><div class="m">${(ph => ph ? html`<span class="ph">${ph}</span>` : nothing)(this._consPhase(c.id))}${c.sub}</div></div>
+          <div class="nm"><div class="n">${this._haName(c.label, eid)}</div><div class="m">${(ph => ph ? html`<span class="ph">${ph}</span>` : nothing)(this._consPhase(c.id))}${c.sub}</div></div>
           <div class="w" style="color:${c.iconColor}">${c.powerW}<span class="u"> W</span></div>
           <div class="st" style="color:${c.statusColor}">${c.statusLabel}</div>
           ${this.view === 'plan' ? html`<div class="dpop">${tiles.map((x: any) => this._dtile(x.k, x.v, x.u))}</div>` : nothing}
@@ -378,96 +338,6 @@ export class ZmOverview extends LitElement {
       </div>`;
   }
 
-  private async _saveName(id: string) {
-    this._nameErr = null;
-    try {
-      const res = await api.saveSchema('edit', id, { device_id: id, name: this._draftName });
-      if (res.ok) this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));
-      else this._nameErr = (res.errors ?? [t('ui.common.unknown_error', 'onbekende fout')]).join('; ');
-    } catch (e: any) {
-      this._nameErr = e?.message ?? String(e);
-    }
-  }
-
-  // the edit popup of one row: its schema group in edit mode, for a battery also its name and the BLE pairing
-  private _editPopup() {
-    const { id, consumer } = this._edit!;
-    const dev = consumer ? null : fleetDevices(this.config)[id];
-    const cfg = consumer ? (this.config?.consumers ?? []).find((x: any) => x.id === id) : null;
-    const name = dev?.name || cfg?.name || id;
-    const href = this._haHref(dev?.home_output ?? cfg?.state ?? '');
-    const fields = this.schema?.[id];
-    const close = () => (this._edit = null);
-    return html`
-      <div class="pop-bg" @click=${close}>
-        <div class="pop wide" role="dialog" @click=${(e: Event) => e.stopPropagation()}>
-          <div class="poph">
-            <h3>${name}</h3>
-            ${href ? html`<a class="pill" href=${href} @click=${this._go}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg>Home Assistant</a>` : nothing}
-            ${dev && ZendureBle.available() ? html`<button class="pill" @click=${() => { this._onboardName = dev.ble_name ?? ''; close(); }}>${t('ui.devices.ble_pair', 'BLE koppelen')}</button>` : nothing}
-            <button class="x" title=${t('ui.common.close', 'Sluiten')} @click=${close}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
-          </div>
-          <div class="popb">
-            ${dev ? html`<label class="fld"><span>${t('ui.devices.name', 'Naam')}</span><div class="erow"><div class="box"><input .value=${this._draftName} @input=${(e: Event) => (this._draftName = (e.target as HTMLInputElement).value)} @keydown=${(e: KeyboardEvent) => e.key === 'Enter' && this._saveName(id)} /></div><button class="addbtn" @click=${() => this._saveName(id)}>${t('ui.common.save', 'Opslaan')}</button></div>${this._nameErr ? html`<span class="err">${this._nameErr}</span>` : nothing}</label>` : nothing}
-            ${fields
-              ? html`<zm-group .entry=${id} .fields=${fields} .config=${this.config} .hass=${this.hass} heading=${name} iconKey=${consumer ? cfg?.kind ?? '' : 'battery'} collection=${consumer ? 'consumers' : ''} ?singleColumn=${consumer} autoEdit @zm-saved=${close}></zm-group>`
-              : html`<div class="empty">${t('ui.app.loading', 'laden…')}</div>`}
-          </div>
-        </div>
-      </div>`;
-  }
-
-  // one line-icon per type, same stroke and viewBox as the icons the cards already use
-  private _typeIcon(name: string) {
-    const p: Record<string, any> = {
-      ev: svg`<path d="M13 2L5 13h5l-1 9 9-12h-6z"></path>`,
-      washer: svg`<rect x="4" y="3" width="16" height="18" rx="2.5"></rect><circle cx="12" cy="13.5" r="4"></circle><path d="M7.5 6.5h1.5"></path>`,
-      dryer: svg`<rect x="4" y="3" width="16" height="18" rx="2.5"></rect><path d="M9 11a3 3 0 0 1 5 1.5M15 16a3 3 0 0 1-5-1.5"></path><path d="M7.5 6.5h1.5"></path>`,
-      dish: svg`<rect x="4" y="3" width="16" height="18" rx="2.5"></rect><path d="M4 9h16M8.5 13h7M8.5 17h4.5"></path>`,
-      plug: svg`<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 01-12 0z"></path><path d="M12 18v4"></path>`,
-      hp: svg`<path d="M3 8h10a3 3 0 1 0-3-3M3 12h14a3 3 0 1 1-3 3M3 16h8a2.5 2.5 0 1 1-2.5 2.5"></path>`,
-      boiler: svg`<path d="M12 3s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z"></path>`,
-      boiler_e: svg`<path d="M12 3s6 6 6 11a6 6 0 0 1-12 0c0-5 6-11 6-11z"></path><path d="M12.8 9.5L10 14h3l-.8 4 3.2-5h-3z"></path>`,
-      pool: svg`<path d="M3 15c2 0 2-1.6 4-1.6s2 1.6 4 1.6 2-1.6 4-1.6 2 1.6 4 1.6M3 19c2 0 2-1.6 4-1.6s2 1.6 4 1.6 2-1.6 4-1.6 2 1.6 4 1.6"></path><path d="M8.5 12V6a2 2 0 1 1 4 0"></path>`,
-    };
-    return p[name] ?? p.plug;
-  }
-
-  private _addConsumer = async (key: string) => {
-    this._picker = false;
-    const preset = CONSUMER_TYPES[key];
-    if (!preset) return;
-    // the name proposed is the preset label, numbered when a consumer of that name already exists; the backend refuses duplicates
-    const names = new Set((this.config?.consumers ?? []).map((c: any) => String(c.name ?? '').toLowerCase()));
-    const label = t(`ui.consumer_type.${key}`, preset.label);
-    let title = label, n = 1;
-    while (names.has(title.toLowerCase())) title = `${label} ${++n}`;
-    const data: Record<string, unknown> = {};
-    if (preset.kind) data.kind = preset.kind;
-    this._busy = true;
-    try {
-      const res = await api.addSubentry(preset.type, title, data);
-      if (res.subentry_id) this._edit = { id: res.subentry_id, consumer: true };  // its popup opens, so the entities can be picked right away
-      this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));
-    } catch { /* ignore */ }
-    finally { this._busy = false; }
-  };
-
-  private _pickerPopup() {
-    return html`
-      <div class="pop-bg" @click=${() => (this._picker = false)}>
-        <div class="pop" @click=${(e: Event) => e.stopPropagation()}>
-          <div class="poph"><h3>${t('ui.consumers.add', 'Verbruiker toevoegen')}</h3><button class="x" @click=${() => (this._picker = false)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></div>
-          <div class="popb"><div class="types">
-            ${Object.entries(CONSUMER_TYPES).map(([k, v]) => html`<button class="type" @click=${() => this._addConsumer(k)}>
-              <span class="ic" style="background:color-mix(in srgb, ${v.color} 15%, transparent)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke=${v.color} stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${this._typeIcon(v.icon)}</svg></span>
-              <span>${t(`ui.consumer_type.${k}`, v.label)}</span>
-            </button>`)}
-          </div></div>
-        </div>
-      </div>`;
-  }
-
   render() {
     const d = this._shown;
     const devs = this._devices();
@@ -488,12 +358,11 @@ export class ZmOverview extends LitElement {
           </div>`}
       </div></div>
       <div class="foot">
-        ${d ? html`<button class="addbtn" ?disabled=${this._busy} @click=${() => (this._picker = true)}>+ ${t('ui.consumers.add', 'Verbruiker toevoegen')}</button>` : nothing}
+        <button class="addbtn" @click=${() => (this._manage = true)}>+ ${t('ui.manage.add', 'Toevoegen')}</button>
         ${devs.length ? html`<button class="addbtn" @click=${() => { this._activeOnly = !this._activeOnly; localStorage.setItem('zm-active-only', this._activeOnly ? '1' : '0'); }}>${this._activeOnly ? t('ui.devices.show_all', 'Alle apparaten') : t('ui.devices.show_active', 'Actieve apparaten')}</button>` : nothing}
         ${ZendureBle.available() ? html`<button class="addbtn" title=${t('ui.ble.title', 'Apparaat koppelen via Bluetooth')} @click=${() => (this._onboardName = '')}>${t('ui.devices.pair', 'Koppelen')}</button>` : nothing}
       </div>
-      ${this._edit ? this._editPopup() : nothing}
-      ${this._picker ? this._pickerPopup() : nothing}
+      ${this._manage ? html`<zm-manage .config=${this.config} .schema=${this.schema} .add=${this.add} .hass=${this.hass} @close=${() => (this._manage = false)}></zm-manage>` : nothing}
       ${this._onboardName !== null
         ? html`<zm-ble-onboard .config=${this.config} .driverId=${Object.keys(byKind(this.config, 'ZendureDriver'))[0] ?? ''} .bleName=${this._onboardName} @close=${() => (this._onboardName = null)}></zm-ble-onboard>`
         : nothing}

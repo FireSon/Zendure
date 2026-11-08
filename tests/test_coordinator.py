@@ -109,3 +109,17 @@ def test_track_p1_huawei_phase_sign_flips(monkeypatch) -> None:
     coord._track_p1("device")
     assert coord.p1_slots["l1"] == [("sensor.inverter_phase_a_active_power", -1)]
     assert coord.p1_slots["total"] == [("sensor.power_meter_active_power", -1)]
+
+
+def test_track_p1_on_our_own_meters_counts_only_the_grid(monkeypatch) -> None:
+    # a Deye carries battery and PV power next to its grid: the zenmaster profile takes only the grid total, the phases go by name
+    keys = ("battery_input", "battery_output", "pv_power", "phase1_power", "phase2_power", "phase3_power", "grid_power")
+    coord, _ = make_coordinator(monkeypatch, [power_entity(f"sensor.deye_78_{k}", platform="zenmaster") for k in keys])
+    coord._track_p1("device")
+    assert coord.p1_slots["total"] == [("sensor.deye_78_grid_power", 1)]
+    assert [coord.p1_slots[p] for p in ("l1", "l2", "l3")] == [[(f"sensor.deye_78_phase{i}_power", 1)] for i in (1, 2, 3)]
+
+    # the Zendure smart meter on the same platform keeps its total
+    coord, _ = make_coordinator(monkeypatch, [power_entity(f"sensor.smartmeter_{k}", platform="zenmaster") for k in ("total_power", "phase1_power")])
+    coord._track_p1("device")
+    assert coord.p1_slots["total"] == [("sensor.smartmeter_total_power", 1)]

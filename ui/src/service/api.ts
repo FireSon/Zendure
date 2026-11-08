@@ -49,6 +49,7 @@ export interface SchemaBundle {
   config: any;
   actions?: Record<string, RowAction[]>;  // the row buttons each consumer offers, in backend order
   tiles?: Record<string, string[]>;  // the entity fields each consumer shows as tiles on its row
+  add?: any[];  // the tiles of the add dialog: consumer types, drivers and the solar group, each with its form
 }
 
 export const api = {
@@ -59,7 +60,7 @@ export const api = {
   // The settings tab (distribution, price, zendure): one singleton edit at a time.
   saveSchema: (action: SchemaAction, section: string, payload?: Record<string, unknown>) =>
     call<SaveResult>('save_schema', { action, section, payload }),
-  // Consumers and solar panels are HA config subentries: the title is the name, the patch holds the fields.
+  // Consumers, solar panels and devices are HA config subentries: the title is the name, the patch holds the fields.
   addSubentry: (subentryType: string, title: string, data?: Record<string, unknown>) =>
     call<SaveResult & { subentry_id?: string }>('subentry_add', { subentry_type: subentryType, title, data }),
   updateSubentry: (subentryId: string, patch: Record<string, unknown>) =>

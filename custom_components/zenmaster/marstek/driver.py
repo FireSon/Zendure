@@ -6,6 +6,7 @@ import logging
 from collections.abc import Callable
 from typing import Any, NamedTuple
 
+from ..config import ConfigField
 from ..entity import EntityDevice
 from .venus import MarstekVenus
 
@@ -31,6 +32,9 @@ class MarstekDriver:
 
     id = "marstek"  # the settings section and the subentry type of the devices
     manufacturer = "Marstek"
+    CONFIG = [ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True)]  # the settings section of the driver: only its id
+    ADD = [ConfigField("product", {"select": {"options": list(PRODUCTS)}}, cast=str), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False)]  # the register generation
+    KEY = "ip"  # Modbus reports no identity: the ip is the serial
 
     def __init__(self, hass, entry_id: str, all_devices: list[EntityDevice], distribution) -> None:
         self.hass = hass

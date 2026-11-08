@@ -442,94 +442,6 @@
       "abort": {
         "reconfigure_successful": "Réglages enregistrés"
       }
-    },
-    "zendure": {
-      "entry_type": "Appareil Zendure",
-      "initiate_flow": {
-        "user": "Ajouter un appareil Zendure",
-        "reconfigure": "Reconfigurer l'appareil"
-      },
-      "step": {
-        "user": {
-          "title": "Ajouter un appareil Zendure",
-          "description": "Les appareils sont normalement trouvés automatiquement. N'en ajoutez un à la main que s'il n'apparaît jamais.",
-          "data": {
-            "prodkey": "Clé produit",
-            "device_id": "Clé appareil",
-            "sn": "Numéro de série",
-            "ip": "Adresse IP",
-            "blemac": "Adresse Bluetooth"
-          },
-          "data_description": {
-            "prodkey": "Le productKey que le cloud Zendure indique pour l'appareil.",
-            "device_id": "Le deviceKey que le cloud Zendure indique pour l'appareil.",
-            "sn": "Le numéro de série sur l'étiquette de l'appareil.",
-            "ip": "Adresse fixe pour l'API locale ; apprise automatiquement si vide.",
-            "blemac": "Apprise automatiquement depuis l'annonce Bluetooth si vide."
-          }
-        },
-        "reconfigure": {
-          "title": "{name}",
-          "description": "Le nom d'un appareil ne change jamais ; ses adresses peuvent changer.",
-          "data": {
-            "ip": "Adresse IP",
-            "blemac": "Adresse Bluetooth"
-          },
-          "data_description": {
-            "ip": "Adresse fixe pour l'API locale ; apprise automatiquement si vide.",
-            "blemac": "Apprise automatiquement depuis l'annonce Bluetooth si vide."
-          }
-        }
-      },
-      "error": {
-        "device_exists": "Cet appareil est déjà configuré",
-        "unknown_prodkey": "Clé produit inconnue"
-      },
-      "abort": {
-        "reconfigure_successful": "Réglages enregistrés"
-      }
-    },
-    "marstek": {
-      "entry_type": "Appareil Marstek",
-      "initiate_flow": {
-        "user": "Ajouter un appareil Marstek",
-        "reconfigure": "Reconfigurer l'appareil"
-      },
-      "step": {
-        "user": {
-          "title": "Ajouter un appareil Marstek",
-          "description": "Une Marstek Venus est pilotée en Modbus TCP : directement en Ethernet (Venus E v3, A, D) ou via une passerelle RS485 (Venus E v1/v2). Modbus ne trouve rien seul, chaque appareil est donc ajouté ici.",
-          "data": {
-            "product": "Génération de registres",
-            "ip": "Adresse IP",
-            "port": "Port"
-          },
-          "data_description": {
-            "product": "v2 : Venus E v1/v2 (via une passerelle RS485), v3 : Venus E v3, vA : Venus A, vD : Venus D.",
-            "ip": "L'adresse de la batterie ou de sa passerelle RS485 ; elle identifie aussi l'appareil.",
-            "port": "Le port Modbus TCP, 502 par défaut."
-          }
-        },
-        "reconfigure": {
-          "title": "{name}",
-          "description": "Le nom d'un appareil ne change jamais, son adresse peut changer.",
-          "data": {
-            "ip": "Adresse IP",
-            "port": "Port"
-          },
-          "data_description": {
-            "ip": "L'adresse de la batterie ou de sa passerelle RS485 ; elle identifie aussi l'appareil.",
-            "port": "Le port Modbus TCP, 502 par défaut."
-          }
-        }
-      },
-      "error": {
-        "device_exists": "Cet appareil est déjà configuré",
-        "unknown_product": "Génération de registres inconnue"
-      },
-      "abort": {
-        "reconfigure_successful": "Réglages enregistrés"
-      }
     }
   },
   "entity": {
@@ -874,7 +786,7 @@
         "consumers": "Consommateurs",
         "export": "injection",
         "import": "soutirage",
-        "solar_groups": "Groupes solaires · maintenant",
+        "solar_groups": "Panneaux solaires · maintenant",
         "load_failed": "Échec du chargement : {error}",
         "loading": "chargement…",
         "now": "maintenant",
@@ -937,7 +849,8 @@
         "edit": "Modifier",
         "no_plan": "Aucun plan chargé.",
         "save": "Enregistrer",
-        "unknown_error": "erreur inconnue"
+        "unknown_error": "erreur inconnue",
+        "back": "Retour"
       },
       "consumer_type": {
         "appliance": "Appareil",
@@ -977,7 +890,7 @@
       },
       "forecast": {
         "d7": "7 jours",
-        "groups": "Groupes solaires",
+        "groups": "Panneaux solaires",
         "groups_hint": "par pan de toit · orientation & contribution",
         "h48": "48 heures",
         "hint": "solaire en barres · prix en ligne",
@@ -1025,7 +938,7 @@
         "actual": "Actuel",
         "add": "Ajouter un panneau solaire",
         "confirm_delete": "Supprimer \"{name}\" ?",
-        "empty": "aucun groupe solaire dans la config",
+        "empty": "aucun panneau solaire dans la config",
         "name": "Nom",
         "new_group": "Nouveau groupe"
       },
@@ -1089,7 +1002,20 @@
         "tip_mix": "Mix · solaire {solar}% · batterie {battery}% · réseau {grid}%",
         "title": "Historique sur 30 jours"
       },
-      "weekdays": "dim,lun,mar,mer,jeu,ven,sam"
+      "weekdays": "dim,lun,mar,mer,jeu,ven,sam",
+      "manage": {
+        "title": "Ajouter",
+        "add": "Ajouter",
+        "consumer": "Consommateurs",
+        "device": "Appareils",
+        "solar": "Panneaux solaires"
+      },
+      "error": {
+        "device_exists": "Cet appareil est déjà ajouté",
+        "unknown_product": "Modèle inconnu",
+        "cannot_connect": "Aucune réponse à cette adresse",
+        "invalid_auth": "Nom d'utilisateur ou mot de passe incorrect"
+      }
     }
   }
 }

@@ -17,7 +17,7 @@ CHUNK = 64  # registers per read
 PAUSE_S = 1.0  # between two requests: a logger stick is slow
 SAMPLE_S = 10.0  # between two samples in the TOU test
 DUMP = ((0x0000, 0x0300), (0x2700, 0x2B00))  # the inverter, then the battery modules (the blocks of ha-solarman's deye_p3 profile)
-SAMPLE = ((0x024B, 6), (0x0270, 3), (0x02AF, 4))  # battery voltage, SOC, current, power; grid power; grid power 32-bit halves
+SAMPLE = ((0x024B, 6), (0x026E, 4), (0x02AF, 4))  # battery voltage, SOC, current, power; grid power L1, L2, L3, total (low words); their high words
 WORK_MODE, TOU, TIMES, POWERS, SOCS, CHARGES = 0x008E, 0x0092, 0x0094, 0x009A, 0x00A6, 0x00AC
 ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
 

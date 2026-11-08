@@ -55,7 +55,7 @@ class ReplayDevice(DistributionDevice):
         self.last_accept = -1e18
         self.power_since = -1e18
 
-    def power(self, watts: int) -> int:
+    def power(self, watts: int, mode: DistributionMode) -> int:
         watts = max(self.power_profile[1].power, min(self.power_profile[0].power, int(watts)))
 
         # bypass: a full pack cannot take more, an empty one passes through no more than the panels make
@@ -89,7 +89,7 @@ class ReplayDevice(DistributionDevice):
         self.power_setpoint = 0
 
 
-async def replay(data: dict, mode: int) -> dict:
+async def replay(data: dict, mode: DistributionMode) -> dict:
     hass = fake_hass()
     dist = Distribution(hass, "replay")
     dist.wear_date = float("inf")
@@ -225,7 +225,7 @@ async def replay(data: dict, mode: int) -> dict:
 
 async def main() -> None:
     data = json.load(open(sys.argv[1], encoding="utf-8"))
-    mode = next((k for k, v in DistributionModi.items() if v == (sys.argv[2] if len(sys.argv) > 2 else "smart")), 2)
+    mode = next((k for k, v in DistributionModi.items() if v == (sys.argv[2] if len(sys.argv) > 2 else "smart")), DistributionMode.SMART)
     result = await replay(data, mode)
 
     print(f"{sys.argv[1]}  mode {DistributionModi[result['mode']]}  {result['hours']:.1f} h  {len(result['soc'])} devices")

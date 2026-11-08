@@ -12,6 +12,7 @@ from custom_components.zenmaster.device import DeviceState
 from custom_components.zenmaster.sensor import HaSensor
 from custom_components.zenmaster.zendure.device import Command, ConnectionType
 from custom_components.zenmaster.zendure.solarflow import ZendureHyper, ZendureSolarFlow, _limits
+from custom_components.zenmaster.distribution import DistributionMode
 
 for cls in (HaSensor, HaNumber, HaBinarySensor):
     cls.add = staticmethod(lambda *a, **k: None)  # no HA platform in tests
@@ -72,18 +73,18 @@ def test_power_local_publishes_the_limits() -> None:
         d.connection = ConnectionType.LOCAL
 
         # a SolarFlow takes the limits as one property write, no hemsEP
-        d.power(700)
+        d.power(700, DistributionMode.MANUAL)
         topic, cmd = d.mqtt.published[0]
         assert topic == "iot/gDa3tb/simdev/properties/write"
         assert cmd["properties"] == {"smartMode": 1, "acMode": 2, "outputLimit": 700, "inputLimit": 0}
 
         d.power_since = 0.0  # the hold after the last command has passed
-        d.power(-500)
+        d.power(-500, DistributionMode.MANUAL)
         _, cmd = d.mqtt.published[1]
         assert cmd["properties"] == {"smartMode": 1, "acMode": 1, "outputLimit": 0, "inputLimit": 500}
 
         d.power_since = 0.0
-        d.power(0)
+        d.power(0, DistributionMode.MANUAL)
         _, cmd = d.mqtt.published[2]
         assert cmd["properties"] == {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}
         d.unload()
@@ -95,7 +96,7 @@ def test_power_cloud_publishes_like_local() -> None:
     async def scenario() -> None:
         d = make_device()
         d.connection = ConnectionType.CLOUD
-        d.power(300)
+        d.power(300, DistributionMode.MANUAL)
         assert len(d.mqtt.published) == 1  # one property write
         d.unload()
 
@@ -108,14 +109,14 @@ def test_power_hyper_publishes_hemsep() -> None:
         d = make_device(model="Hyper2000", cls=ZendureHyper)
         d.connection = ConnectionType.LOCAL
 
-        d.power(600)
+        d.power(600, DistributionMode.MANUAL)
         topic, cmd = d.mqtt.published[0]
         assert topic == "iot/gDa3tb/simdev/properties/write" and cmd["properties"] == {"hemsState": 1}  # raised once
         _, cmd = d.mqtt.published[1]
         assert cmd["function"] == "hemsEP" and cmd["arguments"]["outputPower"] == 600
 
         d.power_since = 0.0  # the hold after the last command has passed
-        d.power(-400)
+        d.power(-400, DistributionMode.MANUAL)
         _, cmd = d.mqtt.published[2]
         assert cmd["function"] == "hemsEP" and cmd["arguments"]["chargePower"] == 400  # no second hemsState write
         d.unload()
@@ -141,9 +142,9 @@ def test_power_returns_power_actual() -> None:
     async def scenario() -> None:
         d = make_device()
         d.connection = ConnectionType.LOCAL
-        assert d.power(700) == 0  # nothing measured yet
+        assert d.power(700, DistributionMode.MANUAL) == 0  # nothing measured yet
         d.power_actual = 650
-        assert d.power(700) == 650
+        assert d.power(700, DistributionMode.MANUAL) == 650
         d.unload()
 
     asyncio.run(scenario())
@@ -153,9 +154,9 @@ def test_mqtt_envelope() -> None:
     async def scenario() -> None:
         d = make_device()
         d.connection = ConnectionType.LOCAL
-        d.power(100)
+        d.power(100, DistributionMode.MANUAL)
         d.power_since = 0.0  # the hold after the last command has passed
-        d.power(200)
+        d.power(200, DistributionMode.MANUAL)
         (_, first), (_, second) = d.mqtt.published  # two property writes
         assert first["messageId"] == 100001 and second["messageId"] == 100002
         assert first["deviceId"] == "simdev" and "timestamp" in first
@@ -169,9 +170,24 @@ def test_power_offline_does_nothing() -> None:
         d = make_device()
         d.unload()  # stop the loop so the queue stays inspectable
         d.connection = ConnectionType.OFFLINE
-        assert d.power(500) == 0
+        assert d.power(500, DistributionMode.MANUAL) == 0
         d.power_off()
         assert d.mqtt.published == [] and d.device_queue.empty()
+
+    asyncio.run(scenario())
+
+
+def test_an_offline_device_is_not_steered_and_stays_offline() -> None:
+    # state OFFLINE on a BLE link that still connects: no command, no setpoint change, and power_off leaves it offline
+    async def scenario() -> None:
+        d = make_device()
+        d.unload()  # stop the loop so the queue stays inspectable
+        d.connection = ConnectionType.BLE
+        d.set_state(DeviceState.OFFLINE)
+        d.power(1200, DistributionMode.INDIVIDUAL)
+        assert d.device_queue.empty() and d.power_setpoint == 0 and d.state == DeviceState.OFFLINE
+        d.power_off()
+        assert d.state == DeviceState.OFFLINE
 
     asyncio.run(scenario())
 
@@ -184,7 +200,7 @@ def test_power_zensdk_and_ble_queue_http_payloads() -> None:
             d.connection = connection
             for watts in (700, -500, 0):
                 d.power_since = 0.0  # the hold after the last command has passed
-                d.power(watts)
+                d.power(watts, DistributionMode.MANUAL)
             assert d.device_queue.get_nowait() == (Command.POWER, _limits(700))
             assert d.device_queue.get_nowait() == (Command.POWER, _limits(-500))
             assert d.device_queue.get_nowait() == (Command.POWER, _limits(0))
@@ -231,6 +247,27 @@ def test_the_individual_setpoint_set_in_ha_stays_out_of_the_device() -> None:
     asyncio.run(scenario())
 
 
+def test_a_silent_streaming_device_goes_offline_within_a_minute(monkeypatch) -> None:
+    # Wi-Fi gone, BLE still connects but reports nothing: offline after STREAM_TIMEOUT; a quiet broker device keeps OFFLINE_TIMEOUT for its bursts
+    async def scenario() -> None:
+        async def ble_up(self) -> bool:
+            return True
+
+        monkeypatch.setattr(ZendureSolarFlow, "_ble_connect", ble_up)
+        ble, broker = make_device(), make_device()
+        for d, connection in ((ble, ConnectionType.BLE), (broker, ConnectionType.LOCAL)):
+            d.connection = connection
+            d.set_state(DeviceState.ACTIVE)
+            d._msg_update = time.time() - 61
+        assert await wait_for(lambda: ble.state == DeviceState.OFFLINE, timeout=3.0)
+        assert ble.power_actual == 0
+        assert broker.state == DeviceState.ACTIVE
+        ble.unload()
+        broker.unload()
+
+    asyncio.run(scenario())
+
+
 def test_zensdk_full_path(monkeypatch) -> None:
     async def scenario() -> None:
         d = make_device()
@@ -240,7 +277,7 @@ def test_zensdk_full_path(monkeypatch) -> None:
         session = FakeSession({"properties": {"outputHomePower": 700, "gridInputPower": 0, "electricLevel": 55}})
         monkeypatch.setattr(zendure_module, "async_get_clientsession", lambda hass: session)
 
-        d.power(700)
+        d.power(700, DistributionMode.MANUAL)
         assert await wait_for(lambda: d.state == DeviceState.SENT)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
         assert d.power_actual == 700 and d.power_setpoint == 700

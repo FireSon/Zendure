@@ -442,94 +442,6 @@
       "abort": {
         "reconfigure_successful": "Settings saved"
       }
-    },
-    "zendure": {
-      "entry_type": "Zendure device",
-      "initiate_flow": {
-        "user": "Add Zendure device",
-        "reconfigure": "Reconfigure device"
-      },
-      "step": {
-        "user": {
-          "title": "Add Zendure device",
-          "description": "Devices are normally found automatically. Add one by hand only when it never shows up.",
-          "data": {
-            "prodkey": "Product key",
-            "device_id": "Device key",
-            "sn": "Serial number",
-            "ip": "IP address",
-            "blemac": "Bluetooth address"
-          },
-          "data_description": {
-            "prodkey": "The productKey the Zendure cloud reports for the device.",
-            "device_id": "The deviceKey the Zendure cloud reports for the device.",
-            "sn": "The serial number on the device label.",
-            "ip": "Fixed address for the local API; learned automatically when empty.",
-            "blemac": "Learned automatically from the Bluetooth advertisement when empty."
-          }
-        },
-        "reconfigure": {
-          "title": "{name}",
-          "description": "The name of a device never changes; its addresses can.",
-          "data": {
-            "ip": "IP address",
-            "blemac": "Bluetooth address"
-          },
-          "data_description": {
-            "ip": "Fixed address for the local API; learned automatically when empty.",
-            "blemac": "Learned automatically from the Bluetooth advertisement when empty."
-          }
-        }
-      },
-      "error": {
-        "device_exists": "This device is already configured",
-        "unknown_prodkey": "Unknown product key"
-      },
-      "abort": {
-        "reconfigure_successful": "Settings saved"
-      }
-    },
-    "marstek": {
-      "entry_type": "Marstek device",
-      "initiate_flow": {
-        "user": "Add Marstek device",
-        "reconfigure": "Reconfigure device"
-      },
-      "step": {
-        "user": {
-          "title": "Add Marstek device",
-          "description": "A Marstek Venus is steered over Modbus TCP: directly over Ethernet (Venus E v3, A, D) or through an RS485 gateway (Venus E v1/v2). Modbus finds nothing on its own, so every device is added here.",
-          "data": {
-            "product": "Register generation",
-            "ip": "IP address",
-            "port": "Port"
-          },
-          "data_description": {
-            "product": "v2: Venus E v1/v2 (through an RS485 gateway), v3: Venus E v3, vA: Venus A, vD: Venus D.",
-            "ip": "The address of the battery or of its RS485 gateway; it also identifies the device.",
-            "port": "The Modbus TCP port, 502 by default."
-          }
-        },
-        "reconfigure": {
-          "title": "{name}",
-          "description": "The name of a device never changes; its address can.",
-          "data": {
-            "ip": "IP address",
-            "port": "Port"
-          },
-          "data_description": {
-            "ip": "The address of the battery or of its RS485 gateway; it also identifies the device.",
-            "port": "The Modbus TCP port, 502 by default."
-          }
-        }
-      },
-      "error": {
-        "device_exists": "This device is already configured",
-        "unknown_product": "Unknown register generation"
-      },
-      "abort": {
-        "reconfigure_successful": "Settings saved"
-      }
     }
   },
   "entity": {
@@ -874,7 +786,7 @@
         "consumers": "Consumers",
         "export": "export",
         "import": "import",
-        "solar_groups": "Solar groups · now",
+        "solar_groups": "Solar panels · now",
         "load_failed": "Loading failed: {error}",
         "loading": "loading…",
         "now": "now",
@@ -937,7 +849,8 @@
         "edit": "Edit",
         "no_plan": "No plan loaded.",
         "save": "Save",
-        "unknown_error": "unknown error"
+        "unknown_error": "unknown error",
+        "back": "Back"
       },
       "consumer_type": {
         "appliance": "Appliance",
@@ -977,7 +890,7 @@
       },
       "forecast": {
         "d7": "7 days",
-        "groups": "Solar groups",
+        "groups": "Solar panels",
         "groups_hint": "per roof plane · orientation & contribution",
         "h48": "48 hours",
         "hint": "solar as bars · price as line",
@@ -1025,7 +938,7 @@
         "actual": "Current",
         "add": "Add solar panel",
         "confirm_delete": "Delete \"{name}\"?",
-        "empty": "no solar groups in the config",
+        "empty": "no solar panels in the config",
         "name": "Name",
         "new_group": "New group"
       },
@@ -1089,7 +1002,20 @@
         "tip_mix": "Mix · solar {solar}% · battery {battery}% · grid {grid}%",
         "title": "30-day history"
       },
-      "weekdays": "Sun,Mon,Tue,Wed,Thu,Fri,Sat"
+      "weekdays": "Sun,Mon,Tue,Wed,Thu,Fri,Sat",
+      "manage": {
+        "title": "Add",
+        "add": "Add",
+        "consumer": "Consumers",
+        "device": "Devices",
+        "solar": "Solar panels"
+      },
+      "error": {
+        "device_exists": "This device is already added",
+        "unknown_product": "Unknown model",
+        "cannot_connect": "No answer at this address",
+        "invalid_auth": "Wrong username or password"
+      }
     }
   }
 }

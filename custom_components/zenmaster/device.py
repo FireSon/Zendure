@@ -5,12 +5,15 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from homeassistant.core import HomeAssistant
 
 from .const import Phase
 from .entity import EntityDevice
+
+if TYPE_CHECKING:
+    from .distribution import DistributionMode
 
 
 DEADBAND_W = 20  # smallest power change worth a new command
@@ -116,8 +119,8 @@ class DistributionDevice(EntityDevice):
         if self.on_phase is not None:
             self.on_phase()
 
-    def power(self, watts: int) -> int:
-        """Vendor contract: the device decides what it will do with the request; the return is the current power_actual."""
+    def power(self, watts: int, mode: DistributionMode) -> int:
+        """Vendor contract: the device decides what it does with the request in this fleet mode; the return is the current power_actual."""
         return self.power_actual
 
     def power_off(self) -> None:
