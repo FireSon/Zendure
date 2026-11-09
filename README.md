@@ -42,17 +42,34 @@ With the arrows above the controls you step back through earlier days. The chart
 
 ### Device and consumer lanes
 
-Under the chart each battery and each consumer has its own lane with its plan per quarter, or on an earlier day what it really did. Hover a bar to see its time and power. Each row shows its phase, its power now and, for a battery, its state of charge. **Add consumer** adds an appliance, a heat pump, a boiler or an EV charger; **All devices** toggles between all and only the online devices; **Pair** connects a new Zendure battery over Bluetooth.
+Under the chart each battery and each consumer has its own lane with its plan per quarter, or on an earlier day what it really did. Hover a bar to see its time and power. Each row shows its phase, its power now and, for a battery, its state of charge. **Add** opens the Add dialog (see below); **All devices** toggles between all and only the online devices; **Pair** connects a new Zendure battery over Bluetooth.
+
+### Adding devices
+
+**Add** under the lanes opens the Add dialog, with a tab for consumers, devices and solar panels. On the left are the ones you already have; pick one to edit or remove it. On the right are the tiles of what you can add: pick a tile, fill in the form and press **Add**. Zendure devices are also found automatically, Anker devices over mDNS; the other brands are added by hand.
+
+![Adding a device](docs/add-devices.png)
 
 ## What ZenMaster plans
 
-### Batteries (Zendure)
+### Batteries
+
+#### Zendure
 
 - SolarFlow 800, 1600, 2400 and 4000, Hyper 2000, Hub 1200 and 2000, AIO 2400 and Ace 1500, plus the Zendure P1 and CT smart meters.
 - Steered over the local zenSDK HTTP API where the device has it, otherwise over a local MQTT broker, with Bluetooth as fallback. Devices are found automatically (MQTT, mDNS, Bluetooth).
 - Every battery is planned on its own: its capacity, its power limits, its own solar input, its round-trip loss and its wear. A pack that has worked more than the fleet average costs a little more per kWh, so the plan spreads the work.
 - The plan charges when power is cheap or solar is left over and discharges when it is expensive, within the phase limits of the connection.
 - The phase of each battery and consumer is detected from its power jumps in the recorder history.
+
+#### Experimental brands
+
+Every brand other than Zendure is experimental: written against the vendor's register maps and documentation and tested against simulated devices, but not yet proven on real hardware. Feedback from owners is welcome.
+
+- **Marstek** Venus E, A and D over Modbus TCP, directly or through an RS485 gateway. Added by hand with its register generation (v2, v3, A or D), its IP address and port. Steered with RS485 control mode and a charge or discharge setpoint; handed back to the work mode it had before.
+- **Anker SOLIX** Solarbank Max AC, XE AC and Solarbank 4 E5000 Pro over Modbus TCP. Found over mDNS or added by hand with its IP address. Steered in Third-Party Control with one signed setpoint; handed back to the operating mode it had before.
+- **Sessy** 5 kWh and 10 kWh over the dongle's local HTTP API. Added by hand with its IP address and the username and password on its sticker. Steered with the API power strategy and a setpoint; handed back to the strategy it had before.
+- **Deye** three-phase hybrid inverters with an LV or HV battery, through their Solarman logger stick. Added by hand with the battery type, the logger's serial number, the battery capacity and the logger's IP address. Its grid meter appears as a device of its own that can be picked as the P1 meter. Steered per mode through its own settings (time-of-use programs, charge and discharge current, work mode, grid charging); its own settings are put back when ZenMaster hands it back.
 
 ### Heat pump for space heating
 
@@ -85,9 +102,9 @@ If you find this project helpful and want to support its development, consider b
 1. Copy `custom_components/zenmaster` into the `custom_components` folder of your Home Assistant configuration.
 2. Restart Home Assistant.
 3. Add the integration **ZenMaster** under Settings, Devices and services.
-4. Open the ZenMaster panel in the sidebar and set the P1 meter, the dynamic price provider and the consumers.
+4. Open the ZenMaster panel in the sidebar, set the P1 meter and the dynamic price provider, and add your devices, consumers and solar panels with **Add**.
 
-ZenMaster needs the Home Assistant recorder for its calibrations and uses `paho-mqtt`, `bleak-retry-connector`, `highspy` and `numpy`, which Home Assistant installs from the manifest.
+ZenMaster needs the Home Assistant recorder for its calibrations and uses `paho-mqtt`, `bleak-retry-connector`, `highspy`, `numpy` and `pymodbus`, which Home Assistant installs from the manifest.
 
 ## Languages
 
