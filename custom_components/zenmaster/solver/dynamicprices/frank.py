@@ -22,7 +22,7 @@ query MarketPrices($date: String!, $resolution: PriceResolution!) {
 
 class FrankProvider(Provider):
     async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
-        await super().fetch(dynamicPrice, now)
+        buy, sell = await super().fetch(dynamicPrice, now)  # raw wholesale forecast in working copies
 
         # the new API serves one day per call at 15-minute resolution; fetch today and the next two days
         rows = []
@@ -42,8 +42,6 @@ class FrankProvider(Provider):
 
         # real day-ahead aligned by each row's 'from' timestamp (slot 12 = the quarter containing now),
         # mirroring the base fetch; keep the last fixed components for the forecast tail
-        buy = dynamicPrice.price_buy.data
-        sell = dynamicPrice.price_sell.data
         size = buy.size
         base = int(now.timestamp()) // 900 * 900 - 12 * 900
         sourcing = etx = 0.0
@@ -75,9 +73,9 @@ class FrankProvider(Provider):
                     sell[slot] = buy_excl
                     tail = max(tail, slot + 1)
 
-        # remaining forecast slots: give the tail the real day's intraday shape, then all-in buy (last fixed components + VAT%)
+        # remaining forecast slots: the real day's intraday shape, then all-in buy as the real rows: VAT on the market price, the last sourcing and energy tax
         self.extend_tail(sell, tail, base, "sell")
-        vat = 1 + self.vat / 100.0
-        buy[tail:] = (sell[tail:] + etx + sourcing) * vat
+        buy[tail:] = sell[tail:] * (1 + self.vat / 100.0) + sourcing + etx
         self.extend_buy(buy, sell, tail, base)
+        return buy, sell
 

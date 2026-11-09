@@ -146,12 +146,14 @@ def test_a_changed_link_is_applied_but_owned_state_is_not() -> None:
     assert wm.power_entity == "sensor.wm2" and wm.armed is True
 
 
-def test_a_rename_follows_without_touching_the_structure() -> None:
+def test_a_rename_changes_only_the_shown_name() -> None:
     coord, entry = _coord(_sub("01A", "appliance", "Wasmachine"))
     asyncio.run(coord.sync_subentries())
     coord.hass.config_entries.async_update_subentry(entry, entry.subentries["01A"], title="Wasmachine zolder")
     assert asyncio.run(coord.sync_subentries()) is False
-    assert coord.consumers[0].name == "Wasmachine zolder"
+    # the ids keep the stable name the consumer was created with, only the title changed
+    assert coord.consumers[0].name == entry.subentries["01A"].data["stable_name"] == "Wasmachine"
+    assert title_taken(entry, "Wasmachine") and title_taken(entry, "Wasmachine zolder")
 
 
 def test_a_duplicate_name_gets_a_suffix() -> None:

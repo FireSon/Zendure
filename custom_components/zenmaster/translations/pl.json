@@ -398,50 +398,6 @@
       "abort": {
         "reconfigure_successful": "Ustawienia zapisane"
       }
-    },
-    "solar_panel": {
-      "entry_type": "Grupa PV",
-      "initiate_flow": {
-        "user": "Dodaj grupę PV",
-        "reconfigure": "Skonfiguruj ponownie grupę PV"
-      },
-      "step": {
-        "user": {
-          "title": "Dodaj grupę PV",
-          "description": "Podaj nazwę i powiązania. Wszystko można też zmienić później w panelu ZenMaster.",
-          "data": {
-            "name": "Nazwa",
-            "power_entity": "Pomiar mocy",
-            "derate_entity": "Ograniczenie"
-          },
-          "data_description": {
-            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje.",
-            "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-            "derate_entity": "Encja number ograniczająca falownik; puste oznacza brak możliwości ograniczania."
-          }
-        },
-        "reconfigure": {
-          "title": "Skonfiguruj ponownie grupę PV",
-          "description": "Dostosuj ustawienia. Panel pokazuje te same pola.",
-          "data": {
-            "name": "Nazwa",
-            "power_entity": "Pomiar mocy",
-            "derate_entity": "Ograniczenie"
-          },
-          "data_description": {
-            "name": "Nazwa; HA nazywa według niej urządzenie i jego encje.",
-            "power_entity": "Czujnik z mocą elektryczną lub prądem tego urządzenia. Ampery są przeliczane na waty na podstawie fazy.",
-            "derate_entity": "Encja number ograniczająca falownik; puste oznacza brak możliwości ograniczania."
-          }
-        }
-      },
-      "error": {
-        "name_exists": "Ta nazwa jest już używana",
-        "name_required": "Podaj nazwę"
-      },
-      "abort": {
-        "reconfigure_successful": "Ustawienia zapisane"
-      }
     }
   },
   "entity": {
@@ -821,7 +777,8 @@
         "title": "Parowanie urządzenia przez Bluetooth",
         "unavailable": "Web Bluetooth nie jest tu dostępny. Wymaga HTTPS (lub localhost) i Chrome/Edge.",
         "log_device": "Urządzenie: {id}",
-        "broker": "Broker"
+        "broker": "Broker",
+        "wifi_psw": "Hasło Wi-Fi"
       },
       "chart": {
         "battery": "Bateria",

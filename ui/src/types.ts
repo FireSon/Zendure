@@ -5,7 +5,6 @@ export type Theme = 'light' | 'dark';
 export interface PlanSeries {
   id: string;
   uom: string;
-  phase: string | null;
   source: string;
   known?: number | null;  // epoch seconds where the real values end; later ones are a forecast
   values: number[];
@@ -54,11 +53,6 @@ export interface SaveResult {
 
 export interface Kpis {
   net_cost_eur: number;
-  grid_import_kwh: number;
-  grid_export_kwh: number;
-  solar_kwh: number;
-  battery_throughput_kwh: number;
-  soc_min: number;
 }
 
 export interface HistoryDay {
@@ -88,6 +82,7 @@ export interface BatterySeries {
 
 export interface Plan {
   times: string[];
+  start: number;  // epoch ms of times[0]
   now: number;
   series: Record<string, number[]>;
   kpis: Kpis;

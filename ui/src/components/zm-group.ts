@@ -29,7 +29,6 @@ export class ZmGroup extends LitElement {
   // Single-column edit layout (one field per row) instead of the default two columns.
   @property({ type: Boolean }) singleColumn = false;
   // Key fields the save must always carry, even when they are filtered out of the display.
-  @property({ attribute: false }) keyPatch: Record<string, unknown> = {};
   @property({ type: Boolean }) autoEdit = false;  // a row just added: open it and start editing right away
   @property() newType = '';  // add mode: an empty form that files a new subentry of this type on save
   @property({ attribute: false }) preset: Record<string, unknown> = {};  // what the tile presets (the appliance kind)
@@ -99,8 +98,6 @@ export class ZmGroup extends LitElement {
       if (JSON.stringify(this._draft[f.id]) !== JSON.stringify(readValue(this.config, f.entry ?? this.entry, f))) (patches[f.entry ?? this.entry] ??= {})[f.id] = this._draft[f.id];
     }
     if (!Object.keys(patches).length) { this._editing = false; return; }
-    for (const f of this.fields) if (f.is_key && patches[f.entry ?? this.entry]) patches[f.entry ?? this.entry][f.id] = readValue(this.config, f.entry ?? this.entry, f);  // the backend finds the object on its key field
-    if (patches[this.entry]) Object.assign(patches[this.entry], this.keyPatch);
     this._saving = true;
     this._result = null;
     try {
@@ -139,7 +136,9 @@ export class ZmGroup extends LitElement {
     try {
       await api.deleteSubentry(this.subentry || this.entry);
       this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));
-    } catch { /* ignore */ }
+    } catch (e: any) {
+      this._result = { ok: false, errors: [e?.message ?? String(e)] };
+    }
     finally { this._saving = false; }
   }
 
@@ -255,7 +254,7 @@ export class ZmGroup extends LitElement {
     if (num) {
       return html`<input class="zin" type="number" step=${num.step ?? 1} .value=${v == null ? '' : String(v)} min=${num.min ?? ''} max=${num.max ?? ''} @change=${(e: Event) => { const raw = (e.target as HTMLInputElement).value; this._set(f.id, raw === '' ? null : Number(raw)); }} />`;
     }
-    return html`<input class="zin" type=${this._isSecret(f) ? 'password' : 'text'} autocomplete="new-password" placeholder=${f.selector?.entity ? 'sensor.…' : ''} .value=${v == null ? '' : String(v)} @change=${(e: Event) => this._set(f.id, (e.target as HTMLInputElement).value)} />`;
+    return html`<input class="zin" type=${this._isSecret(f) ? 'password' : 'text'} autocomplete="new-password" placeholder=${f.selector?.entity ? 'sensor.…' : v === true ? '••••••••' : ''} .value=${v == null || v === true ? '' : String(v)} @change=${(e: Event) => this._set(f.id, (e.target as HTMLInputElement).value)} />`;
   }
 
   private _usesPicker(f: Field) { return (!!f.selector?.entity || !!f.selector?.device) && this.hass && haPickersReady(); }

@@ -54,7 +54,7 @@ export interface SchemaBundle {
 
 export const api = {
   getSchema: () => call<SchemaBundle>('get_schema'),
-  getPlan: () => call<PlanSeries[]>('get_plan'),
+  getPlan: () => call<{ slot: number | null; series: PlanSeries[] }>('get_plan'),
   getHistory: () => call<{ days: HistoryDay[] }>('get_history'),
   getDay: (day: string) => call<PlanSeries[]>('get_day', { day }),
   // The settings tab (distribution, price, zendure): one singleton edit at a time.

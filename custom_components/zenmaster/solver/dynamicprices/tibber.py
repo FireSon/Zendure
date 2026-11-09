@@ -29,7 +29,7 @@ query {
 
 class TibberProvider(Provider):
     async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
-        await super().fetch(dynamicPrice, now)   # raw wholesale forecast in buy + sell
+        buy, sell = await super().fetch(dynamicPrice, now)  # raw wholesale forecast in working copies
 
         headers = {"Authorization": f"Bearer {dynamicPrice.access_token}", "Content-Type": "application/json"}
         try:
@@ -45,8 +45,6 @@ class TibberProvider(Provider):
             raise ProviderError(f"Tibber payload malformed: {err}") from err
 
         rows = (info.get("today") or []) + (info.get("tomorrow") or [])
-        buy = dynamicPrice.price_buy.data
-        sell = dynamicPrice.price_sell.data
         size = buy.size
         step = int((datetime.fromisoformat(rows[1]["startsAt"]) - datetime.fromisoformat(rows[0]["startsAt"])).total_seconds()) // 900 if len(rows) > 1 else 4
         base = int(now.timestamp()) // 900 * 900 - 12 * 900  # slot 12 = the quarter containing now
@@ -70,3 +68,4 @@ class TibberProvider(Provider):
         self.extend_tail(sell, tail, base, "sell")
         buy[tail:] = sell[tail:] + (delta_sum / n if n else 0.0)
         self.extend_buy(buy, sell, tail, base)
+        return buy, sell

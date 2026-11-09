@@ -79,7 +79,7 @@ export function chartData(plan: Plan, history?: HistoryDay[]): any {
   });
 
   const slotMs = 15 * 60 * 1000;
-  const dayBase = Date.now() - (plan.now ?? 0) * slotMs;  // clock time of series slot 0
+  const dayBase = plan.start;  // clock time of series slot 0
   const WD = t('ui.weekdays', 'zo,ma,di,wo,do,vr,za').split(',');
   const todayKey = new Date(dayBase).toDateString();
 
@@ -135,7 +135,7 @@ export function chartData(plan: Plan, history?: HistoryDay[]): any {
 
   return {
     series: s,  // every plan series by id, for the rows that read their own (a battery's charge and discharge)
-    N, NOW: plan.now, times: plan.times, price_buy, price_sell, solar, load, consumers,
+    N, NOW: plan.now, times: plan.times, start: plan.start, price_buy, price_sell, solar, load, consumers,
     charge, discharge, soc, grid_buy, grid_sell,
     cij, fcSolar, fcCats, fcDays, fcPriceA, fcPriceB, fc7Solar, fc7PriceA, fc7PriceB, fc7Known, fc7Cats, fc7Days, solarPerDay,
   };
@@ -217,11 +217,14 @@ export function consumerCards(d: any, consumers?: any[], hass?: any, actions?: R
   const i = d.NOW;
   const byId = new Map<string, any>(d.consumers.map((c: any) => [c.id, c]));
   const list = consumers ?? d.consumers.map((c: any) => ({ id: c.id, type: c.kind }));
+  // the slots of the day shown only: today for the live plan, that day for a past one; the live window also holds the last three hours and tomorrow
+  const today = new Date(d.NOW >= 0 ? Date.now() : d.start).toDateString();
+  const isToday = Array.from({ length: d.N }, (_, j) => new Date(d.start + j * Q * 3600000).toDateString() === today);
   return list.map((cfg: any) => {
     const k = kindOf(cfg.type, cfg.name || cfg.id, cfg.kind);
     const planC = byId.get(cfg.id);
     const power: number[] = planC ? planC.power : new Array(d.N).fill(0);
-    const eToday = sum(power) * Q;
+    const eToday = sum(power.filter((_, j) => isToday[j])) * Q;
     let nextIdx = -1; for (let j = i + 1; j < d.N; j++) { if (power[j] > 0.02) { nextIdx = j; break; } }
     const state = String(hass?.states?.[cfg.state]?.state ?? 'none');
     const [fallback, color] = STATE_NL[state] ?? STATE_NL.none;
@@ -229,13 +232,11 @@ export function consumerCards(d: any, consumers?: any[], hass?: any, actions?: R
     const next = nextIdx >= 0 ? d.times[nextIdx] : '';
     const watts = measuredW(hass, cfg.power_entity);
     return {
-      id: cfg.id, label: k.label, kind: k.kind, color: k.color, type: cfg.type,
-      isHp: k.kind === 'hp', isBoiler: k.kind === 'boiler', isEv: k.kind === 'ev',
-      iconBg: 'color-mix(in srgb, ' + k.color + ' 15%, transparent)', iconColor: k.color,
+      id: cfg.id, label: k.label, color: k.color, iconColor: k.color,
       sub: k.name,
       powerW: Number.isFinite(watts) ? watts.toFixed(0) : '-',
       statusLabel: (state === 'armed' || state === 'planned') && next ? t('ui.consumers.until', '{state} tot {time}', { state: label, time: next }) : label,
-      statusColor: color, statusDot: color,
+      statusColor: color,
       energyToday: nl(eToday, 1), nextLabel: next || '-', hasNext: !!next,
       // the entity fields its type shows on the row, read live from HA; an unlinked field shows '-'
       entityTiles: (tiles?.[cfg.id] ?? []).map((fid) => {

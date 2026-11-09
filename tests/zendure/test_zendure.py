@@ -55,6 +55,8 @@ def make_device(model: str = "SF2400 AC", cls: type = ZendureSolarFlow) -> Zendu
     for e in d.entities.values():
         e.hass = None
     d.mqtt = FakeMqtt()
+    # a pack between its limits, so both directions are open
+    d.soc = 50.0
     return d
 
 

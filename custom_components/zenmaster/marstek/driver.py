@@ -14,7 +14,7 @@ class Product(NamedTuple):
     pwr_max: int  # W both ways until the device reports its own limits (44002/44003)
 
 
-# the register generations Omnibattery maps (ffunes/Omnibattery const/registers_common.py); the user picks one when adding a device
+# the register generations of ViperRNMC/marstek_venus_modbus (registers/e_v12, e_v3, a, d.yaml); the user picks one when adding a device
 PRODUCTS: dict[str, Product] = {
     "v2": Product("VenusE", 2500),
     "v3": Product("VenusE", 2500),

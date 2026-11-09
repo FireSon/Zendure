@@ -38,9 +38,7 @@ def _with_expiry(tokens: dict) -> dict:
 
 class ZonneplanProvider(Provider):
     async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
-        await super().fetch(dynamicPrice, now)   # raw wholesale forecast in buy + sell
-        buy = dynamicPrice.price_buy.data
-        sell = dynamicPrice.price_sell.data
+        buy, sell = await super().fetch(dynamicPrice, now)  # raw wholesale forecast in working copies
         size = buy.size
         base = int(now.timestamp()) // 900 * 900 - 12 * 900  # slot 12 = the quarter containing now
         tail, delta_sum, n = 12, 0.0, 0
@@ -70,6 +68,7 @@ class ZonneplanProvider(Provider):
         self.extend_tail(sell, tail, base, "sell")
         buy[tail:] = sell[tail:] + (delta_sum / n if n else 0.0)
         self.extend_buy(buy, sell, tail, base)
+        return buy, sell
 
     async def _chart(self, dynamicPrice, chart: str, retry: bool = True):
         """The app's consumer-prices chart: chart.series.prices, each with start_date and amounts."""

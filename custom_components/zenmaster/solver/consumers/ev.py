@@ -45,7 +45,6 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         self.charge_power_entity = ""
         self.soc_entity = ""
         self.connected_entity = ""
-        self.connected = False
         self.current_soc = 0.0
         self.capacity_kwh = 0.0
         self.max_power_kw = 0.0
@@ -68,7 +67,6 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         self.mode = ChargeMode(self.mode)  # accept the plain int value coming from the config
         self.ev_power = lp.data(self.id + "_power", "kW")
         lp.track(self.soc_entity, lambda v: setattr(self, "current_soc", v / 100.0))  # HA reports %, we hold a 0-1 fraction
-        lp.state(self.connected_entity, lambda s: setattr(self, "connected", s == "on"))
 
     async def apply_power(self) -> None:
         # the planned charge power for this quarter
@@ -77,10 +75,16 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         await self._write(self.ev_power.data[12])
 
     async def entry_prerun(self, lp: LpSolver, now: datetime) -> None:
+        # every quarter the charger gets the plan of this quarter, also 0 when there is nothing to charge
         self.ev_power.data[12:] = 0.0
-        if self.mode is ChargeMode.off or not self.connected:
-            return
+        # the cable as the entity shows it now: no copy that can miss a change
+        connected = (s := lp.hass.states.get(self.connected_entity)) is not None and s.state == "on"
+        if self.mode is not ChargeMode.off and connected:
+            self.plan(lp, now)
+        await self.apply_power()
 
+    def plan(self, lp: LpSolver, now: datetime) -> None:
+        # the charge power per quarter until departure, as far as the car still takes it
         max_kwh = (self.ev_max_soc - self.current_soc) * self.capacity_kwh
         if max_kwh <= 0.0:
             return
@@ -124,5 +128,3 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
                     max_kwh -= kwh
 
         lp.phase_add(self.phase, self.ev_power.data[12:108], 0, slots_until_departure)
-
-        await self.apply_power()

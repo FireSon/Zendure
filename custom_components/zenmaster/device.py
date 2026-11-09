@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import time
 from dataclasses import dataclass
 from enum import IntEnum
@@ -14,6 +16,8 @@ from .entity import EntityDevice
 
 if TYPE_CHECKING:
     from .distribution import DistributionMode
+
+_LOGGER = logging.getLogger(__name__)
 
 
 DEADBAND_W = 20  # smallest power change worth a new command
@@ -60,7 +64,7 @@ class ProfileDischarge(PowerProfile):
     """Discharge direction profile."""
 
     def available_power(self, device: DistributionDevice) -> int:
-        if device.soc_limit == 2:  # the device's own verdict: empty
+        if device.soc_limit == 2 or (device.kwh and device.soc <= device.soc_min):  # empty: the device's own verdict or ours
             return 0
         # thermal derating: at 55 °C or more, delivering 25 W or more under its setpoint for 25 s, the device is asked no more than it proves to manage plus 15 W
         if device.temp >= 55 and device.power_setpoint - device.power_actual > 25 and time.time() - device.power_since > 25:
@@ -75,7 +79,7 @@ class ProfileCharge(PowerProfile):
     """Charge direction profile."""
 
     def available_power(self, device: DistributionDevice) -> int:
-        if device.soc_limit == 1:  # the device's own verdict: full
+        if device.soc_limit == 1 or (device.kwh and device.soc >= device.soc_max):  # full: the device's own verdict or ours
             return 0
         return self.power
 
@@ -124,6 +128,10 @@ class DistributionDevice(EntityDevice):
         """Vendor contract: the device decides what it does with the request in this fleet mode; the return is the current power_actual."""
         return self.power_actual
 
+    def clamp(self, watts: int) -> int:
+        # a request inside what the device can do now: its limits, empty or full, its thermal derating
+        return max(self.power_profile[True].available_power(self), min(self.power_profile[False].available_power(self), watts))
+
     def power_off(self) -> None:
         """Vendor contract: end the control mode; the device returns to its own behavior."""
 
@@ -133,3 +141,109 @@ class DistributionDevice(EntityDevice):
                 self.on_invalidate()
             self.state = state
             self.state_since = time.time()
+
+
+class PolledDevice(DistributionDevice):
+    """A battery on a connection of its own: one loop sends a pending command first, else polls, and wakes at once on a new command."""
+
+    POLL_S = 2.0  # s between two polls without a command
+    HOLD_S = 2.0  # s a device is left alone after a command
+    RESEND_S = 30  # s before an accepted setpoint goes again, in case the device lost it
+    OFFLINE_POLLS = 3  # failed polls before the device counts as offline
+
+    def __init__(self, hass: HomeAssistant, device_id: str, profiles: list[PowerProfile], name: str | None = None, subentry_id: str | None = None) -> None:
+        super().__init__(hass, device_id, profiles, name, subentry_id)
+        # the loop starts once the vendor's own __init__ is through: create_task only schedules it
+        self.blocked = False  # the device says it cannot follow a setpoint now
+        self._pending: tuple[str, int] | None = None  # ("power", W) or ("off", 0)
+        self._control = False  # the device is ours since the last power()
+        self._silent = 0
+        self._polls = 0
+        self._wake = asyncio.Event()
+        self.device_task = asyncio.get_running_loop().create_task(self.device_loop())
+
+    def unload(self) -> None:
+        # the loop stops; a device under our control is handed back on its way out, then the connection closes
+        self.device_task.cancel()
+        self.hass.async_create_task(self.close())
+
+    async def close(self) -> None:
+        try:
+            if self._control:
+                await self.send("off", 0)
+        finally:
+            await self.disconnect()
+
+    def config_changed(self) -> None:
+        if self.on_config_changed is not None:
+            self.on_config_changed(self)
+
+    def power(self, watts: int, mode: DistributionMode) -> int:
+        watts = self.clamp(watts)
+
+        # the device is busy with its last command, unreachable, or cannot follow
+        if time.time() - self.power_since < self.HOLD_S or self.state == DeviceState.OFFLINE or self.blocked:
+            return self.power_actual
+
+        # an accepted setpoint is not sent again while the power is on its way; after RESEND_S once more, in case the device lost it
+        if watts == self.power_setpoint and self.state >= DeviceState.CONFIRM and time.time() - self.state_since < self.RESEND_S:
+            return self.power_actual
+
+        # no new command while both the measured power and the last setpoint sit within 10 W of the new target
+        if abs(self.power_actual - watts) < 10 and abs(self.power_setpoint - watts) < 10:
+            return self.power_actual
+        if self.power_setpoint != watts:
+            self.power_since = time.time()
+        self.setpoint.update_value(watts)  # publish the setpoint we are about to send, so the recorder holds the command side too
+        self._pending = ("power", watts)
+        self._wake.set()
+        self.set_state(DeviceState.SENT)  # SENT, CONFIRM once the device accepts it, ACTIVE once the power follows
+        return self.power_actual
+
+    def power_off(self) -> None:
+        # the device returns to the mode it had before we took control
+        self._pending = ("off", 0)
+        self._wake.set()
+        self.setpoint.update_value(0)
+        if self.state != DeviceState.OFFLINE:
+            self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
+
+    async def device_loop(self) -> None:
+        while True:
+            try:
+                if (command := self._pending) is not None:
+                    self._pending = None
+                    await self.send(*command)
+                else:
+                    await self.poll()
+
+                # a new command wakes the loop at once
+                try:
+                    async with asyncio.timeout(self.POLL_S):
+                        await self._wake.wait()
+                except TimeoutError:
+                    pass
+                self._wake.clear()
+
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # the task must never die
+                _LOGGER.exception("device task %s", self.device_id)
+
+    def poll_failed(self, err: Exception) -> None:
+        # a failed poll: after OFFLINE_POLLS in a row the device counts as offline, with no power
+        self._silent += 1
+        _LOGGER.debug("%s: poll failed (%s)", self.name, err)
+        if self._silent >= self.OFFLINE_POLLS and self.state != DeviceState.OFFLINE:
+            self.power_actual = 0
+            self.set_state(DeviceState.OFFLINE)
+
+    async def send(self, kind: str, watts: int) -> None:
+        """Vendor contract: write a setpoint ("power") or hand the device back ("off")."""
+
+    async def poll(self) -> None:
+        """Vendor contract: read the device, update_status on success, poll_failed on an error."""
+
+    async def disconnect(self) -> None:
+        """Vendor contract: close the connection."""

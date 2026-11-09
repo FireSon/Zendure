@@ -53,6 +53,7 @@ def _coordinator(hass: HomeAssistant):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_schema"})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_get_schema(hass, connection, msg):
     # UI-keyed field definitions (with their HA selector) + current values, all from the live coordinator.
@@ -75,7 +76,7 @@ async def ws_get_schema(hass, connection, msg):
     actions: dict = {}
     tiles: dict = {}
     for c in coord.consumers:
-        item = {"type": types[type(c)], "name": c.name}
+        item = {"type": types[type(c)], "name": coord.entry.subentries[c.id].title}
         coord.config.serialize(c, payload=item)  # its fields, plus the entity_id of its state sensor
         config["consumers"].append(item)
         schema[c.id] = _form(type(c).CONFIG)
@@ -96,6 +97,7 @@ async def ws_get_schema(hass, connection, msg):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_plan"})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_get_plan(hass, connection, msg):
     coord = _coordinator(hass)
@@ -106,6 +108,7 @@ async def ws_get_plan(hass, connection, msg):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/subscribe_plan"})
+@websocket_api.require_admin
 @callback
 def ws_subscribe_plan(hass, connection, msg):
     # push: re-emit a "plan updated" event whenever the coordinator finishes a solve
@@ -124,6 +127,7 @@ def ws_subscribe_plan(hass, connection, msg):
     vol.Required("type"): f"{DOMAIN}/save_schema", vol.Required("action"): vol.In([a.value for a in SchemaAction]),
     vol.Required("section"): str, vol.Optional("payload"): dict,
 })
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_save_schema(hass, connection, msg):
     # the settings tab: distribution, the vendor drivers and prices. Consumers and solar panels go through the subentry commands.
@@ -131,11 +135,11 @@ async def ws_save_schema(hass, connection, msg):
     if coord is None:
         connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
         return
-    if (device := coord.config.deserialize_poly([*coord.devices, *coord.drivers.values(), coord.prices], msg.get("payload") or {})) is None:
-        connection.send_error(msg["id"], "not_found", msg["section"])
-        return
     if msg["action"] != SchemaAction.edit:
-        connection.send_error(msg["id"], "invalid", "edit only; consumers and solar groups go through their subentry")
+        connection.send_error(msg["id"], "invalid", "edit only; consumers and solar panels go through their subentry")
+        return
+    if (device := coord.config.deserialize_poly([*coord.devices, *coord.drivers.values(), coord.prices], msg["section"], msg.get("payload") or {})) is None:
+        connection.send_error(msg["id"], "not_found", msg["section"])
         return
     coord.config.serialize(device, msg["section"], coord.config.payload)
     await coord.config.save()
@@ -148,15 +152,15 @@ async def ws_save_schema(hass, connection, msg):
         await device.connect()
     if device is coord.prices and (otp := str((msg.get("payload") or {}).get("otp") or "")):
         hass.async_create_task(coord.prices.authorise(hass, otp))  # the code rides along with this save and is never stored
-    coord.rebuild_solver()  # a changed setting only reaches the LP through a rebuild
     if device is coord.distribution and coord.distribution.p1_device:
         coord._track_p1(coord.distribution.p1_device)  # a different P1 meter is read from now on
-    hass.async_create_task(coord._tick())
+    hass.async_create_task(coord._tick(rebuild=True))  # a changed setting only reaches the LP through a rebuild
     connection.send_result(msg["id"], {"ok": True})
 
 
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/subentry_add", vol.Required("subentry_type"): str, vol.Required("title"): str, vol.Optional("data"): dict})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_subentry_add(hass, connection, msg):
     # the panel's "add": one subentry of the given type; the coordinator then builds the consumer or solar panel from it
@@ -204,6 +208,7 @@ async def ws_subentry_add(hass, connection, msg):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/subentry_update", vol.Required("subentry_id"): str, vol.Required("patch"): dict})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_subentry_update(hass, connection, msg):
     # the panel's "save" on a consumer or solar panel: "name" is the title, the other fields merge into the subentry data
@@ -232,6 +237,7 @@ async def ws_subentry_update(hass, connection, msg):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/subentry_delete", vol.Required("subentry_id"): str})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_subentry_delete(hass, connection, msg):
     # HA removes the subentry's device and entities along with it; the coordinator drops the consumer or panel
@@ -253,6 +259,7 @@ async def ws_subentry_delete(hass, connection, msg):
 
 @websocket_api.websocket_command({
     vol.Required("type"): f"{DOMAIN}/consumer_action", vol.Required("consumer"): str, vol.Required("action"): str})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_consumer_action(hass, connection, msg):
     # the action buttons on a consumer row: start, stop, skip, and the arm_off/arm_on that hands it back
@@ -266,6 +273,7 @@ async def ws_consumer_action(hass, connection, msg):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/price_auth"})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_price_auth(hass, connection, msg):
     # the "vraag code aan" button on the price card; the patch travels back so the card can show the code field
@@ -278,6 +286,7 @@ async def ws_price_auth(hass, connection, msg):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_history"})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_get_history(hass, connection, msg):
     # Realised history per calendar day, from the recorder: the kWh aggregators give their daily delta,
@@ -370,9 +379,10 @@ def _history_days(daily, hourly, ids, panels):
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_day", vol.Required("day"): str})
+@websocket_api.require_admin
 @websocket_api.async_response
 async def ws_get_day(hass, connection, msg):
-    # one past calendar day as it really went, in the shape of get_plan: 96 quarters per series, from the recorder and the weather of that day
+    # one past calendar day as it really went, in the shape of get_plan: the quarters of that day per series, from the recorder and the weather of that day
     from homeassistant.components.recorder import get_instance
     from homeassistant.components.recorder.statistics import statistics_during_period
 
@@ -382,6 +392,8 @@ async def ws_get_day(hass, connection, msg):
         return
     start = dt_util.start_of_local_day(date.fromisoformat(msg["day"]))
     end = start + timedelta(days=1)
+    # the quarters of that day: 92 or 100 on the days the clock changes
+    quarters = int(end.timestamp() - start.timestamp()) // 900
 
     # the fleet sensors by plan series with the factor to the plan's unit, and every consumer's own meter in kW
     dist = coord.distribution
@@ -403,12 +415,12 @@ async def ws_get_day(hass, connection, msg):
         stats = await get_instance(hass).async_add_executor_job(statistics_during_period, hass, start, end, wanted, period, None, {"mean"})
     series = {}
     for sid, (eid, factor) in ids.items():
-        sums, counts = [0.0] * 96, [0] * 96
+        sums, counts = [0.0] * quarters, [0] * quarters
         for row in stats.get(eid, []):
             if (mean := row.get("mean")) is None:
                 continue
             stamp = dt_util.utc_from_timestamp(row["start"]) if isinstance(row["start"], (int, float)) else row["start"]
-            for q in range(i := int((stamp - start).total_seconds() // 900), min(96, i + span)):
+            for q in range(i := int((stamp - start).total_seconds() // 900), min(quarters, i + span)):
                 sums[q], counts[q] = sums[q] + mean * factor, counts[q] + 1
         series[sid] = [s / n if n else 0.0 for s, n in zip(sums, counts)]
     # the plan's house load is the base without the consumers, as the baseload takes it
@@ -419,7 +431,7 @@ async def ws_get_day(hass, connection, msg):
     params = {"latitude": hass.config.latitude, "longitude": hass.config.longitude, "minutely_15": "temperature_2m", "timezone": hass.config.time_zone, "start_date": msg["day"], "end_date": msg["day"]}
     try:
         async with async_get_clientsession(hass).get(_OPEN_METEO_URL, params=params, timeout=ClientTimeout(total=20)) as resp:
-            series["temp"] = (await resp.json())["minutely_15"]["temperature_2m"][:96]
+            series["temp"] = (await resp.json())["minutely_15"]["temperature_2m"][:quarters]
     except (aiohttp.ClientError, asyncio.TimeoutError, KeyError):
         pass
     connection.send_result(msg["id"], [{"id": sid, "uom": "", "source": "recorder", "known": None, "values": v} for sid, v in series.items()])

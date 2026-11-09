@@ -21,7 +21,7 @@ from homeassistant.util import dt as dt_util
 from zeroconf import ServiceStateChange
 from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo
 
-from .config import Config
+from .config import Config, read_field
 from .solver.baseload import BaseLoad
 from .solver.battery import DistributionEntry
 from .solver.boiler import BoilerElectric, BoilerHeatPump
@@ -76,9 +76,9 @@ def phase_of(eid: str) -> Phase:
 
 
 def title_taken(entry, title: str, skip: str = "") -> bool:
-    # names must stay unique as slugs: HA derives the entity ids from them
+    # names must stay unique as slugs, the shown one and the stable one the ids are built on
     slug = snakecase(title)
-    return any(snakecase(sub.title) == slug for sid, sub in entry.subentries.items() if sid != skip)
+    return any(slug in (snakecase(sub.title), snakecase(sub.data.get("stable_name", sub.title))) for sid, sub in entry.subentries.items() if sid != skip)
 
 
 def field_values(obj, fields) -> dict:
@@ -122,7 +122,7 @@ class Coordinator:
         self.forecast = Forecast()
         self.consumers: list = []
         self.distribution.consumers = self.consumers  # the same list, so the phase detection sees every consumer
-        self.solver = LpSolver(self.track, self.state)
+        self.solver = LpSolver(self.track)
         self._solve_lock = asyncio.Lock()
         self._sync_lock = asyncio.Lock()
         self._unsubs: list = []  # registrations for the life of the coordinator: the timers
@@ -162,13 +162,12 @@ class Coordinator:
         # periodic dump: without it the kWh counters only reach the Store when a user happens to move a knob
         self._unsubs.append(async_track_time_interval(self.hass, self.timer_elapsed, timedelta(minutes=15)))
 
-        # solver wiring: the structure, then the blackboard, the quarter tick and one solve
+        # solver wiring: the blackboard, the quarter tick and one solve on the structure built in it
         self.solver.hass = self.hass
-        self.rebuild_solver()
         if self.distribution.p1_device:  # every power entity on the P1 device feeds total/L1/L2/L3 by name
             self._track_p1(self.distribution.p1_device)
         self._unsubs.append(async_track_time_change(self.hass, self._tick, minute=[0, 15, 30, 45], second=0))
-        await self._tick()
+        await self._tick(rebuild=True)
 
     async def _entry_updated(self, _hass, _entry) -> None:  # noqa: ANN001
         # HA hands the listener a coroutine to schedule; discovery and the subentry dialogs land here
@@ -184,7 +183,7 @@ class Coordinator:
         for sid, sub in self.entry.subentries.items():
             if sid in built or (driver := self.drivers.get(sub.subentry_type)) is None:
                 continue
-            if (device := driver.init_device(sid, sub.title, dict(sub.data))) is None:
+            if (device := driver.init_device(sid, self.stable_name(sub), dict(sub.data))) is None:
                 continue
             changed = True
             if isinstance(device, DistributionDevice):
@@ -209,6 +208,12 @@ class Coordinator:
         sub =ConfigSubentry(data=MappingProxyType(data), subentry_type=kind, title=name, unique_id=f"{kind}_{sn}")
         self.hass.config_entries.async_add_subentry(self.entry, sub)
         return sub.subentry_id
+
+    def stable_name(self, sub) -> str:
+        # the name every unique_id is built on: the title it had first, kept in the subentry, so a rename only changes what is shown
+        if "stable_name" not in sub.data:
+            self.hass.config_entries.async_update_subentry(self.entry, sub, data={**sub.data, "stable_name": sub.title})
+        return sub.data.get("stable_name", sub.title)
 
     def persist_device(self, device: EntityDevice) -> bool:
         # ip, blemac and the pack names back into the device's subentry; False when nothing changed
@@ -281,6 +286,12 @@ class Coordinator:
                 self.forecast.solar_panels = panels
                 changed = True
             self.distribution.solar_panels = [(p.power_entity, p.derate_entity) for p in panels]
+
+            # a rename changes only what is shown: the device name in HA follows the title, the ids keep the stable name
+            for device in (*self.devices, *self.consumers):
+                if device.subentry_id and (sub := self.entry.subentries.get(device.subentry_id)) is not None and device.title != sub.title:
+                    device.title = sub.title
+                    dr.async_get(self.hass).async_get_or_create(config_entry_id=self.entry_id, config_subentry_id=device.subentry_id, identifiers={(DOMAIN, device.device_id)}, name=sub.title)
             return changed
 
     async def sync_consumers(self) -> bool:
@@ -291,12 +302,12 @@ class Coordinator:
             if (cls := SUBENTRY_TYPES.get(sub.subentry_type)) is None:
                 continue
             if (consumer := existing.pop(sid, None)) is None:
-                consumer = cls()
-                consumer.id, consumer.name, consumer.hass, consumer.entry = sid, sub.title, self.hass, self.entry
+                consumer, name = cls(), self.stable_name(sub)
+                consumer.id, consumer.name, consumer.hass, consumer.entry = sid, name, self.hass, self.entry
                 consumer.on_setting, consumer.on_action = self.setting_changed, self.consumer_command
                 for field in cls.CONFIG:
                     if field.cast is not None and not field.transient and not field.is_key and field.id in sub.data:
-                        setattr(consumer, field.id, field.cast(sub.data[field.id]))
+                        setattr(consumer, field.id, read_field(consumer, field, sub.data[field.id]))
                 dr.async_get(self.hass).async_get_or_create(
                     config_entry_id=self.entry_id,
                     config_subentry_id=sid,
@@ -306,7 +317,7 @@ class Coordinator:
                     model=cls.__name__,
                     via_device_id=(zen.id if (zen := device_by_identifier(self.hass, PANEL_TITLE)) else None),  # the ZenMaster device
                 )
-                EntityDevice.__init__(consumer, self.hass, sid, sub.title, subentry_id=sid)  # its own device: status, buttons and settings
+                EntityDevice.__init__(consumer, self.hass, sid, name, subentry_id=sid)  # its own device: status, buttons and settings
                 consumer.device_load(self.config.section("devices", consumer.device_id))  # the settings as they stood before the restart
                 await consumer.restore(self.hass)
                 self.persist_consumer(consumer)  # the restored state back into the subentry, so both sides agree from the start
@@ -317,12 +328,9 @@ class Coordinator:
             for field in cls.CONFIG:
                 if field.cast is None or field.transient or field.is_key or field.hidden or field.id not in sub.data:
                     continue
-                if getattr(consumer, field.id, None) != (value := field.cast(sub.data[field.id])):
+                if getattr(consumer, field.id, None) != (value := read_field(consumer, field, sub.data[field.id])):
                     setattr(consumer, field.id, value)
                     changed = True
-            if consumer.name != sub.title:
-                consumer.name = sub.title
-                dr.async_get(self.hass).async_get_or_create(config_entry_id=self.entry_id, config_subentry_id=sid, identifiers={(DOMAIN, sid)}, name=sub.title)
         for gone in existing.values():
             self.consumers.remove(gone)  # HA already cleared its device and entities along with the subentry
             changed = True
@@ -332,8 +340,7 @@ class Coordinator:
         # after any subentry change, from HA's dialogs or our own handlers: rebuild the LP when the structure moved,
         # and let the panel re-read its config either way
         if await self.sync_subentries() or devices_changed:
-            self.rebuild_solver()
-            await self._tick()
+            await self._tick(rebuild=True)
         async_dispatcher_send(self.hass, f"{DOMAIN}_plan")
 
     def persist_consumer(self, consumer) -> None:
@@ -359,8 +366,7 @@ class Coordinator:
 
     async def _settled(self, _now) -> None:
         self._settle = None
-        self.rebuild_solver()
-        await self._tick()
+        await self._tick(rebuild=True)
         await self._store_save()  # the new setting into the Store, so a restart finds it back
 
     async def consumer_command(self, consumer, action: str) -> None:
@@ -397,11 +403,13 @@ class Coordinator:
         self.solver.globals["batteries"] = self.distribution.devices
         self.solver.globals["p1"] = self.p1_slots
 
-    async def _tick(self, now=None) -> None:
-        # the 15-min solve tick; on a successful solve, signal the panel to re-fetch the plan
-        if not self.distribution.solver:  # the solver is off: no plan, the fleet runs on its own control
-            return
+    async def _tick(self, now=None, rebuild: bool = False) -> None:
+        # the 15-min solve tick, after a rebuild when the structure changed, both under the lock so a rebuild never swaps the columns under a running solve; on a successful solve the panel re-fetches the plan
         async with self._solve_lock:
+            if rebuild:
+                self.rebuild_solver()
+            if not self.distribution.solver:  # the solver is off: no plan, the fleet runs on its own control
+                return
             x = await self.solver.run(now or dt_util.now())
         if x is not None:
             async_dispatcher_send(self.hass, f"{DOMAIN}_plan")
@@ -470,17 +478,6 @@ class Coordinator:
         # the current value at once, so a restart does not leave the entry at 0; the P1 meter (keep) waits for its first real reading
         if entity_id != "" and not keep and (state := self.hass.states.get(entity_id)) is not None:
             handler(Event("state_changed", {"new_state": state}))
-
-    def state(self, entity_id: str, callback: Callable[[str], None], keep: bool = False) -> None:
-        # like track(), but hands the raw state string to the callback (for binary/enum entities)
-        @ha_callback
-        def handler(event: Event) -> None:
-            new = event.data.get("new_state")
-            if new is not None:
-                callback(new.state)
-
-        if entity_id != "":
-            (self._p1_unsubs if keep else self._track_unsubs).append(async_track_state_change_event(self.hass, [entity_id], handler))
 
     def _track_p1(self, device_id: str) -> None:
         # the meter chosen before lets go first, so a new choice works without a restart

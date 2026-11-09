@@ -398,50 +398,6 @@
       "abort": {
         "reconfigure_successful": "Settings saved"
       }
-    },
-    "solar_panel": {
-      "entry_type": "Solar group",
-      "initiate_flow": {
-        "user": "Add solar group",
-        "reconfigure": "Reconfigure solar group"
-      },
-      "step": {
-        "user": {
-          "title": "Add solar group",
-          "description": "Enter the name and the links. Everything can also be changed later in the ZenMaster panel.",
-          "data": {
-            "name": "Name",
-            "power_entity": "Power measurement",
-            "derate_entity": "Curtailment"
-          },
-          "data_description": {
-            "name": "Name; HA names the device and its entities after it.",
-            "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-            "derate_entity": "Number entity that throttles the inverter; empty means it cannot curtail."
-          }
-        },
-        "reconfigure": {
-          "title": "Reconfigure solar group",
-          "description": "Adjust the settings. The panel shows the same fields.",
-          "data": {
-            "name": "Name",
-            "power_entity": "Power measurement",
-            "derate_entity": "Curtailment"
-          },
-          "data_description": {
-            "name": "Name; HA names the device and its entities after it.",
-            "power_entity": "Sensor with the electrical power or the current of this device. Amperes are converted to watts using the phase.",
-            "derate_entity": "Number entity that throttles the inverter; empty means it cannot curtail."
-          }
-        }
-      },
-      "error": {
-        "name_exists": "This name is already in use",
-        "name_required": "Enter a name"
-      },
-      "abort": {
-        "reconfigure_successful": "Settings saved"
-      }
     }
   },
   "entity": {
@@ -821,7 +777,8 @@
         "title": "Pair device via Bluetooth",
         "unavailable": "Web Bluetooth is not available here. Requires HTTPS (or localhost) and Chrome/Edge.",
         "log_device": "Device: {id}",
-        "broker": "Broker"
+        "broker": "Broker",
+        "wifi_psw": "Wi-Fi password"
       },
       "chart": {
         "battery": "Battery",

@@ -91,6 +91,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
     def unload(self) -> None:
         if self.device_task is not None:
             self.device_task.cancel()
+        self._ble_close()
 
     def subentry_data(self) -> dict[str, Any]:
         return {**ZendureDevice.subentry_data(self), "batteries": self.battery_names}
@@ -206,7 +207,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         # an offline device is not steered: nothing is sent, the setpoint stays as it was
         if self.state == DeviceState.OFFLINE:
             return self.power_actual
-        watts = max(self.power_profile[1].power, min(self.power_profile[0].power, watts))  # clamp to rated power, both directions
+        watts = self.clamp(watts)
         watts = max(-self.charge_max_power, watts)
 
         # outputPower is an absolute target and the pass-through is already flowing, so ask for it on top or the command sits below it
@@ -248,7 +249,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         if self.state != DeviceState.OFFLINE:
             self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
 
-    def update_properties(self, payload: dict, now: float, on_ha: bool = False) -> None:
+    def update_properties(self, payload: dict, now: float) -> None:
         # update last update
         self._msg_update = now
 
@@ -257,10 +258,6 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             for bp in batprops:
                 if (sn := bp.pop("sn", None)) is not None:
                     if (bat := self.batteries.get(sn, None)) is None:
-                        if not on_ha:
-                            bp["sn"] = sn
-                            self.hass.loop.call_soon_threadsafe(self.update_properties, payload, now, True)
-                            return
                         bat = ZendureBattery._registry.get(sn) or ZendureBattery(self.hass, sn, self, bp.get("packType"))
                         self.batteries[sn] = bat
                         if (kwh := sum(b.kWh for b in self.batteries.values())) != self.kwh:
@@ -272,7 +269,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         # update the device entities
         for k, v in (payload.get("properties") or {}).items():
             # update the entities; the state handling below must also run on unchanged values
-            self.entity_update(k, v, on_ha)
+            self.entity_update(k, v)
 
             if k in ["outputHomePower", "gridInputPower"]:
                 self.power_actual = self.home_output - self.home_input
@@ -285,7 +282,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             elif k == "gridState":
                 # the AC side lost the grid (a tripped group): notify once on the drop, the inverter cannot deliver or charge from the grid until it is back
                 if v == 0 and self.grid_state == 1:
-                    self.hass.loop.call_soon_threadsafe(persistent_notification.async_create, self.hass, f"{self.name}: no grid on the AC side since {time.strftime('%H:%M')}, check its group", PANEL_TITLE, f"{DOMAIN}_grid_{self.sn}")
+                    persistent_notification.async_create(self.hass, f"{self.name}: no grid on the AC side since {time.strftime('%H:%M')}, check its group", PANEL_TITLE, f"{DOMAIN}_grid_{self.sn}")
                 self.grid_state = v
             elif k in ["chargeLimit", "chargeMaxLimit"]:
                 self.entities["input_limit"].update_range(0, v)
@@ -360,7 +357,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             # get the properties; an answer puts the device on zenSDK, also one that came in over the broker
             response = await session.get(f"http://{self.ip}/properties/report", headers=HTTP_HEADER, timeout=HTTP_TIMEOUT)
             payload = json.loads(await response.text())
-            self.update_properties(payload, time.time(), True)
+            self.update_properties(payload, time.time())
             self.connection = ConnectionType.ZENSDK
 
         except Exception:
@@ -380,7 +377,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             try:
                 session = async_get_clientsession(self.hass)
                 async with session.get(f"http://{self.ip}/properties/report", headers=HTTP_HEADER, timeout=HTTP_TIMEOUT) as response:
-                    self.update_properties(json.loads(await response.text()), time.time(), True)
+                    self.update_properties(json.loads(await response.text()), time.time())
                 self.connection = ConnectionType.ZENSDK
                 return
             except Exception:

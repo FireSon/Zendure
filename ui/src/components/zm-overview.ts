@@ -55,6 +55,7 @@ export class ZmOverview extends LitElement {
   @state() private _narrow = NARROW.matches;
   @state() private _day: string | null = null;  // the past day shown, null for the live plan
   @state() private _dayD: any = null;
+  @state() private _err: string | null = null;
   private get _shown() { return this._day ? this._dayD : this.d; }
   private _option: any = null;  // the chart option, rebuilt only when the plan or the theme changes, not on every hass update
   private _onNarrow = () => { this._narrow = NARROW.matches; };
@@ -71,12 +72,20 @@ export class ZmOverview extends LitElement {
 
   // a step through the days: the live plan for today, the recorder for a day before it
   private async _step(days: number | null) {
-    const now = new Date(), cur = this._day ? new Date(this._day + 'T12:00') : now;
-    const to = days === null ? now : new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + days, 12);
-    if (to.toDateString() === now.toDateString() || to > now) { this._day = null; return; }
-    const iso = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
-    this._dayD = chartData(await loadDay(iso, this.config));
-    this._day = iso;
+    await this._run(async () => {
+      const now = new Date(), cur = this._day ? new Date(this._day + 'T12:00') : now;
+      const to = days === null ? now : new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + days, 12);
+      if (to.toDateString() === now.toDateString() || to > now) { this._day = null; return; }
+      const iso = `${to.getFullYear()}-${String(to.getMonth() + 1).padStart(2, '0')}-${String(to.getDate()).padStart(2, '0')}`;
+      this._dayD = chartData(await loadDay(iso, this.config));
+      this._day = iso;
+    });
+  }
+
+  // an action of the overview: a failure shows above it instead of getting lost
+  private async _run(job: () => Promise<unknown>) {
+    this._err = null;
+    try { await job(); } catch (e: any) { this._err = e?.message ?? String(e); }
   }
 
   // previous, the day shown (a click goes back to today) and next, above the controls
@@ -89,6 +98,7 @@ export class ZmOverview extends LitElement {
     tokens,
     css`
       :host { display: block; }
+      .err { font-family: var(--zm-font-body); font-size: var(--zm-fs-s); color: #e8645a; }
       .top { position: relative; }
       .flow { display: block; width: 100%; height: 276px; }
       /* the steering of the distribution, in the chart's left margin */
@@ -268,8 +278,10 @@ export class ZmOverview extends LitElement {
   }
 
   private async _act(id: string, action: string) {
-    await api.consumerAction(id, action);
-    this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));  // arm_off changes the config the row reads
+    await this._run(async () => {
+      await api.consumerAction(id, action);
+      this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));  // arm_off changes the config the row reads
+    });
   }
 
   // a battery's plan in this lane: discharge up in teal, charging (over AC and from its own panels) in blue, scaled to its own peak; each bar shows its quarter and power on hover
@@ -310,10 +322,10 @@ export class ZmOverview extends LitElement {
   }
 
   private async _saveMaxKw(v: number) {
-    try {
-      await api.saveSchema('edit', 'distribution', { id: 'distribution', max_kw: v });
+    await this._run(async () => {
+      await api.saveSchema('edit', 'distribution', { max_kw: v });
       this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));
-    } catch { /* ignore */ }
+    });
   }
 
   // Modus, Handmatig and Correctie are the distribution's entities, Max net its max_kw setting
@@ -348,6 +360,7 @@ export class ZmOverview extends LitElement {
     const frac = d ? (d.NOW + 0.5) / d.N : 0;
     // on the phone the controls sit above the chart instead of in its left margin
     return html`
+      ${this._err ? html`<div class="err">${this._err}</div>` : nothing}
       ${this._narrow && this.view === 'plan' ? this._nav(true) : nothing}
       ${!d || this._narrow ? this._controls(true) : nothing}
       <div class=${this._narrow ? 'narrow' : ''} style="--lbl:${this._lbl}px"><div class="wide">

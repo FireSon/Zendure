@@ -64,6 +64,8 @@ class Driver:
         for collection in (self._all_devices, self.distribution.devices):
             if device in collection:
                 collection.remove(device)
+        # the fleet order and its capacity without it from the next tick
+        self.distribution.on_invalidate()
 
     @classmethod
     def device_family(cls, data: dict[str, Any]) -> str | None:

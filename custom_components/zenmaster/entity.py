@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import inspect
 import logging
 import re
@@ -107,6 +106,7 @@ class EntityDevice:
         self.hass = hass
         self.device_id = device_id
         self.name = name or device_id  # the stable name every unique_id and entity_id is built on
+        self.title = self.name  # the name shown, follows a rename; name itself never changes
         self.subentry_id = subentry_id  # set for a device that belongs to a config subentry: its entities are filed there too
         self.device_info = DeviceInfo(identifiers={(DOMAIN, device_id)})
         self.entities: dict[str, HaEntity | None] = {}
@@ -148,7 +148,7 @@ class EntityDevice:
             if (s := entity.state) is not None:
                 store[entity._attr_unique_id] = s
 
-    def entity_update(self, key: str, value: Any, on_ha: bool = False) -> bool | None:
+    def entity_update(self, key: str, value: Any) -> bool | None:
         """Route incoming data to the correct entity; None when there is no entity for the key."""
         if entity := self.entities.get(key):
             return entity.update_value(value)
@@ -165,11 +165,8 @@ class EntityDevice:
             self.entities[key] = entity
             return entity.update_value(value)
 
-        entity = cls(self, name, vendor_id=key, **kwargs) if on_ha else asyncio.run_coroutine_threadsafe(self._entity_add(cls, name, key, kwargs), self.hass.loop).result()
+        entity = cls(self, name, vendor_id=key, **kwargs)
         return entity.update_value(value) if entity else False
-
-    async def _entity_add(self, cls, name, key, kwargs) -> HaEntity:
-        return cls(self, name, vendor_id=key, **kwargs)
 
     def entity_write(self, entity: HaEntity, value: Any) -> None:
         """Write value to hardware. Override in device subclasses."""

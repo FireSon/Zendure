@@ -93,7 +93,15 @@ class Appliance(SolverEntry, ConsumerDevice):
             await self.on_action(self, "start")
 
     def release(self) -> None:
-        self.armed = False  # hands off: nothing waits for a cheap window any more
+        # hands off: nothing waits for a cheap window any more, and a switch the arming cut goes back on
+        if self.armed and self.switch_entity and self.hass is not None:
+            self.hass.async_create_task(self.hass.services.async_call("homeassistant", "turn_on", {"entity_id": self.switch_entity}, blocking=False))
+        self.armed = False
+
+    def cycle(self) -> list[float]:
+        # the cycle to plan: the learned profile, else flat on the rating and duration, a missing one the default of its kind
+        kw, slots = _DEFAULTS.get(self.kind, (0.0, 0))
+        return self._profile or [self.power_rating if self.power_rating > 0 else kw] * (self.cycle_duration_slots if self.cycle_duration_slots > 0 else slots)
 
     def entry_config(self, lp: LpSolver) -> None:
         self.data = lp.data(self.id + "_power", "kW", 2, source="lp")   # placed profile (12 history + 192)
@@ -121,10 +129,10 @@ class Appliance(SolverEntry, ConsumerDevice):
             return
         if rested >= self._quiet_s:             # below -> above after a real rest: witnessed start
             self._running_since = now
-        if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S or now < self._direct_until:
+        if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S or now < self._direct_until or not any(self.cycle()):
             if self.status is EntryStatus.none:
                 self.status = EntryStatus.running  # it draws while we plan nothing: say so instead of "off"
-            return                              # hands off / busy / a pause inside a cycle / past the 2-min window
+            return                              # hands off / busy / a pause inside a cycle / past the 2-min window / a cycle of unknown size
         self.armed = True
         self.armed_at = now
         self.status = EntryStatus.armed
@@ -147,7 +155,7 @@ class Appliance(SolverEntry, ConsumerDevice):
 
         # book the measured energy at the price of the quarter it was used in, and remember the price
         # of the quarter the cycle was armed in: that is what it would have cost without shifting
-        price = float(lp.price_buy.data[12]) if getattr(lp, "price_buy", None) is not None else 0.0
+        price = float(lp.price_buy.data[lp.settle]) if getattr(lp, "price_buy", None) is not None else 0.0
         if self.armed and self._arm_price is None:
             self._arm_price = price
         if self._pending_kwh:
@@ -177,12 +185,11 @@ class Appliance(SolverEntry, ConsumerDevice):
         # plan this cycle in its cheapest window when armed; baseload has already seeded the phase loads
         self.data.data[12:] = 0.0
         if self.armed:
-            # without a learned profile a flat cycle; a rating or duration that is not set takes the default of its kind
-            kw, slots = _DEFAULTS.get(self.kind, (0.0, 0))
-            profile = self._profile or [self.power_rating if self.power_rating > 0 else kw] * (self.cycle_duration_slots if self.cycle_duration_slots > 0 else slots)
+            profile = self.cycle()
             slot = _time_to_slot(self.latest_start_time) if self.latest_start_time else None
             if slot is not None:
-                latest = (slot - (now.hour * 60 + now.minute) // 15) % 96 or 96  # wall-clock slot -> slots from now
+                # started by then, so finished a cycle later: place_block wants the slots it must be finished in
+                latest = ((slot - (now.hour * 60 + now.minute) // 15) % 96 or 96) + len(profile)  # wall-clock slot -> slots from now
             else:
                 # no fixed time: the moment of arming sets the deadline. In the evening the cycle must be done by
                 # 08:00; during the day within four hours and never past 17:00, so it cannot run into cooking.

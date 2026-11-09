@@ -115,7 +115,7 @@ export class ZmManage extends LitElement {
   private async _saveName(key: string) {
     this._nameErr = null;
     try {
-      const res = await api.saveSchema('edit', key, { device_id: key, name: this._name });
+      const res = await api.saveSchema('edit', key, { name: this._name });
       if (res.ok) this.dispatchEvent(new CustomEvent('zm-saved', { bubbles: true, composed: true }));
       else this._nameErr = (res.errors ?? [t('ui.common.unknown_error', 'onbekende fout')]).join('; ');
     } catch (e: any) {

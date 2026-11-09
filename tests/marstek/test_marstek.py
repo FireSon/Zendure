@@ -73,7 +73,7 @@ class FakeModbus:
 
 def start(monkeypatch, product: str = "v3"):
     # the driver with one device on a fake client; the pauses shrunk so a test runs in tenths of a second
-    monkeypatch.setattr(venus_module, "POLL_S", 0.01)
+    monkeypatch.setattr(venus_module.MarstekVenus, "POLL_S", 0.01)
     loop = asyncio.get_running_loop()
     hass = fake_hass()
     hass.async_create_task = loop.create_task
@@ -137,7 +137,7 @@ def test_power_takes_control_and_writes_the_setpoint(monkeypatch) -> None:
         driver, d, fake = start(monkeypatch)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
 
-        # discharge: control mode on, then both powers and force_mode, like Omnibattery
+        # discharge: control mode on, then both powers and force_mode
         d.power(800, DistributionMode.MANUAL)
         assert d.state == DeviceState.SENT
         assert await wait_for(lambda: d.state == DeviceState.CONFIRM)
@@ -238,7 +238,7 @@ def test_coordinator_builds_and_drops_a_marstek() -> None:
 
         # a removed subentry drops it again through its own driver
         coord.hass.async_create_task = asyncio.get_running_loop().create_task
-        entry.subentries = {sid: s for sid, s in entry.subentries.items() if s is not sub}
+        entry.subentries = {sid: s for sid, s in entry.subentries.items() if sid != sub.subentry_id}
         assert coord.sync_devices() is True
         assert d not in coord.devices and d not in coord.distribution.devices and not coord.drivers["marstek"].devices
 

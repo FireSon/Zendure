@@ -62,7 +62,7 @@ class FakeDongle:
 
 async def start(monkeypatch, password: str = PASSWORD, strategy: str | None = None, dongle: FakeDongle | None = None):
     # the fake dongle on a free port, one battery aimed at it; the pauses shrunk so a test runs in tenths of a second
-    monkeypatch.setattr(battery_module, "POLL_S", 0.01)
+    monkeypatch.setattr(battery_module.SessyBattery, "POLL_S", 0.01)
     dongle = dongle or FakeDongle()
     runner = web.AppRunner(dongle.app)
     await runner.setup()

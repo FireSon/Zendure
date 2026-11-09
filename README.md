@@ -99,10 +99,17 @@ If you find this project helpful and want to support its development, consider b
 
 ## Installation
 
-1. Copy `custom_components/zenmaster` into the `custom_components` folder of your Home Assistant configuration.
-2. Restart Home Assistant.
+### Through HACS (recommended)
+
+1. Open HACS in Home Assistant and search for **ZenMaster**. Not listed yet? Add `https://github.com/FireSon/ZenMaster` under the three dots, **Custom repositories**, with the type **Integration**.
+2. Install **ZenMaster** and restart Home Assistant.
 3. Add the integration **ZenMaster** under Settings, Devices and services.
 4. Open the ZenMaster panel in the sidebar, set the P1 meter and the dynamic price provider, and add your devices, consumers and solar panels with **Add**.
+
+### By hand
+
+1. Copy `custom_components/zenmaster` into the `custom_components` folder of your Home Assistant configuration.
+2. Restart Home Assistant and continue with step 3 above.
 
 ZenMaster needs the Home Assistant recorder for its calibrations and uses `paho-mqtt`, `bleak-retry-connector`, `highspy`, `numpy` and `pymodbus`, which Home Assistant installs from the manifest.
 

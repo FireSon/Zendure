@@ -33,7 +33,7 @@ PV = range(0x02A0, 0x02A4)  # the four MPPT inputs
 GRID = (("phase1_power", 0x026E), ("phase2_power", 0x026F), ("phase3_power", 0x0270))  # key, low word: a signed 16-bit word holds any phase up to 63 A
 FAST = ((VOLTAGE, 0x0271 - VOLTAGE), (PV[0], len(PV)))  # battery up to the grid phases (38), the PV inputs (4)
 
-# the control registers of ha-solarman's deye_p3 profile; not verified on a device
+# the control registers of ha-solarman's deye_p3 profile, writable there with the same values
 CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, SOLAR_SELL, TOU = 0x006C, 0x006D, 0x0080, 0x0082, 0x0091, 0x0092
 SELL_POWER = 0x008F  # max sell power, W at the TOU scale: caps what goes to the grid
 POWERS, SOCS, SOURCES = range(0x009A, 0x00A0), range(0x00A6, 0x00AC), range(0x00AC, 0x00B2)  # per TOU program: discharge power, SOC floor or target, charge source (1 = grid)
@@ -115,6 +115,7 @@ class DeyeInverter(DistributionDevice):
             self.on_config_changed(self)
 
     def power(self, watts: int, mode: DistributionMode) -> int:
+        watts = self.clamp(watts)
         # the loop sends a request once; the same one every tick changes nothing
         if self.state != DeviceState.OFFLINE:
             self.request = (watts, mode)
@@ -226,14 +227,15 @@ class DeyeInverter(DistributionDevice):
             self._silent += 1
             _LOGGER.debug("Deye %s: poll failed (%s)", self.name, err)
             if self._silent >= OFFLINE_POLLS and self.state != DeviceState.OFFLINE:
-                self.power_actual = 0
+                # offline: what it has is no longer known, back online the request goes out again
+                self.power_actual, self.sent = 0, None
                 self.set_state(DeviceState.OFFLINE)
             return
         self._silent = 0
         self.update_status(values)
 
     def update_status(self, r: dict[int, int]) -> None:
-        # the battery; its power is taken positive for discharge (to verify on a device)
+        # the battery; its power positive for discharge, as ha-solarman's battery state reads it
         self.entity_update("soc", r[SOC])
         self.entity_update("battery_voltage", round(r[VOLTAGE] * self.product.volt_scale, 2))
         battery = decode([r[BATTERY_POWER]], "int16") * self.product.power_scale

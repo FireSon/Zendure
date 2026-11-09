@@ -14,6 +14,7 @@ from test_subentries import _coord
 # the decorators register the command with HA; in a test the plain coroutine is what we call
 websocket_api.websocket_command = lambda schema: (lambda f: f)
 websocket_api.async_response = lambda f: f
+websocket_api.require_admin = lambda f: f
 sys.modules.pop("custom_components.zenmaster.websocket", None)
 websocket = importlib.import_module("custom_components.zenmaster.websocket")
 
