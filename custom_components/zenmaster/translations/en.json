@@ -532,6 +532,10 @@
   },
   "config_panel": {
     "field": {
+      "allow_control": {
+        "name": "Allow control",
+        "description": "Experimental: ZenMaster may steer this device. Its control is not yet confirmed on real hardware; off, the device only reports."
+      },
       "temp_entity": {
         "name": "Temperature sensor",
         "description": "The sensor that measures the temperature of this store."

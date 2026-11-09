@@ -90,6 +90,8 @@ class ProfileCharge(PowerProfile):
 class DistributionDevice(EntityDevice):
     """Generic contract only; the vendor implements the behavior and keeps every field and state truthful."""
 
+    allow_control = True  # the fleet steers it; a brand whose control is not confirmed on a device leaves that to the user
+
     def __init__(self, hass: HomeAssistant, device_id: str, profiles: list[PowerProfile], name: str | None = None, subentry_id: str | None = None) -> None:
         super().__init__(hass, device_id, name, subentry_id)
 

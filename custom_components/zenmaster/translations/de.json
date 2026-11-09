@@ -532,6 +532,10 @@
   },
   "config_panel": {
     "field": {
+      "allow_control": {
+        "name": "Steuerung erlauben",
+        "description": "Experimentell: ZenMaster darf dieses Gerät steuern. Die Steuerung ist noch nicht an echter Hardware bestätigt; aus, meldet das Gerät nur Messwerte."
+      },
       "temp_entity": {
         "name": "Temperatursensor",
         "description": "Der Sensor, der die Temperatur dieses Speichers misst."

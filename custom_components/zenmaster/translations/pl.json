@@ -532,6 +532,10 @@
   },
   "config_panel": {
     "field": {
+      "allow_control": {
+        "name": "Zezwól na sterowanie",
+        "description": "Eksperymentalne: ZenMaster może sterować tym urządzeniem. Sterowanie nie zostało jeszcze potwierdzone na prawdziwym sprzęcie; wyłączone, urządzenie tylko raportuje pomiary."
+      },
       "temp_entity": {
         "name": "Czujnik temperatury",
         "description": "Czujnik mierzący temperaturę tego zasobnika."

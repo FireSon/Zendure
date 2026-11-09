@@ -66,10 +66,10 @@ Under the chart each battery and each consumer has its own lane with its plan pe
 
 Every brand other than Zendure is experimental: written against the vendor's register maps and documentation and tested against simulated devices, but not yet proven on real hardware. Feedback from owners is welcome.
 
-- **Marstek** Venus E, A and D over Modbus TCP, directly or through an RS485 gateway. Added by hand with its register generation (v2, v3, A or D), its IP address and port. Steered with RS485 control mode and a charge or discharge setpoint; handed back to the work mode it had before.
+- **Marstek** Venus E, A and D over Modbus TCP, directly or through an RS485 gateway. Added by hand with its register generation (v2, v3, A or D), its IP address and port. Steered with RS485 control mode and a charge or discharge setpoint; handed back to the work mode it had before. Control is opt-in per device (Allow control) and off by default; without it the device only reports.
 - **Anker SOLIX** Solarbank Max AC, XE AC and Solarbank 4 E5000 Pro over Modbus TCP. Found over mDNS or added by hand with its IP address. Steered in Third-Party Control with one signed setpoint; handed back to the operating mode it had before.
 - **Sessy** 5 kWh and 10 kWh over the dongle's local HTTP API. Added by hand with its IP address and the username and password on its sticker. Steered with the API power strategy and a setpoint; handed back to the strategy it had before.
-- **Deye** three-phase hybrid inverters with an LV or HV battery, through their Solarman logger stick. Added by hand with the battery type, the logger's serial number, the battery capacity and the logger's IP address. Its grid meter appears as a device of its own that can be picked as the P1 meter. Steered per mode through its own settings (time-of-use programs, charge and discharge current, work mode, grid charging); its own settings are put back when ZenMaster hands it back.
+- **Deye** three-phase hybrid inverters with an LV or HV battery, through their Solarman logger stick. Added by hand with the battery type, the logger's serial number, the battery capacity and the logger's IP address. Its grid meter appears as a device of its own that can be picked as the P1 meter. Steered per mode through its own settings (time-of-use programs, charge and discharge current, work mode, grid charging); its own settings are put back when ZenMaster hands it back. Control is opt-in per device (Allow control) and off by default; without it the device only reports.
 
 ### Heat pump for space heating
 

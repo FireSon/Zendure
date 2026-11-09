@@ -57,7 +57,7 @@ class MarstekVenus(PolledDevice):
     POLL_S = 2.0  # telemetry every 2 s
     HOLD_S = 3.0  # a device is left alone this long after a command: the power follows in 2.5 to 3.5 s (ViperRNMC/marstek_venus_modbus#276)
 
-    CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False), *FLEET, ConfigField("temp", {"entity": {}}, readonly=True)]
+    CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False), ConfigField("allow_control", {"boolean": {}}, cast=bool), *FLEET, ConfigField("temp", {"entity": {}}, readonly=True)]
 
     def __init__(self, hass: HomeAssistant, driver: MarstekDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
         self.driver = driver
@@ -65,6 +65,7 @@ class MarstekVenus(PolledDevice):
         self.model: str = data["product"]  # the register generation: v2, v3, vA or vD
         self.ip: str = data.get("ip") or self.sn
         self.port = int(data.get("port") or PORT)
+        self.allow_control: bool = bool(data.get("allow_control"))  # off by default: the control is not confirmed on a device
         self.on_config_changed: Any = None  # the coordinator: persist subentry_data(); nothing is learned over Modbus
         self.home_input = self.home_output = self.battery_input = self.battery_output = 0
         self.work_mode: int | None = None  # user_work_mode before we took control, put back when we hand it back
@@ -81,7 +82,7 @@ class MarstekVenus(PolledDevice):
         self.client = AsyncModbusTcpClient(self.ip, port=self.port)
 
     def subentry_data(self) -> dict[str, Any]:
-        return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port}
+        return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "allow_control": self.allow_control}
 
     async def disconnect(self) -> None:
         self.client.close()
