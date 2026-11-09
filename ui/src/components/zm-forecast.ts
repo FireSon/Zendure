@@ -7,7 +7,7 @@ import { t } from '../service/i18n.js';
 import './zm-chart.js';
 import './zm-solartable.js';
 
-// "Vooruitblik": 48u/7d toggle on one #fcChart, then the Zonnegroepen (zm-solartable: per-meter
+// "Vooruitblik": 48u/7d toggle on one #fcChart, then the Zonnepanelen (zm-solartable: per-meter
 // clustered table, each dakvlak row independently editable).
 
 export class ZmForecast extends LitElement {
@@ -16,6 +16,7 @@ export class ZmForecast extends LitElement {
   @property({ attribute: false }) schema: Schema | null = null;
   @property({ attribute: false }) config: any = null;
   @property({ attribute: false }) hass: any = null;
+  @property({ attribute: false }) add: any[] = [];  // the tile catalog of the add dialog, for the solar groups
   @state() private _horizon: '48u' | '7d' = '7d';
   private _option: any = null;  // the chart option, rebuilt only when the plan, the theme or the horizon changes, not on every hass update
 
@@ -50,8 +51,8 @@ export class ZmForecast extends LitElement {
   render() {
     const d = this.d;
     // the solar groups need no plan, so they also show with the solver off
-    const groups = html`<div class="sechead mt"><h3>${t('ui.forecast.groups', 'Zonnegroepen')}</h3><span class="hint r">${t('ui.forecast.groups_hint', 'per dakvlak · oriëntatie & bijdrage')}</span></div>
-      <zm-solartable .config=${this.config} .schema=${this.schema} .hass=${this.hass}></zm-solartable>`;
+    const groups = html`<div class="sechead mt"><h3>${t('ui.forecast.groups', 'Zonnepanelen')}</h3><span class="hint r">${t('ui.forecast.groups_hint', 'per dakvlak · oriëntatie & bijdrage')}</span></div>
+      <zm-solartable .config=${this.config} .schema=${this.schema} .hass=${this.hass} .add=${this.add}></zm-solartable>`;
     if (!d) return html`<div class="empty">${t('ui.common.no_plan', 'Geen plan geladen.')}</div>${groups}`;
     const is48 = this._horizon === '48u';
     return html`

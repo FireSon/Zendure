@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections.abc import Callable
 from datetime import timedelta
@@ -8,7 +9,7 @@ from functools import partial
 from types import MappingProxyType
 from typing import Any
 
-from homeassistant.components import persistent_notification
+from homeassistant.components import bluetooth, persistent_notification, zeroconf
 from homeassistant.config_entries import ConfigEntry, ConfigSubentry
 from homeassistant.core import Event, HomeAssistant, callback as ha_callback
 from homeassistant.helpers import device_registry as dr
@@ -17,8 +18,10 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event, async_track_time_change, async_track_time_interval
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
+from zeroconf import ServiceStateChange
+from zeroconf.asyncio import AsyncServiceBrowser, AsyncServiceInfo
 
-from .config import FIELDS, Config
+from .config import Config
 from .solver.baseload import BaseLoad
 from .solver.battery import DistributionEntry
 from .solver.boiler import BoilerElectric, BoilerHeatPump
@@ -28,12 +31,17 @@ from .solver.dynamicprice import DynamicPrice
 from .solver.forecast import Forecast, SolarPanel
 from .solver.heating import HeatingHeatPump, PoolHeatPump
 from .solver.solver import LpSolver
+from .anker.driver import AnkerDriver
+from .deye.driver import DeyeDriver
 from .marstek.driver import MarstekDriver
+from .sessy.driver import SessyDriver
 from .zendure.driver import ZendureDriver
 from .const import DOMAIN, PANEL_TITLE, Phase, watt_factor
-from .entity import EntityDevice, snakecase, unique_name
+from .entity import EntityDevice, device_by_identifier, snakecase, unique_name
 from .device import DistributionDevice
 from .distribution import Distribution
+
+_LOGGER = logging.getLogger(__name__)
 
 MANAGER = "energy_manager"  # the subentry that carries the distribution device and the lists the panel edits
 
@@ -47,6 +55,9 @@ SUBENTRY_TYPES = {
     "pool_heat_pump": PoolHeatPump,
 }
 
+# every brand ZenMaster speaks to; the config flow asks them about a find before the entry exists
+DRIVERS = (ZendureDriver, MarstekDriver, AnkerDriver, SessyDriver, DeyeDriver)
+
 # per integration how its grid total is read: ("enum", power fragment, direction fragment, the state that means export),
 # or a list of (name fragment, sign) for the total and the phases; absent means the default produced/consumed name rules
 P1_PROFILES: dict[str, Any] = {
@@ -55,7 +66,8 @@ P1_PROFILES: dict[str, Any] = {
     "sma": [("metering_power_absorbed", 1), ("metering_power_supplied", -1), ("feed", -1), ("draw", 1)],
 }
 PHASE_FRAGS = ((), ("phase_1", "phase1", "_l1", "phase_a"), ("phase_2", "phase2", "_l2", "phase_b"), ("phase_3", "phase3", "_l3", "phase_c"))  # indexed on Phase: the name fragments that put a P1 entity on that phase
-NOT_METER = ("demand", "peak")  # P1 entities in W or kW that are no reading of the grid: the capacity tariff's monthly peak and quarter average (HomeWizard, DSMR in Belgium)
+# P1 entities in W or kW that are no reading of the grid: the capacity tariff, the meter's statistics and thresholds, a battery group
+NOT_METER = ("demand", "peak", "average", "min_power", "max_power", "threshold", "battery")
 
 
 def phase_of(eid: str) -> Phase:
@@ -98,14 +110,12 @@ class Coordinator:
         self.distribution.on_save = self._store_save
         self.distribution.on_capacity = self.capacity_changed
         self.config = Config(store=Store(hass, version=1, key=f"{DOMAIN}.devices", atomic_writes=True))
-        self.zendure = ZendureDriver(hass, self.entry_id, self.devices, self.distribution)
-        self.zendure.on_zeroconf = self.zeroconf
         # one driver per brand, keyed on its subentry type; each hands its finds to discovered under its own type
-        self.drivers = {d.id: d for d in (self.zendure, MarstekDriver(hass, self.entry_id, self.devices, self.distribution))}
+        self.drivers = {cls.id: cls(hass, self.entry_id, self.devices, self.distribution) for cls in DRIVERS}
         for driver in self.drivers.values():
             driver.on_discovered = partial(self.discovered, kind=driver.id)
+        self._browser: AsyncServiceBrowser | None = None  # mDNS for every driver's service types
         self.battery = DistributionEntry(self.distribution)  # the fleet in the LP; owns the plan-driven mode and the savings
-        self.zeroconf_ip: dict[str, str] = {}  # serial -> ip from mDNS for devices that are not built yet
         self.prices = DynamicPrice()
         self.prices.on_save = self._store_save  # the price entry persists a fresh token itself
         self.baseload = BaseLoad()
@@ -131,9 +141,9 @@ class Coordinator:
         await self.config.load()
         self.distribution.device_load(self.config.section("devices", self.distribution.device_id))
         self.battery.load(self.config.section("devices", "solver"))
-        self.config.deserialize(self.distribution, FIELDS[Distribution])
+        self.config.deserialize(self.distribution, Distribution.CONFIG)
         for driver in self.drivers.values():
-            self.config.deserialize(driver, FIELDS[type(driver)])
+            self.config.deserialize(driver, driver.CONFIG)
         self.sync_devices()
         if self.entry is not None:
             self.entry.async_on_unload(self.entry.add_update_listener(self._entry_updated))
@@ -147,6 +157,7 @@ class Coordinator:
         await self.sync_subentries()
         for driver in self.drivers.values():
             await driver.connect()
+        await self._listen()
 
         # periodic dump: without it the kWh counters only reach the Store when a user happens to move a knob
         self._unsubs.append(async_track_time_interval(self.hass, self.timer_elapsed, timedelta(minutes=15)))
@@ -180,28 +191,23 @@ class Coordinator:
                 device.on_phase = lambda: self.setting_changed(None)  # its phase is fixed in the LP structure
             device.on_config_changed = self.persist_device
             device.device_load(self.config.section("devices", device.device_id))
-            if (ip := self.zeroconf_ip.pop(getattr(device, "sn", ""), None) or self.zeroconf_ip.pop(getattr(device, "device_key", ""), None)) and not getattr(device, "ip", None):
-                device.ip = ip
-                self.persist_device(device)
         for sid, device in built.items():
             if sid not in self.entry.subentries:
                 device.driver.remove_device(device)  # HA already cleared its registry device and entities along with the subentry
                 changed = True
         return changed
 
-    def discovered(self, data: dict[str, Any], kind: str) -> None:
-        # the driver found a device: it becomes a subentry with a name that never changes again; the update listener builds it from there
+    def discovered(self, data: dict[str, Any], kind: str) -> str | None:
+        # the driver found a device, or the panel added one: it becomes a subentry with a name that never changes again; the update listener builds it from there
         sn = data["sn"]
         if self.entry is None or any(s.data.get("sn") == sn for s in self.entry.subentries.values()):
-            return
+            return None
         family = data.pop("family")
         taken = {s.title for s in self.entry.subentries.values()} | {d.name for d in self.devices}
         name = unique_name(family, sn, taken)
-        if (ip := self.zeroconf_ip.pop(sn, None)) and not data.get("ip"):
-            data["ip"] = ip
-        self.hass.config_entries.async_add_subentry(
-            self.entry, ConfigSubentry(data=MappingProxyType(data), subentry_type=kind, title=name, unique_id=f"{kind}_{sn}")
-        )
+        sub =ConfigSubentry(data=MappingProxyType(data), subentry_type=kind, title=name, unique_id=f"{kind}_{sn}")
+        self.hass.config_entries.async_add_subentry(self.entry, sub)
+        return sub.subentry_id
 
     def persist_device(self, device: EntityDevice) -> None:
         # ip, blemac and the pack names back into the device's subentry; a no-op when nothing changed
@@ -211,17 +217,28 @@ class Coordinator:
         if dict(sub.data) != data:
             self.hass.config_entries.async_update_subentry(self.entry, sub, data=data)
 
-    def zeroconf(self, find: dict[str, Any]) -> None:
-        # the driver's mDNS find: the ip of a device we know, or kept until the device shows up through its own transport
-        for d in self.zendure.devices.values():
-            if d.sn == find["sn"] or (find["device_id"] and d.device_key == find["device_id"]):
-                if (reader := find.get("reader_sn")) and getattr(d, "reader_sn", "") != reader:
-                    d.reader_sn = reader
-                if getattr(d, "ip", None) != find["ip"]:
-                    d.ip = find["ip"]
-                self.persist_device(d)  # a no-op when nothing changed
-                return
-        self.zeroconf_ip[find["sn"] or find["device_id"]] = find["ip"]  # a find without a serial is only matchable on its MQTT address
+    async def _listen(self) -> None:
+        # after setup HA starts no discovery flows for us (single instance): one mDNS browser for every driver's service types,
+        # one Bluetooth callback per matcher; a find goes to each driver that listens for it
+        try:
+            types = {m["type"] for d in self.drivers.values() for m in getattr(d, "ZEROCONF", [])}
+            aiozc = await zeroconf.async_get_async_instance(self.hass)
+            self._browser = AsyncServiceBrowser(aiozc.zeroconf, list(types), handlers=[self._on_zeroconf])
+            self._unsubs += [bluetooth.async_register_callback(self.hass, d.bluetooth_found, m, bluetooth.BluetoothScanningMode.ACTIVE) for d in self.drivers.values() for m in getattr(d, "BLUETOOTH", [])]
+        except Exception as err:
+            _LOGGER.debug("Discovery listeners not available: %s", err)
+
+    def _on_zeroconf(self, zeroconf: Any, service_type: str, name: str, state_change: Any) -> None:
+        if state_change is not ServiceStateChange.Removed:
+            self.hass.async_create_task(self._resolve_find(zeroconf, service_type, name))
+
+    async def _resolve_find(self, zc: Any, service_type: str, name: str) -> None:
+        # resolved once, then handed to the drivers of that service type
+        info = AsyncServiceInfo(service_type, name)
+        if await info.async_request(zc, 3000) and (addresses := info.parsed_addresses()):
+            for d in self.drivers.values():
+                if any(m["type"] == service_type for m in getattr(d, "ZEROCONF", [])):
+                    await d.zeroconf_found(name, addresses[0], info.decoded_properties)
 
     def manager_list(self, key: str) -> list[dict]:
         # the manager subentry carries the lists the panel edits: a solar group has no device of its own to hang them on
@@ -284,7 +301,7 @@ class Coordinator:
                     name=sub.title,
                     manufacturer=PANEL_TITLE,
                     model=cls.__name__,
-                    via_device=(DOMAIN, PANEL_TITLE),  # the ZenMaster device's identifier
+                    via_device_id=(zen.id if (zen := device_by_identifier(self.hass, PANEL_TITLE)) else None),  # the ZenMaster device
                 )
                 EntityDevice.__init__(consumer, self.hass, sid, sub.title, subentry_id=sid)  # its own device: status, buttons and settings
                 consumer.device_load(self.config.section("devices", consumer.device_id))  # the settings as they stood before the restart
@@ -397,6 +414,9 @@ class Coordinator:
         self._unsubs = []
         self._p1_unsubs = []
         self._track_unsubs = []
+        if self._browser is not None:
+            await self._browser.async_cancel()
+            self._browser = None
         # stop the fleet and hand HEMS back, so no device keeps running on our last setpoint once we are gone
         for d in self.distribution.devices:
             d.power_off()

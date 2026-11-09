@@ -5,12 +5,15 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from homeassistant.core import HomeAssistant
 
 from .const import Phase
 from .entity import EntityDevice
+
+if TYPE_CHECKING:
+    from .distribution import DistributionMode
 
 
 DEADBAND_W = 20  # smallest power change worth a new command
@@ -25,11 +28,12 @@ class DeviceState(IntEnum):
     """Shared meaning for every vendor; the distribution relies on these semantics."""
 
     CREATED = 0  # just built, the device has never reported
-    OFFLINE = 1  # unreachable: the vendor machinery is probing
-    EXTERNAL = 2  # own behavior, not under our control
-    SENT = 3  # command sent, awaiting the transport ack
-    CONFIRM = 4  # acked, awaiting the output to follow
-    ACTIVE = 5  # under control at a confirmed setpoint (0 W included)
+    CONTROLLER = 1  # regulates itself and is not steered by us: in no capacity, plan or regulation
+    OFFLINE = 2  # unreachable: the vendor machinery is probing
+    EXTERNAL = 3  # own behavior, not under our control
+    SENT = 4  # command sent, awaiting the transport ack
+    CONFIRM = 5  # acked, awaiting the output to follow
+    ACTIVE = 6  # under control at a confirmed setpoint (0 W included)
 
 
 @dataclass
@@ -116,8 +120,8 @@ class DistributionDevice(EntityDevice):
         if self.on_phase is not None:
             self.on_phase()
 
-    def power(self, watts: int) -> int:
-        """Vendor contract: the device decides what it will do with the request; the return is the current power_actual."""
+    def power(self, watts: int, mode: DistributionMode) -> int:
+        """Vendor contract: the device decides what it does with the request in this fleet mode; the return is the current power_actual."""
         return self.power_actual
 
     def power_off(self) -> None:

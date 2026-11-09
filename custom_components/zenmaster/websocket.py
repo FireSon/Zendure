@@ -25,6 +25,24 @@ from .solver.forecast import SolarPanel, _OPEN_METEO_URL
 
 HISTORY_DAYS = 30  # calendar days in the trend view
 
+# the consumer tiles of the add dialog: subentry type, the appliance kind it presets, colour and icon
+CONSUMER_TILES = {
+    "ev": ("electric_vehicle", "", "#1fb89a", "ev"),
+    "washingmachine": ("appliance", "washingmachine", "#3aa0c9", "washer"),
+    "dryer": ("appliance", "dryer", "#8f7ae5", "dryer"),
+    "dishwasher": ("appliance", "dishwasher", "#2fbf9f", "dish"),
+    "appliance": ("appliance", "custom", "#3aa0c9", "plug"),
+    "heatpump": ("heating_heat_pump", "", "#f47a20", "hp"),
+    "boiler_hp": ("boiler_heat_pump", "", "#f5a623", "boiler"),
+    "boiler_electric": ("boiler_electric", "", "#f5a623", "boiler_e"),
+    "pool": ("pool_heat_pump", "", "#4aa3df", "pool"),
+}
+
+
+def _form(fields) -> list[dict]:
+    # the fields as the panel draws them: everything but the cast
+    return [{k: v for k, v in asdict(f).items() if k != "cast"} for f in fields]
+
 
 def _coordinator(hass: HomeAssistant):
     # The single Coordinator entry (has .distribution). None before setup.
@@ -60,16 +78,21 @@ async def ws_get_schema(hass, connection, msg):
         item = {"type": types[type(c)], "name": c.name}
         coord.config.serialize(c, payload=item)  # its fields, plus the entity_id of its state sensor
         config["consumers"].append(item)
-        schema[c.id] = [{k: v for k, v in asdict(f).items() if k != "cast"} for f in type(c).CONFIG]
+        schema[c.id] = _form(type(c).CONFIG)
         actions[c.id] = [asdict(a) for a in type(c).ACTIONS]  # the row buttons this consumer offers
         tiles[c.id] = type(c).TILES  # the entity fields its row shows as tiles
-    fields = [{k: v for k, v in asdict(f).items() if k != "cast"} for f in SolarPanel.CONFIG]
+    fields = _form(SolarPanel.CONFIG)
     config["solar_panels"] = []
     for row in coord.manager_list("solar_panels"):
         config["solar_panels"].append({"id": row["id"], "name": row.get("name", ""), "power_entity": row.get("power_entity", ""), "derate_entity": row.get("derate_entity", "")})
         schema[f"solar_panel:{row['id']}"] = fields
 
-    connection.send_result(msg["id"], {"schema": schema, "config": config, "actions": actions, "tiles": tiles})
+    # the add dialog: a tile per consumer type, per driver and for the solar group, each with the form it opens
+    add = [{"id": k, "group": "consumer", "type": t, "data": {"kind": kind} if kind else {}, "color": color, "icon": icon, "fields": _form(SUBENTRY_TYPES[t].CONFIG)} for k, (t, kind, color, icon) in CONSUMER_TILES.items()]
+    add += [{"id": d.id, "group": "device", "type": d.id, "label": d.manufacturer, "fields": _form(d.ADD)} for d in coord.drivers.values()]
+    add.append({"id": "solar_panel", "group": "solar", "type": "solar_panel", "fields": fields})
+
+    connection.send_result(msg["id"], {"schema": schema, "config": config, "actions": actions, "tiles": tiles, "add": add})
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_plan"})
@@ -116,6 +139,8 @@ async def ws_save_schema(hass, connection, msg):
         return
     coord.config.serialize(device, msg["section"], coord.config.payload)
     await coord.config.save()
+    if getattr(device, "subentry_id", None):
+        coord.persist_device(device)  # what a device is reached on (ip, port, credentials) lives in its subentry
     if device in coord.drivers.values():
         await device.connect()
     if device is coord.prices and (otp := str((msg.get("payload") or {}).get("otp") or "")):
@@ -136,6 +161,23 @@ async def ws_subentry_add(hass, connection, msg):
     if coord is None or coord.entry is None:
         connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
         return
+
+    # a device: the driver identifies it, then it is filed like a found device, under the name it keeps
+    if (driver := coord.drivers.get(msg["subentry_type"])) is not None:
+        data = dict(msg.get("data") or {})
+        if isinstance(found := await driver.identify(hass, data) if hasattr(driver, "identify") else {}, str):
+            connection.send_result(msg["id"], {"ok": False, "errors": [found]})
+            return
+        data |= found
+        data["sn"] = str(data.get(getattr(driver, "KEY", "sn"), ""))  # the field that identifies the device becomes its serial
+        if error := "device_exists" if any(s.data.get("sn") == data["sn"] for s in coord.entry.subentries.values()) else None if (family := driver.device_family(data)) else "unknown_product":
+            connection.send_result(msg["id"], {"ok": False, "errors": [error]})
+            return
+        sid = coord.discovered({**data, "family": family}, kind=driver.id)
+        await coord.resync(coord.sync_devices())
+        connection.send_result(msg["id"], {"ok": True, "subentry_id": sid})
+        return
+
     if msg["subentry_type"] not in SUBENTRY_TYPES and msg["subentry_type"] != "solar_panel":
         connection.send_error(msg["id"], "not_found", msg["subentry_type"])
         return

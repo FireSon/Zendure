@@ -12,14 +12,17 @@ from homeassistant.helpers import device_registry as dr
 from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
+from ..config import FLEET, IDENTITY, ConfigField
 from ..const import DOMAIN, PhaseModi
 from ..device import DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
+from ..modbus import decode
 from ..number import HaNumber
 from ..select import HaSelect
 from ..sensor import HaSensor
 
 if TYPE_CHECKING:
-    from .driver import MarstekDriver
+    from ..distribution import DistributionMode
+    from .driver import MarstekDriver, Product
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +33,7 @@ SLOW_EVERY = 15  # temperature, capacity, limits and work mode once per this man
 OFFLINE_POLLS = 3  # failed polls before the device counts as offline
 POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
 POWER_MAX_TIME = 10  # s: or this long after the command
+RESEND_S = 30  # s: an accepted setpoint goes again only after this long, in case the device lost it
 DOD_DEFAULT = 88  # % the device discharges by default; soc_min starts at 100 - this
 
 # the control registers, the same for every generation (ffunes/Omnibattery const/registers_common.py)
@@ -51,17 +55,12 @@ SLOW = ("temp", "kwh", "charge_max", "discharge_max")
 MESSAGE_WAIT_S = {"v2": 0.05, "v3": 0.15, "vA": 0.15, "vD": 0.15}  # pause before every message; v3, A and D need 150 ms (Omnibattery MESSAGE_WAIT_MS)
 
 
-def decode(registers: list[int], kind: str) -> int:
-    # a 32-bit value comes high word first; the signed types wrap
-    value = registers[0] << 16 | registers[1] if kind == "int32" else registers[0]
-    bits = 32 if kind == "int32" else 16
-    return value - (1 << bits) if kind != "uint16" and value >= 1 << (bits - 1) else value
-
-
 class MarstekVenus(DistributionDevice):
     """A Venus E, A or D on its own Modbus TCP connection, directly or through an RS485 gateway."""
 
-    def __init__(self, hass: HomeAssistant, driver: MarstekDriver, subentry_id: str | None, name: str, data: dict[str, Any], pwr_max: int) -> None:
+    CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False), *FLEET, ConfigField("temp", {"entity": {}}, readonly=True)]
+
+    def __init__(self, hass: HomeAssistant, driver: MarstekDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
         self.driver = driver
         self.sn: str = data["sn"]  # the identity: the ip it was added with
         self.model: str = data["product"]  # the register generation: v2, v3, vA or vD
@@ -73,7 +72,7 @@ class MarstekVenus(DistributionDevice):
 
         # the registry entry first: the entities find their device there
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, self.sn)}, name=name, manufacturer=driver.manufacturer, model=f"Venus ({self.model})")
-        DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(pwr_max), ProfileCharge(-pwr_max)], name, subentry_id)
+        DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(product.pwr_max), ProfileCharge(-product.pwr_max)], name, subentry_id)
         self.entities["soc_min"].update_value(100 - DOD_DEFAULT)
         self.entities["soc_max"].update_value(100)
 
@@ -130,11 +129,15 @@ class MarstekVenus(DistributionDevice):
         if self.on_invalidate is not None:
             self.on_invalidate()
 
-    def power(self, watts: int) -> int:
+    def power(self, watts: int, mode: DistributionMode) -> int:
         watts = max(self.power_profile[1].power, min(self.power_profile[0].power, watts))  # clamp to the device limits, both directions
 
         # the device is busy with its last command, or unreachable
         if time.time() - self.power_since < HOLD_S or self.state == DeviceState.OFFLINE:
+            return self.power_actual
+
+        # an accepted setpoint is not sent again while the power is on its way; after RESEND_S once more, in case the device lost it
+        if watts == self.power_setpoint and self.state >= DeviceState.CONFIRM and time.time() - self.state_since < RESEND_S:
             return self.power_actual
 
         # no new command while both the measured power and the last setpoint sit within 10 W of the new target
@@ -153,7 +156,8 @@ class MarstekVenus(DistributionDevice):
         self._pending = ("off", 0)
         self._wake.set()
         self.setpoint.update_value(0)
-        self.set_state(DeviceState.EXTERNAL)
+        if self.state != DeviceState.OFFLINE:
+            self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
 
     async def device_loop(self) -> None:
         while True:
@@ -209,6 +213,7 @@ class MarstekVenus(DistributionDevice):
                     ok = await self.write(WORK_MODE, self.work_mode)
                 self._control = not ok
         except (ModbusException, OSError, TimeoutError) as err:
+            self.client.close()  # a late reply left in the buffer fails every next read on its transaction id (anker-charging#81): start clean
             _LOGGER.warning("Marstek %s: %s not sent (%s)", self.name, kind, err)
             return
         if not ok:
@@ -225,6 +230,7 @@ class MarstekVenus(DistributionDevice):
                 await self.client.connect()
             values = {key: await self.read(key) for key in keys}
         except (ModbusException, OSError, TimeoutError) as err:
+            self.client.close()  # a late reply left in the buffer fails every next read on its transaction id (anker-charging#81): start clean
             self._silent += 1
             _LOGGER.debug("Marstek %s: poll failed (%s)", self.name, err)
             if self._silent >= OFFLINE_POLLS and self.state != DeviceState.OFFLINE:

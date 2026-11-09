@@ -5,12 +5,6 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
 from .device import DistributionDevice
-from .distribution import Distribution
-from .marstek.driver import MarstekDriver
-from .marstek.venus import MarstekVenus
-from .zendure.driver import ZendureDriver
-from .zendure.smartmeter import ZendureSmartMeter
-from .zendure.solarflow import ZendureSolarFlow
 
 if TYPE_CHECKING:
     from homeassistant.helpers.storage import Store
@@ -31,109 +25,14 @@ class ConfigField:
     section_key: str | None = None  # display grouping in the UI card; a technical key, the UI translates it
 
 
-# the card's view of the shared classes, which come from Zendure-HA v2 and carry no CONFIG of their own
-FIELDS: dict[type, list[ConfigField]] = {
-    Distribution: [
-        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True),
-        ConfigField("max_kw", {"number": {"min": 0, "step": 0.1, "unit_of_measurement": "kW"}}, cast=float),
-        ConfigField("max_output", {"number": {"min": 0, "step": 100, "unit_of_measurement": "W"}}, cast=int, required=False),
-        ConfigField("p1_device", {"device": {}}, cast=str, required=False),
-        ConfigField("mode", {"entity": {}}, readonly=True),
-        ConfigField("manual_power", {"entity": {}}, readonly=True),
-        ConfigField("setpoint_correction", {"entity": {}}, readonly=True),
-        ConfigField("soc", {"entity": {}}, readonly=True),
-        ConfigField("available_kwh", {"entity": {}}, readonly=True),
-        ConfigField("capacity_kwh", {"entity": {}}, readonly=True),
-        ConfigField("charge_power", {"entity": {}}, readonly=True),
-        ConfigField("discharge_power", {"entity": {}}, readonly=True),
-        ConfigField("charge_power_aggr", {"entity": {}}, readonly=True),
-        ConfigField("discharge_power_aggr", {"entity": {}}, readonly=True),
-        ConfigField("grid_import", {"entity": {}}, readonly=True),
-        ConfigField("grid_export", {"entity": {}}, readonly=True),
-        ConfigField("grid_l1", {"entity": {}}, readonly=True),
-        ConfigField("grid_l2", {"entity": {}}, readonly=True),
-        ConfigField("grid_l3", {"entity": {}}, readonly=True),
-        ConfigField("optimize", {"entity": {}}, readonly=True),
-        ConfigField("savings_today", {"entity": {}}, readonly=True),
-    ],
-    ZendureDriver: [
-        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True),
-        ConfigField("apptoken", {"text": {"type": "password"}}, cast=str, required=False, section_key="cloud"),
-        ConfigField("cloud_url", {"text": {}}, cast=str, required=False, expert=True, section_key="cloud"),
-        ConfigField("mqtt_host", {"text": {}}, cast=str, required=False, section_key="local_broker"),
-        ConfigField("mqtt_port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False, section_key="local_broker"),
-        ConfigField("mqtt_user", {"text": {}}, cast=str, required=False, section_key="local_broker"),
-        ConfigField("mqtt_psw", {"text": {"type": "password"}}, cast=str, required=False, section_key="local_broker"),
-        ConfigField("mqtt_log", {"boolean": {}}, cast=bool, section_key="local_broker"),
-        ConfigField("wifi_ssid", {"text": {}}, cast=str, required=False, section_key="wifi"),
-        ConfigField("wifi_psw", {"text": {"type": "password"}}, cast=str, required=False, section_key="wifi"),
-    ],
-    ZendureSolarFlow: [
-        ConfigField("device_id", {"text": {}}, cast=str, is_key=True, readonly=True),
-        ConfigField("name", {"text": {}}, cast=str, readonly=True),
-        ConfigField("model", {"text": {}}, cast=str, readonly=True),
-        ConfigField("prodkey", {"text": {}}, cast=str, readonly=True),
-        ConfigField("sn", {"text": {}}, cast=str, readonly=True),
-        ConfigField("ip", {"text": {}}, cast=str, required=False),
-        ConfigField("blemac", {"text": {}}, cast=str, required=False),
-        ConfigField("ble_name", {"text": {}}, cast=str, visible_when={"name": "-"}, readonly=True),
-        ConfigField("kwh", {"number": {"step": 0.1, "unit_of_measurement": "kWh"}}, cast=float, readonly=True),
-        ConfigField("soc", {"entity": {}}, readonly=True),
-        ConfigField("soc_min", {"entity": {}}, readonly=True),
-        ConfigField("soc_max", {"entity": {}}, readonly=True),
-        ConfigField("home_input", {"entity": {}}, readonly=True),
-        ConfigField("home_output", {"entity": {}}, readonly=True),
-        ConfigField("home_input_aggr", {"entity": {}}, readonly=True),
-        ConfigField("home_output_aggr", {"entity": {}}, readonly=True),
-        ConfigField("rte", {"entity": {}}, readonly=True),
-        ConfigField("bypass", {"entity": {}}, readonly=True),
-        ConfigField("grid_state", {"entity": {}}, readonly=True),
-        ConfigField("solar", {"entity": {}}, readonly=True),
-        ConfigField("power_phase", {"entity": {}}, readonly=True),
-        ConfigField("temp", {"entity": {}}, readonly=True),
-        ConfigField("connection", {"number": {}}, cast=int, readonly=True),
-    ],
-    ZendureSmartMeter: [
-        ConfigField("device_id", {"text": {}}, cast=str, is_key=True, readonly=True),
-        ConfigField("name", {"text": {}}, cast=str, readonly=True),
-        ConfigField("model", {"text": {}}, cast=str, readonly=True),
-        ConfigField("sn", {"text": {}}, cast=str, readonly=True),
-        ConfigField("totalPower", {"entity": {}}, readonly=True),
-        ConfigField("phase1_power", {"entity": {}}, readonly=True),
-        ConfigField("phase2_power", {"entity": {}}, readonly=True),
-        ConfigField("phase3_power", {"entity": {}}, readonly=True),
-        ConfigField("phase1_current", {"entity": {}}, readonly=True),
-        ConfigField("phase2_current", {"entity": {}}, readonly=True),
-        ConfigField("phase3_current", {"entity": {}}, readonly=True),
-    ],
-    MarstekDriver: [
-        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True),
-    ],
-    MarstekVenus: [
-        ConfigField("device_id", {"text": {}}, cast=str, is_key=True, readonly=True),
-        ConfigField("name", {"text": {}}, cast=str, readonly=True),
-        ConfigField("model", {"text": {}}, cast=str, readonly=True),
-        ConfigField("sn", {"text": {}}, cast=str, readonly=True),
-        ConfigField("ip", {"text": {}}, cast=str, readonly=True),
-        ConfigField("port", {"number": {}}, cast=int, readonly=True),
-        ConfigField("kwh", {"number": {"step": 0.1, "unit_of_measurement": "kWh"}}, cast=float, readonly=True),
-        ConfigField("soc", {"entity": {}}, readonly=True),
-        ConfigField("soc_min", {"entity": {}}, readonly=True),
-        ConfigField("soc_max", {"entity": {}}, readonly=True),
-        ConfigField("home_input", {"entity": {}}, readonly=True),
-        ConfigField("home_output", {"entity": {}}, readonly=True),
-        ConfigField("home_input_aggr", {"entity": {}}, readonly=True),
-        ConfigField("home_output_aggr", {"entity": {}}, readonly=True),
-        ConfigField("rte", {"entity": {}}, readonly=True),
-        ConfigField("power_phase", {"entity": {}}, readonly=True),
-        ConfigField("temp", {"entity": {}}, readonly=True),
-    ],
-}
+# what every fleet device shows: its identity, and its battery; a brand puts its own fields around them
+IDENTITY = [ConfigField("device_id", {"text": {}}, cast=str, is_key=True, readonly=True), ConfigField("name", {"text": {}}, cast=str, readonly=True), ConfigField("model", {"text": {}}, cast=str, readonly=True)]
+FLEET = [ConfigField("kwh", {"number": {"step": 0.1, "unit_of_measurement": "kWh"}}, cast=float, readonly=True), *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("soc", "soc_min", "soc_max", "home_input", "home_output", "home_input_aggr", "home_output_aggr", "rte", "power_phase"))]
 
 
 def fields_of(obj: Any) -> list[ConfigField] | None:
-    # a shared class from FIELDS (subclasses included), a solver class from its own CONFIG
-    return next((fields for cls, fields in FIELDS.items() if isinstance(obj, cls)), None) or getattr(type(obj), "CONFIG", None)
+    # every class carries its own fields, a subclass those of its parent
+    return getattr(type(obj), "CONFIG", None)
 
 
 class Config:
@@ -190,6 +89,9 @@ class Config:
         self.serialize(obj, name, config)
         config[name]["kind"] = type(obj).__name__  # the UI picks its card on this
         config[name]["fleet"] = isinstance(obj, DistributionDevice)  # the UI groups the battery fleet on this, not the class name
+        if isinstance(obj, DistributionDevice):
+            config[name]["state"] = int(obj.state)  # the UI dims what is offline or not heard yet; not a field, so a save never writes it back
+        config[name]["subentry_id"] = getattr(obj, "subentry_id", None)  # a device is edited and removed through its subentry
 
     def serialize(self, obj: Any, name: str | None = None, payload: dict | None = None) -> None:
         fields = fields_of(obj)

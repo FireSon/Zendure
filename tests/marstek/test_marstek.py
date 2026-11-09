@@ -11,6 +11,7 @@ from custom_components.zenmaster.marstek.venus import CHARGE, DISCHARGE, FORCE, 
 from custom_components.zenmaster.number import HaNumber
 from custom_components.zenmaster.select import HaSelect
 from custom_components.zenmaster.sensor import HaSensor
+from custom_components.zenmaster.distribution import DistributionMode
 from conftest import fake_hass
 from test_subentries import _coord
 
@@ -137,21 +138,21 @@ def test_power_takes_control_and_writes_the_setpoint(monkeypatch) -> None:
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
 
         # discharge: control mode on, then both powers and force_mode, like Omnibattery
-        d.power(800)
+        d.power(800, DistributionMode.MANUAL)
         assert d.state == DeviceState.SENT
         assert await wait_for(lambda: d.state == DeviceState.CONFIRM)
         assert fake.writes == [(RS485, RS485_ON), (DISCHARGE, 800), (CHARGE, 0), (FORCE, 2)]
 
         # within the hold no second command; after it a charge, capped by the device limit it reports
         fake.writes.clear()
-        d.power(-1000)
+        d.power(-1000, DistributionMode.MANUAL)
         await asyncio.sleep(0.05)
         assert fake.writes == []
         fake.regs[44002] = 1200
         d._polls = 0  # the next poll reads the limits
         assert await wait_for(lambda: d.power_profile[1].power == -1200)
         d.power_since = 0.0
-        d.power(-3000)
+        d.power(-3000, DistributionMode.MANUAL)
         assert await wait_for(lambda: (FORCE, 1) in fake.writes)
         assert fake.writes == [(RS485, RS485_ON), (DISCHARGE, 0), (CHARGE, 1200), (FORCE, 1)]
         d.unload()
@@ -163,7 +164,7 @@ def test_power_off_hands_back_the_old_work_mode(monkeypatch) -> None:
     async def scenario() -> None:
         driver, d, fake = start(monkeypatch)
         assert await wait_for(lambda: d.work_mode == 1)
-        d.power(500)
+        d.power(500, DistributionMode.MANUAL)
         assert await wait_for(lambda: (FORCE, 2) in fake.writes)
         fake.writes.clear()
         d.power_off()
@@ -191,7 +192,7 @@ def test_unload_hands_back_a_device_under_control(monkeypatch) -> None:
     async def scenario() -> None:
         driver, d, fake = start(monkeypatch)
         assert await wait_for(lambda: d.work_mode == 1)
-        d.power(500)
+        d.power(500, DistributionMode.MANUAL)
         assert await wait_for(lambda: (FORCE, 2) in fake.writes)
         fake.writes.clear()
         d.unload()  # Home Assistant stops: the loop is gone, the hand back still goes out

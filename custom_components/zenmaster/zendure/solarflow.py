@@ -16,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from ..binary_sensor import HaBinarySensor
+from ..config import FLEET, IDENTITY, ConfigField
 from ..const import DOMAIN, PANEL_TITLE, PhaseModi
 from ..device import HOLD_S, REPORT_WAIT_S, DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
 from ..entity import HaEntity
@@ -27,6 +28,7 @@ from .battery import ZendureBattery
 from .device import Command, ConnectionType, ZendureDevice, centi_convert, temp_convert
 
 if TYPE_CHECKING:
+    from ..distribution import DistributionMode
     from .driver import ZendureDriver
 
 
@@ -35,6 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 HTTP_HEADER = {"content-type": "application/json; charset=UTF-8"}
 HTTP_TIMEOUT = ClientTimeout(total=1)
 OFFLINE_TIMEOUT = 2400.0  # some devices report in bursts with more than a minute of silence in between
+STREAM_TIMEOUT = 60.0  # zenSDK is polled every 2 s and BLE pushes continuously: this long without a report is a lost device, not a burst
 POWER_SET = 40
 POWER_MAX_TIME = 10
 
@@ -51,6 +54,18 @@ def _limits(watts: int) -> dict:
 
 class ZendureSolarFlow(ZendureDevice, DistributionDevice):
     """Zendure battery device with MQTT/HTTP/BLE communication."""
+
+    CONFIG = [
+        *IDENTITY,
+        ConfigField("prodkey", {"text": {}}, cast=str, readonly=True),
+        ConfigField("sn", {"text": {}}, cast=str, readonly=True),
+        ConfigField("ip", {"text": {}}, cast=str, required=False),
+        ConfigField("blemac", {"text": {}}, cast=str, required=False),
+        ConfigField("ble_name", {"text": {}}, cast=str, visible_when={"name": "-"}, readonly=True),
+        *FLEET,
+        *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("bypass", "grid_state", "solar", "temp")),
+        ConfigField("connection", {"number": {}}, cast=int, readonly=True),
+    ]
 
     def __init__(self, hass: HomeAssistant, driver: ZendureDriver | None, subentry_id: str | None, name: str, data: dict[str, Any], model: str, pwr_max: int, pwr_min: int) -> None:
         ZendureDevice.__init__(self, hass, driver, subentry_id, name, data, model)
@@ -187,7 +202,10 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         elif self.connection != ConnectionType.OFFLINE:
             self.device_queue.put_nowait((Command.WRITE, command))
 
-    def power(self, watts: int) -> int:
+    def power(self, watts: int, mode: DistributionMode) -> int:
+        # an offline device is not steered: nothing is sent, the setpoint stays as it was
+        if self.state == DeviceState.OFFLINE:
+            return self.power_actual
         watts = max(self.power_profile[1].power, min(self.power_profile[0].power, watts))  # clamp to rated power, both directions
         watts = max(-self.charge_max_power, watts)
 
@@ -227,7 +245,8 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             self.device_queue.put_nowait((Command.POWER, _limits(0)))
             self.device_queue.put_nowait((Command.WRITE, {"properties": {"hemsState": 0}}))
         self.setpoint.update_value(0)
-        self.set_state(DeviceState.EXTERNAL)
+        if self.state != DeviceState.OFFLINE:
+            self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
 
     def update_properties(self, payload: dict, now: float, on_ha: bool = False) -> None:
         # update last update
@@ -289,8 +308,8 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
                 except asyncio.TimeoutError:
                     cmd, value = Command.TIMEOUT, None
 
-                # first the state, every round, whatever the command was
-                if self._msg_update + OFFLINE_TIMEOUT < time.time():
+                # first the state, every round, whatever the command was: the broker reports in bursts, zenSDK and BLE stream, so they get a short leash
+                if self._msg_update + (OFFLINE_TIMEOUT if self.connection in (ConnectionType.CLOUD, ConnectionType.LOCAL) else STREAM_TIMEOUT) < time.time():
                     self.connection = ConnectionType.OFFLINE
                     self.power_actual = 0
                     self.set_state(DeviceState.OFFLINE)

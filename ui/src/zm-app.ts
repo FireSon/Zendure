@@ -28,6 +28,7 @@ export class ZmApp extends LitElement {
   @state() private _schema: Schema | null = null;
   @state() private _actions: Record<string, any[]> = {};
   @state() private _tiles: Record<string, string[]> = {};
+  @state() private _add: any[] = [];  // the tiles of the add dialog
   @state() private _status: 'loading' | 'ok' | 'error' = 'loading';
   @state() private _error = '';
   @state() private _optimizing = true;
@@ -98,6 +99,7 @@ export class ZmApp extends LitElement {
     this._config = bundle.config;
     this._actions = bundle.actions ?? {};
     this._tiles = bundle.tiles ?? {};
+    this._add = bundle.add ?? [];
     try { await refetchLive(); this._reslice(); } catch { /* no plan */ }
   }
 
@@ -215,11 +217,11 @@ export class ZmApp extends LitElement {
 
   private _content() {
     switch (this._tab) {
-      case 'dashboard': return html`<zm-overview view="plan" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles}></zm-overview>`;
+      case 'dashboard': return html`<zm-overview view="plan" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles} .add=${this._add}></zm-overview>`;
       case 'cijfers': return html`<zm-cijfers .d=${this._d} .theme=${this._theme}></zm-cijfers>`;
-      case 'devices': return html`<zm-overview view="tiles" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles}></zm-overview>`;
+      case 'devices': return html`<zm-overview view="tiles" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles} .add=${this._add}></zm-overview>`;
       case 'settings': return html`<zm-settings .schema=${this._schema} .config=${this._config} .hass=${this.hass} ></zm-settings>`;
-      case 'solar': return html`<zm-forecast .d=${this._d} .theme=${this._theme} .schema=${this._schema} .config=${this._config} .hass=${this.hass}></zm-forecast>`;
+      case 'solar': return html`<zm-forecast .d=${this._d} .theme=${this._theme} .schema=${this._schema} .config=${this._config} .hass=${this.hass} .add=${this._add}></zm-forecast>`;
     }
     return nothing;
   }
@@ -244,7 +246,7 @@ export class ZmApp extends LitElement {
           <div class="h">${icon(svg`<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"></path>`)}${t('ui.app.solar', 'Zon')}<span class="s">${t('ui.app.now', 'nu')}</span></div>
           <div class="v">${s.solar}<small> W</small></div>
         </div>
-        ${s.panels.length ? html`<div class="zpop"><div class="zh">${t('ui.app.solar_groups', 'Zonnegroepen · nu')}</div>
+        ${s.panels.length ? html`<div class="zpop"><div class="zh">${t('ui.app.solar_groups', 'Zonnepanelen · nu')}</div>
           ${s.panels.map((p, i) => html`<div class="zr"><i style="background:${PANEL_COLORS[i % PANEL_COLORS.length]}"></i><span>${p.name}</span><b>${p.w}<small> W</small></b></div>`)}</div>` : nothing}
       </div>
       <div class="kpi" style="--c:#1fb89a;--t:var(--zm-teal-soft)">

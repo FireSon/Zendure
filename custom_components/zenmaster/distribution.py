@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
@@ -21,6 +20,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.util import dt as dt_util
 
 from .button import HaButton
+from .config import ConfigField
 from .const import DOMAIN, PANEL_TITLE, Phase, PhaseModi, watt_factor
 from .device import DeviceState, DistributionDevice
 from .entity import EntityDevice, snakecase
@@ -56,7 +56,7 @@ class DistributionMode(Enum):
     INDIVIDUAL = 6  # every battery its own setpoint from the plan
 
 
-DistributionModi = {m.value: m.name.lower() for m in DistributionMode}  # the select options; the lowercase names are the translation keys
+DistributionModi = {m: m.name.lower() for m in DistributionMode}  # the select options keyed on the mode itself; the lowercase names are the translation keys
 
 
 @dataclass
@@ -71,6 +71,14 @@ class DistributionProfile:
 
 class Distribution(EntityDevice):
     """Per-meter fleet manager (active when self.devices is non-empty)."""
+
+    CONFIG = [
+        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True),
+        ConfigField("max_kw", {"number": {"min": 0, "step": 0.1, "unit_of_measurement": "kW"}}, cast=float),
+        ConfigField("max_output", {"number": {"min": 0, "step": 100, "unit_of_measurement": "W"}}, cast=int, required=False),
+        ConfigField("p1_device", {"device": {}}, cast=str, required=False),
+        *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("mode", "manual_power", "setpoint_correction", "soc", "available_kwh", "capacity_kwh", "charge_power", "discharge_power", "charge_power_aggr", "discharge_power_aggr", "grid_import", "grid_export", "grid_l1", "grid_l2", "grid_l3", "optimize", "savings_today")),
+    ]
 
     def __init__(self, hass: HomeAssistant, entry_id: str, subentry_id: str | None = None) -> None:
         dr.async_get(hass).async_get_or_create(config_entry_id=entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, PANEL_TITLE)}, name="Distribution")  # display name only; ids stay on PANEL_TITLE
@@ -88,7 +96,7 @@ class Distribution(EntityDevice):
         self.phase_limit_w = 17000 / 3
 
         # entity values: the declaration is the initial state, the entity writes it from here on
-        self.mode = 0
+        self.mode = DistributionMode.OFF
         self.manual_power = 0.0
         self.setpoint_correction = 0.0
 
@@ -103,6 +111,7 @@ class Distribution(EntityDevice):
         # indexed by Phase: 0 the three-phase devices, 1 to 3 the phases
         self.power: list[float] = [0, 0, 0, 0]  # what the meter shows per phase
         self.sp: list[int] = [0, 0, 0, 0]  # per phase the sum of the setpoints of its devices, index 0 the three-phase ones
+        self.actual: list[int] = [0, 0, 0, 0]  # per phase what its devices deliver now, index 0 the three-phase ones
         self.available: list[int] = [0, 0, 0, 0]  # per phase what its devices can still deliver, 0 for an empty one
         self.phase_limited = [False, False, False, False]  # per phase whether the phase guard holds it out of the regular distribution
         self.pwr_low = 0.0  # discharging: how long the first running device has sat under 1.5 times its start level, in watt-ticks
@@ -253,7 +262,7 @@ class Distribution(EntityDevice):
         mode = DistributionMode(entity.value)
         _LOGGER.info("Update operation: %s", mode)
 
-        if mode != DistributionMode.OFF and (len(self.devices) == 0 or all(d.state == DeviceState.OFFLINE for d in self.devices)):
+        if mode != DistributionMode.OFF and (len(self.devices) == 0 or all(d.state in (DeviceState.OFFLINE, DeviceState.CONTROLLER) for d in self.devices)):
             _LOGGER.warning("No devices online, not possible to start the operation")
             persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", PANEL_TITLE, PANEL_TITLE)
             self.power_off()  # the select already shows the new mode: back to off
@@ -275,7 +284,7 @@ class Distribution(EntityDevice):
 
     def power_off(self) -> None:
         # the fleet off: the mode to off and every battery back to its own behaviour
-        self.entities["mode"].update_value(DistributionMode.OFF.value)
+        self.entities["mode"].update_value(DistributionMode.OFF)
         for d in self.devices:
             d.power_off()
 
@@ -289,10 +298,10 @@ class Distribution(EntityDevice):
         self.entities["capacity_kwh"].update_value(self.capacity)
 
         # in off no device with a battery keeps a setpoint, such as the plain-inverter one update_order gave before its packs reported
-        if DistributionMode(int(self.mode)) == DistributionMode.OFF:
+        if self.mode == DistributionMode.OFF:
             for d in self.devices:
                 if d.kwh and d.power_setpoint:
-                    d.power_off()
+                    d.power(0, self.mode)
 
     async def _process_p1(self, p1: int, power: list[float], now: float) -> None:
         now = now or time.time()
@@ -310,25 +319,35 @@ class Distribution(EntityDevice):
             self.order_date = now - now % 600 + 600
             self.update_order()
 
-        # off: the sensors are updated, the fleet is not steered; the tick length feeds every rate below
-        if (mode := DistributionMode(int(self.mode))) == DistributionMode.OFF:
+        # off: the sensors are updated; under optimize the plan holds every battery at 0 W, otherwise the fleet is not steered; the tick length feeds every rate below
+        if self.mode == DistributionMode.OFF:
+            if self.optimize:
+                for d in self.devices:
+                    if d.kwh:
+                        d.power(0, self.mode)
             return
-        if mode == DistributionMode.INDIVIDUAL:
+        if self.mode == DistributionMode.INDIVIDUAL:
             self.update_individual()
             return
         elapsed = min(3.0, now - self.p1_time) if self.p1_time else 1.0
         self.p1_time = now
 
         # the demand is what the meter shows plus what the fleet delivers; the setpoint follows from mode, stabilizer and direction
-        self.setpoint = self.update_setpoint(mode, p1 + power_actual + int(self.setpoint_correction), self.solar, now, elapsed)
+        self.setpoint = self.update_setpoint(self.mode, p1 + power_actual + int(self.setpoint_correction), self.solar, now, elapsed)
         self.setpoint_avg += (abs(self.setpoint) - self.setpoint_avg) * elapsed / 900  # ~15-min EMA of the demand
         self.update_power(self.setpoint < 0, self.setpoint, elapsed)
+
+        # a battery the fleet left without a setpoint hears the mode as well: one that regulates itself picks its setting from it, one at rest is a no-op for its dead band
+        for d in self.devices:
+            if d.kwh and not d.power_setpoint and (d.state in (DeviceState.EXTERNAL, DeviceState.CONTROLLER) or abs(d.power_actual) < 10):
+                d.power(0, self.mode)
 
     def update_telemetry(self, p1: int) -> int:
         """What the fleet does now: the sum, the setpoint per phase in self.sp, the live sensors; returns power_actual."""
         power_actual = 0
         kwh = 0.0
         self.sp = [0, 0, 0, 0]
+        self.actual = [0, 0, 0, 0]  # per phase what its devices deliver now, + output, - input
         self.available = [0, 0, 0, 0]
         for d in self.devices:
             if d.state <= DeviceState.EXTERNAL:
@@ -337,6 +356,7 @@ class Distribution(EntityDevice):
             power_actual += d.power_actual - (min(d.power_actual, d.solar + max(0, -d.grid_off_power)) if d.bypass else 0) + max(0, d.grid_off_power)
             kwh += d.kwh * (d.soc - d.soc_min) / 100
             self.sp[d.power_phase or Phase.all] += d.power_setpoint  # Phase.all is 0, so a device without a known phase lands on the three-phase slot as well
+            self.actual[d.power_phase or Phase.all] += d.power_actual
             self.available[d.power_phase or Phase.all] += d.power_profile[False].available_power(d)
 
         # live display sensors from current telemetry (every P1 tick, regardless of mode)
@@ -430,12 +450,13 @@ class Distribution(EntityDevice):
             self.distribute_power(int(setpoint * room[phase] / max(total, -setpoint, 1)), devices)  # its share of the rest pro rata on room, never past it
 
     def phase_guard(self, phase: int) -> int:
-        """A phase's room 1 A under its limit, the house on it being the meter plus our setpoint there; limited from over the limit until it reads 2 A under."""
+        """A phase's room 1 A under its limit, the house on it being the meter plus what our devices deliver now; limited from over the limit until it reads 2 A under."""
         if self.power[phase] < self.phase_limit_w - 2 * PHASE_MARGIN_W:
             self.phase_limited[phase] = False
         if self.power[phase] > self.phase_limit_w:
             self.phase_limited[phase] = True
-        return int(self.phase_limit_w - PHASE_MARGIN_W - self.power[phase] - self.sp[phase])
+        # the house is the meter plus what our devices do now, a command still ramping is not in the meter yet
+        return int(self.phase_limit_w - PHASE_MARGIN_W - self.power[phase] - self.actual[phase])
 
     def update_individual(self) -> None:
         """Every battery its own setpoint; a limited phase is landed by the phase guard with all its batteries instead."""
@@ -447,12 +468,16 @@ class Distribution(EntityDevice):
                 self.distribute_power(target, order)  # 1 A under the limit by its own batteries, as far as they can
                 for d in self.devices:
                     if d.power_phase == phase and d not in order:
-                        d.power(0)  # a battery that cannot help in this direction stops, so it adds nothing
+                        d.power(0, self.mode)  # a battery that cannot help in this direction stops, so it adds nothing
+            # a free phase whose batteries together would charge past the room is held by the guard at the room
+            elif not self.phase_limited[phase] and sum(d.individual or 0 for d in self.devices if d.power_phase == phase) < -room:
+                self.phase_limited[phase] = True
+                self.distribute_power(-room, self.profile[True].phases[phase])
 
         # the batteries of a free phase, and those without a known phase, their own setpoint on every P1 tick
         for d in self.devices:
             if d.individual is not None and not (d.power_phase and self.phase_limited[d.power_phase]):
-                d.power(d.individual)
+                d.power(d.individual, self.mode)
 
     def distribute_power(self, setpoint: int, order: list[DistributionDevice]) -> None:
         """The setpoint over the devices that already run this way, weighted by rated power and the room in the pack; a standing one starts at RANGE_MIN when the running ones would pass twice their optimal band."""
@@ -476,7 +501,7 @@ class Distribution(EntityDevice):
             else:
                 standing.append(d)
                 if d.power_actual:
-                    d.power(0)
+                    d.power(0, self.mode)
 
         # what the running set cannot carry inside twice its optimal band has to come from standing devices; the set never gets more than its rating
         excess = max(0, demand - 2 * optimal) if demand > RANGE_MIN else 0
@@ -499,7 +524,7 @@ class Distribution(EntityDevice):
                     self.pwr_low = 0
                 if self.pwr_low > p_max // 4:
                     share = 0
-            d.power(sign * share)
+            d.power(sign * share, self.mode)
             demand -= share
 
         # start standing devices at RANGE_MIN until the excess is covered: in the plan's order while optimize follows it,
@@ -510,7 +535,7 @@ class Distribution(EntityDevice):
                 break
             if d.soc_limit == (1 if charging else 2):
                 continue
-            d.power(sign * RANGE_MIN)
+            d.power(sign * RANGE_MIN, self.mode)
             excess -= 2 * (abs(d.power_profile[charging].power) // 4)
             self.pwr_low = 0
 
@@ -523,8 +548,8 @@ class Distribution(EntityDevice):
             scores: dict[DistributionDevice, float] = {}
             for d in self.devices:
                 # a device without a battery works as a plain inverter: without this power command it delivers nothing
-                if not d.kwh and d.state > DeviceState.CREATED:
-                    d.power(d.power_profile[False].power)
+                if not d.kwh and d.state > DeviceState.OFFLINE:
+                    d.power(d.power_profile[False].power, self.mode)
                     continue
                 # the device's own verdict overrules the percentage
                 if d.soc_limit == (1 if charging else 2):
@@ -552,8 +577,8 @@ class Distribution(EntityDevice):
             self.profile[charging].phases = [[d for d in order if (d.power_phase or Phase.all) == phase] for phase in (0, 1, 2, 3)]
         # a battery outside the order of the fleet's direction stops; in individual every battery follows its own setpoint instead
         for d in self.devices:
-            if d.power_setpoint and d.kwh and d not in self.profile[self.charging].order and int(self.mode) != DistributionMode.INDIVIDUAL.value:
-                d.power(0)
+            if d.power_setpoint and d.kwh and d not in self.profile[self.charging].order and self.mode != DistributionMode.INDIVIDUAL:
+                d.power(0, self.mode)
 
     def read_jumps(self, entity_ids: list[str]) -> dict[str, list[tuple[float, float]]]:
         # per entity the moments it jumped more than PHASE_JUMP_W against its previous value, as (time, delta); runs on the recorder's thread
