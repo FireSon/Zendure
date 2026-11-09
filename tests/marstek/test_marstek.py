@@ -71,14 +71,14 @@ class FakeModbus:
         return Reply()
 
 
-def start(monkeypatch, product: str = "v3"):
+def start(monkeypatch, product: str = "v3", allow_control: bool = True):
     # the driver with one device on a fake client; the pauses shrunk so a test runs in tenths of a second
     monkeypatch.setattr(venus_module.MarstekVenus, "POLL_S", 0.01)
     loop = asyncio.get_running_loop()
     hass = fake_hass()
     hass.async_create_task = loop.create_task
     driver = MarstekDriver(hass, "entry", [], types.SimpleNamespace(devices=[], on_invalidate=lambda: None))
-    d = driver.init_device("sub1", "VenusE_17", {"sn": IP, "product": product, "ip": IP, "port": 502})
+    d = driver.init_device("sub1", "VenusE_17", {"sn": IP, "product": product, "ip": IP, "port": 502, "allow_control": allow_control})
     d.client = FakeModbus()
     d.wait = 0.0
     for e in d.entities.values():
@@ -218,6 +218,17 @@ def test_silent_device_goes_offline_and_comes_back(monkeypatch) -> None:
     asyncio.run(scenario())
 
 
+def test_without_allow_control_it_only_reports(monkeypatch) -> None:
+    async def scenario() -> None:
+        # the default: polled and reported, but out of the fleet and never written
+        driver, d, fake = start(monkeypatch, allow_control=False)
+        assert await wait_for(lambda: d.soc == 98)
+        assert not d.allow_control and driver.distribution.devices == [] and fake.writes == []
+        d.unload()
+
+    asyncio.run(scenario())
+
+
 def test_unknown_generation_is_skipped() -> None:
     driver = MarstekDriver(fake_hass(), "entry", [], types.SimpleNamespace(devices=[], on_invalidate=lambda: None))
     assert driver.init_device("sub1", "x", {"sn": IP, "product": "VenusC", "ip": IP}) is None
@@ -229,7 +240,7 @@ def test_coordinator_builds_and_drops_a_marstek() -> None:
         coord, entry = _coord()
 
         # a subentry of type marstek, as the flow files it, becomes the device on the Marstek driver, in the fleet
-        coord.discovered({"sn": IP, "product": "v3", "ip": IP, "port": 502, "family": "VenusE"}, kind="marstek")
+        coord.discovered({"sn": IP, "product": "v3", "ip": IP, "port": 502, "allow_control": True, "family": "VenusE"}, kind="marstek")
         (sub,) = [s for s in entry.subentries.values() if s.subentry_type != "energy_manager"]  # the coordinator files its own manager subentry
         assert (sub.subentry_type, sub.title, sub.unique_id) == ("marstek", "VenusE_17", f"marstek_{IP}")
         assert coord.sync_devices() is True

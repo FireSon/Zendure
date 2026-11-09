@@ -532,6 +532,10 @@
   },
   "config_panel": {
     "field": {
+      "allow_control": {
+        "name": "Autoriser le pilotage",
+        "description": "Expérimental : ZenMaster peut piloter cet appareil. Le pilotage n'est pas encore confirmé sur du matériel réel ; désactivé, l'appareil ne fait que remonter ses mesures."
+      },
       "temp_entity": {
         "name": "Capteur de température",
         "description": "Le capteur qui mesure la température de ce stockage."

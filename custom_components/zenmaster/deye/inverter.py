@@ -61,6 +61,7 @@ class DeyeInverter(DistributionDevice):
         ConfigField("sn", {"text": {}}, cast=str, readonly=True),
         ConfigField("ip", {"text": {}}, cast=str),
         ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False),
+        ConfigField("allow_control", {"boolean": {}}, cast=bool),
         ConfigField("kwh", {"number": {"step": 0.1, "unit_of_measurement": "kWh"}}, cast=float, readonly=True),
         *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("soc", "battery_voltage", "battery_input", "battery_output", "pv_power", "temp", "work_mode")),
     ]
@@ -72,6 +73,7 @@ class DeyeInverter(DistributionDevice):
         self.product = product
         self.ip: str = data["ip"]
         self.port = int(data.get("port") or PORT)
+        self.allow_control: bool = bool(data.get("allow_control"))  # off by default: the control is not confirmed on a device
         self.on_config_changed: Any = None  # the coordinator: persist subentry_data(); nothing is learned over the stick
 
         # the registry entry first: the entities find their device there; the power profile follows from its own maximum currents at the first poll
@@ -108,7 +110,7 @@ class DeyeInverter(DistributionDevice):
             self.logger.close()
 
     def subentry_data(self) -> dict[str, Any]:
-        return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "kwh": self.kwh, "saved": self.saved}
+        return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "kwh": self.kwh, "saved": self.saved, "allow_control": self.allow_control}
 
     def config_changed(self) -> None:
         if self.on_config_changed is not None:

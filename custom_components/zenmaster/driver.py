@@ -48,9 +48,9 @@ class Driver:
         if (old := self.devices.get(data["sn"])) is not None:
             self.remove_device(old)
 
-        # a power device joins the fleet; every device is in the coordinator's list
+        # a power device joins the fleet when it may be steered; every device is in the coordinator's list
         device = self.DEVICE(self.hass, self, subentry_id, name, data, row)
-        if isinstance(device, DistributionDevice):
+        if isinstance(device, DistributionDevice) and device.allow_control:
             self.distribution.devices.append(device)
             device.on_invalidate = self.distribution.on_invalidate
         self.devices[device.sn] = device

@@ -76,7 +76,7 @@ async def start(monkeypatch, registers: dict[int, int], product: str = "HV", por
     hass.async_create_task = asyncio.get_running_loop().create_task  # unload hands back on a task of its own
     distribution = types.SimpleNamespace(devices=[], on_invalidate=lambda: None)
     driver = DeyeDriver(hass, "entry", [], distribution)
-    d = driver.init_device("sub1", "Deye_5678", {"sn": str(SERIAL), "product": product, "ip": "127.0.0.1", "port": port or stick_port, "kwh": 10.24})
+    d = driver.init_device("sub1", "Deye_5678", {"sn": str(SERIAL), "product": product, "ip": "127.0.0.1", "port": port or stick_port, "kwh": 10.24, "allow_control": True})
     for e in d.entities.values():
         if e is not None:
             e.hass = None
@@ -109,7 +109,7 @@ def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
 
         # reads only, every one with the stick's serial; in the fleet as a controller, which counts in no plan or regulation
         assert {f for f, _ in stick.requests} == {0x03} and {s for _, s in stick.requests} == {SERIAL}
-        assert distribution.devices == [d] and d.subentry_data() == {"product": "HV", "sn": str(SERIAL), "ip": "127.0.0.1", "port": d.port, "kwh": 10.24, "saved": {}}
+        assert distribution.devices == [d] and d.subentry_data() == {"product": "HV", "sn": str(SERIAL), "ip": "127.0.0.1", "port": d.port, "kwh": 10.24, "saved": {}, "allow_control": True}
         d.unload()
         stick.server.close()
 
@@ -201,7 +201,7 @@ def test_unknown_battery_type_is_skipped() -> None:
 def test_coordinator_builds_a_deye_in_the_fleet() -> None:
     async def scenario() -> None:
         coord, entry = _coord()
-        coord.discovered({"sn": str(SERIAL), "product": "HV", "ip": "127.0.0.1", "port": 1, "kwh": 10.24, "family": "Deye"}, kind="deye")
+        coord.discovered({"sn": str(SERIAL), "product": "HV", "ip": "127.0.0.1", "port": 1, "kwh": 10.24, "allow_control": True, "family": "Deye"}, kind="deye")
         (sub,) = [s for s in entry.subentries.values() if s.subentry_type != "energy_manager"]  # the coordinator files its own manager subentry
         assert sub.subentry_type == "deye"
         assert coord.sync_devices() is True
