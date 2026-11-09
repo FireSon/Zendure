@@ -9,7 +9,6 @@ import json
 import logging
 import random
 import time
-from collections.abc import Callable
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from types import SimpleNamespace
@@ -25,6 +24,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from ..config import ConfigField
 from ..const import DOMAIN
 from ..device import DeviceState, DistributionDevice
+from ..driver import Driver
 from ..entity import EntityDevice
 from .battery import ZendureBattery
 from .device import COMMAND_CHAR, READ_CHAR, ConnectionType, ZendureDevice
@@ -78,7 +78,7 @@ def product_row(product: str) -> Product | None:
     return PRODUCTS.get(product.lower().replace(" ", ""))
 
 
-class ZendureDriver:
+class ZendureDriver(Driver):
     """Connects to MQTT, discovers devices, routes telemetry; the coordinator turns its finds into subentries."""
 
     id = "zendure"  # the settings section and the subentry type of the devices
@@ -104,12 +104,7 @@ class ZendureDriver:
     ]
 
     def __init__(self, hass, entry_id: str, all_devices: list[EntityDevice], distribution) -> None:
-        self.hass = hass
-        self.entry_id = entry_id
-        self._all_devices = all_devices
-        self.distribution = distribution
-        self.devices: dict[str, ZendureSolarFlow | ZendureSmartMeter] = {}
-        self.on_discovered: Callable[[dict[str, Any]], None] | None = None  # the coordinator: a new device's subentry data plus its "family"
+        super().__init__(hass, entry_id, all_devices, distribution)
         self._ips: dict[str, str] = {}  # serial or MQTT address -> ip from mDNS, for a device that is not built yet
         self._mqtt_clients: dict[ConnectionType, mqtt.Client] = {}
         self._mqtt_log = logging.getLogger(f"{DOMAIN}.mqtt")  # raw payload log; the file is opened on first use
@@ -220,13 +215,6 @@ class ZendureDriver:
         self.devices[device.sn] = device
         self._all_devices.append(device)
         return device
-
-    def remove_device(self, device: EntityDevice) -> None:
-        device.unload()
-        self.devices.pop(device.device_id, None)  # the identity of a Zendure device is its serial
-        for collection in (self._all_devices, self.distribution.devices):
-            if device in collection:
-                collection.remove(device)
 
     @classmethod
     def device_family(cls, data: dict[str, Any]) -> str | None:

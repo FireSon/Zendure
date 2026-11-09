@@ -262,7 +262,7 @@ class Distribution(EntityDevice):
         mode = DistributionMode(entity.value)
         _LOGGER.info("Update operation: %s", mode)
 
-        if mode != DistributionMode.OFF and (len(self.devices) == 0 or all(d.state == DeviceState.OFFLINE for d in self.devices)):
+        if mode != DistributionMode.OFF and (len(self.devices) == 0 or all(d.state in (DeviceState.OFFLINE, DeviceState.CONTROLLER) for d in self.devices)):
             _LOGGER.warning("No devices online, not possible to start the operation")
             persistent_notification.async_create(self.hass, "No devices online, not possible to start the operation", PANEL_TITLE, PANEL_TITLE)
             self.power_off()  # the select already shows the new mode: back to off
@@ -339,7 +339,7 @@ class Distribution(EntityDevice):
 
         # a battery the fleet left without a setpoint hears the mode as well: one that regulates itself picks its setting from it, one at rest is a no-op for its dead band
         for d in self.devices:
-            if d.kwh and not d.power_setpoint and (d.state == DeviceState.EXTERNAL or abs(d.power_actual) < 10):
+            if d.kwh and not d.power_setpoint and (d.state in (DeviceState.EXTERNAL, DeviceState.CONTROLLER) or abs(d.power_actual) < 10):
                 d.power(0, self.mode)
 
     def update_telemetry(self, p1: int) -> int:

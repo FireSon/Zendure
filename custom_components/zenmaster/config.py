@@ -89,6 +89,8 @@ class Config:
         self.serialize(obj, name, config)
         config[name]["kind"] = type(obj).__name__  # the UI picks its card on this
         config[name]["fleet"] = isinstance(obj, DistributionDevice)  # the UI groups the battery fleet on this, not the class name
+        if isinstance(obj, DistributionDevice):
+            config[name]["state"] = int(obj.state)  # the UI dims what is offline or not heard yet; not a field, so a save never writes it back
         config[name]["subentry_id"] = getattr(obj, "subentry_id", None)  # a device is edited and removed through its subentry
 
     def serialize(self, obj: Any, name: str | None = None, payload: dict | None = None) -> None:

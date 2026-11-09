@@ -22,7 +22,7 @@ from ..sensor import HaSensor
 
 if TYPE_CHECKING:
     from ..distribution import DistributionMode
-    from .driver import AnkerDriver
+    from .driver import AnkerDriver, Product
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -58,13 +58,13 @@ class AnkerSolarbank(DistributionDevice):
 
     CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False), *FLEET, ConfigField("temp", {"entity": {}}, readonly=True)]
 
-    def __init__(self, hass: HomeAssistant, driver: AnkerDriver, subentry_id: str | None, name: str, data: dict[str, Any], dc_pv: bool) -> None:
+    def __init__(self, hass: HomeAssistant, driver: AnkerDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
         self.driver = driver
         self.sn: str = data["sn"]
         self.model: str = data["product"]  # the product code from the serial
         self.ip: str = data["ip"]
         self.port = int(data.get("port") or PORT)
-        self.dc_pv = dc_pv
+        self.dc_pv = product.dc_pv
         self.on_config_changed: Any = None  # the coordinator: persist subentry_data() after the ip was learned
         self.mode_mask: int | None = None  # the modes the firmware offers now; None until read
         self.home_input = self.home_output = self.battery_input = self.battery_output = 0

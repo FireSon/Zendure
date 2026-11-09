@@ -3,6 +3,8 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from conftest import fake_hass
 import custom_components.zenmaster.coordinator as coordinator_module
 from custom_components.zenmaster.binary_sensor import HaBinarySensor
@@ -99,6 +101,14 @@ def test_track_p1_skips_the_capacity_tariff_entities(monkeypatch) -> None:
     assert [e for e, _, _ in calls] == ["sensor.p1_digital_meter_power"]
 
 
+def test_track_p1_skips_the_statistics_entities(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Tibber's average, minimum and maximum, DSMR's threshold and HomeWizard's battery group are no grid readings
+    keys = ("power", "average_power", "min_power", "max_power", "actual_threshold_electricity", "battery_group_power")
+    coord, _ = make_coordinator(monkeypatch, [power_entity(f"sensor.meter_{key}") for key in keys])
+    coord._track_p1("device")
+    assert coord.p1_slots["total"] == [("sensor.meter_power", 1)]
+
+
 def test_track_p1_huawei_phase_sign_flips(monkeypatch) -> None:
     # Huawei signs the grid export-positive, so its phases are negated against the import-positive convention
     entities = [
@@ -111,13 +121,13 @@ def test_track_p1_huawei_phase_sign_flips(monkeypatch) -> None:
     assert coord.p1_slots["total"] == [("sensor.power_meter_active_power", -1)]
 
 
-def test_track_p1_on_our_own_meters_counts_only_the_grid(monkeypatch) -> None:
-    # a Deye carries battery and PV power next to its grid: the zenmaster profile takes only the grid total, the phases go by name
-    keys = ("battery_input", "battery_output", "pv_power", "phase1_power", "phase2_power", "phase3_power", "grid_power")
-    coord, _ = make_coordinator(monkeypatch, [power_entity(f"sensor.deye_78_{k}", platform="zenmaster") for k in keys])
+def test_track_p1_on_our_own_meters_needs_no_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    # the Deye's meter device carries only its grid: the total and the phases go by name
+    keys = ("grid_power", "phase1_power", "phase2_power", "phase3_power")
+    coord, _ = make_coordinator(monkeypatch, [power_entity(f"sensor.deye_78_meter_{key}", platform="zenmaster") for key in keys])
     coord._track_p1("device")
-    assert coord.p1_slots["total"] == [("sensor.deye_78_grid_power", 1)]
-    assert [coord.p1_slots[p] for p in ("l1", "l2", "l3")] == [[(f"sensor.deye_78_phase{i}_power", 1)] for i in (1, 2, 3)]
+    assert coord.p1_slots["total"] == [("sensor.deye_78_meter_grid_power", 1)]
+    assert [coord.p1_slots[phase] for phase in ("l1", "l2", "l3")] == [[(f"sensor.deye_78_meter_phase{number}_power", 1)] for number in (1, 2, 3)]
 
     # the Zendure smart meter on the same platform keeps its total
     coord, _ = make_coordinator(monkeypatch, [power_entity(f"sensor.smartmeter_{k}", platform="zenmaster") for k in ("total_power", "phase1_power")])

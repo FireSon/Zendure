@@ -20,6 +20,10 @@ def crc16(data: bytes) -> int:
     return crc
 
 
+class Refused(OSError):
+    """The inverter answered with a Modbus exception: it refuses the request, the connection is fine."""
+
+
 class Logger:
     """One TCP connection to the stick, opened on first use and dropped after any failure."""
 
@@ -41,6 +45,10 @@ class Logger:
         # function 3, holding registers; the answer is function code, byte count, the words big endian
         data = await self.request(struct.pack(">BHH", 0x03, start, count))
         return list(struct.unpack(f">{count}H", data[2 : 2 + 2 * count]))
+
+    async def write(self, address: int, value: int) -> None:
+        # function 16 with one register: a Deye takes its settings only this way
+        await self.request(struct.pack(">BHHBH", 0x10, address, 1, 2, value & 0xFFFF))
 
     async def request(self, pdu: bytes) -> bytes:
         # a failed request drops the connection: a late answer left behind would be taken for the next one
@@ -69,7 +77,7 @@ class Logger:
         if len(modbus) < 5 or crc16(modbus[:-2]) != struct.unpack("<H", modbus[-2:])[0]:
             raise OSError(f"no valid Modbus answer in {reply.hex()}")
         if modbus[1] & 0x80:
-            raise OSError(f"Modbus exception {modbus[2]}")
+            raise Refused(f"Modbus exception {modbus[2]}")
         return modbus[1:-2]
 
     async def receive(self) -> bytes:

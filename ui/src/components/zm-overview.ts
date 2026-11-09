@@ -26,6 +26,7 @@ const LBL_NARROW = 160;  // px: the name column on the phone
 
 // ConnectionType from device.py: 0 offline, 1 local broker, 2 cloud, 3 zensdk (http), 4 ble
 const CONN_COLOR: Record<number, string> = { 0: '#e8645a', 1: '#4a90d9', 2: '#1fb89a', 3: '#3aa0c9', 4: '#4a90d9' };
+const CONTROLLER_COLOR = '#9b7bd4';  // regulates itself: online, not steered
 const PHASE_ORDER = ['L1', 'L2', 'L3', 'L1-3', ''];  // the device rows by phase; an unknown phase last
 
 interface DevRow {
@@ -33,7 +34,7 @@ interface DevRow {
   net: number; wattColor: string; socPct: number; dim: boolean;
   kwhAvail: number | null; kwhCap: number;
   inAggr: number | null; outAggr: number | null; rte: number | null;
-  solar: number | null; temp: number | null; tempColor: string; conn: number; online: boolean; phase: string;
+  solar: number | null; temp: number | null; tempColor: string; dot: string; online: boolean; phase: string;
 }
 
 export class ZmOverview extends LitElement {
@@ -192,14 +193,15 @@ export class ZmOverview extends LitElement {
       const load = net !== 0 && rated > 0 ? Math.abs(net) / rated : 0;
       const temp = this._optNum(e.temp);
       const gridOff = e.grid_state ? this._ent(e.grid_state)?.state === 'off' : false;  // no grid on the AC side: shown as offline
+      const offline = [0, 2].includes(Number(e.state ?? 0)) || gridOff;  // CREATED or OFFLINE: never heard or unreachable
       return {
         id, name: e.name || id, model: e.model ?? '', eid: e.home_output ?? '', hasPack: kwhCap > 0,
         net, wattColor: net === 0 ? 'var(--zm-text-dim)' : load >= 0.97 ? '#e8645a' : load >= 0.85 ? '#f5a623' : '#13967d',
-        socPct, dim: Number(e.connection ?? 0) === 0 || gridOff,
+        socPct, dim: offline,
         kwhAvail: kwhCap > 0 ? kwhCap * socPct / 100 : null, kwhCap,
         inAggr: this._optNum(e.home_input_aggr), outAggr: this._optNum(e.home_output_aggr), rte: this._optNum(e.rte),
         solar: this._optNum(e.solar), temp, tempColor: temp != null && temp >= 58 ? '#e8645a' : temp != null && temp >= 50 ? '#f5a623' : 'var(--zm-text)',
-        conn: gridOff ? 0 : Number(e.connection ?? 0), online: Number(e.connection ?? 0) !== 0, phase: this._phase(e.power_phase),
+        dot: offline ? CONN_COLOR[0] : Number(e.state) === 1 ? CONTROLLER_COLOR : CONN_COLOR[Number(e.connection ?? 1)], online: !offline, phase: this._phase(e.power_phase),
       };
     }).sort((a, b) => PHASE_ORDER.indexOf(a.phase) - PHASE_ORDER.indexOf(b.phase));
   }
@@ -242,7 +244,7 @@ export class ZmOverview extends LitElement {
     return html`
       <div class="row ${d.dim ? 'dim' : ''}">
         <div class="lbl">
-          <div class="nm"><div class="n">${this._haName(d.name, d.eid)}</div><div class="m"><i style="background:${CONN_COLOR[d.conn] ?? 'var(--zm-text-faint)'}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
+          <div class="nm"><div class="n">${this._haName(d.name, d.eid)}</div><div class="m"><i style="background:${d.dot}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
           <div class="w" style="color:${d.wattColor}">${d.net > 0 ? '+' : ''}${d.net}<span class="u"> W</span></div>
           <div class="bat">${d.hasPack ? html`<i style="width:${d.socPct}%"></i>` : nothing}</div>
           ${this.view === 'plan' ? html`<div class="dpop">${this._devTiles(d)}</div>` : nothing}

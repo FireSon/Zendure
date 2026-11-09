@@ -28,11 +28,12 @@ class DeviceState(IntEnum):
     """Shared meaning for every vendor; the distribution relies on these semantics."""
 
     CREATED = 0  # just built, the device has never reported
-    OFFLINE = 1  # unreachable: the vendor machinery is probing
-    EXTERNAL = 2  # own behavior, not under our control
-    SENT = 3  # command sent, awaiting the transport ack
-    CONFIRM = 4  # acked, awaiting the output to follow
-    ACTIVE = 5  # under control at a confirmed setpoint (0 W included)
+    CONTROLLER = 1  # regulates itself and is not steered by us: in no capacity, plan or regulation
+    OFFLINE = 2  # unreachable: the vendor machinery is probing
+    EXTERNAL = 3  # own behavior, not under our control
+    SENT = 4  # command sent, awaiting the transport ack
+    CONFIRM = 5  # acked, awaiting the output to follow
+    ACTIVE = 6  # under control at a confirmed setpoint (0 W included)
 
 
 @dataclass

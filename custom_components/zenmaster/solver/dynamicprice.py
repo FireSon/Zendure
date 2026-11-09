@@ -189,7 +189,11 @@ class DynamicPrice(SolverEntry):
 
     async def _refresh(self, now: datetime) -> None:
         # last_fetch marks a FULLY completed refresh; any failure leaves it unset so the next tick retries
-        await self._provider.fetch(self, now)
+        try:
+            await self._provider.fetch(self, now)
+        except ProviderError as err:
+            _LOGGER.warning("price refresh: %s", err)
+            return
         self.price_buy.known = self.price_sell.known = self._provider.known_until  # the outlook dashes the prices past this point
         self._provider.last_fetch = now
 

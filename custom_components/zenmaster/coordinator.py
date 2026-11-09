@@ -31,9 +31,13 @@ from .solver.dynamicprice import DynamicPrice
 from .solver.forecast import Forecast, SolarPanel
 from .solver.heating import HeatingHeatPump, PoolHeatPump
 from .solver.solver import LpSolver
-from .drivers import DRIVERS
+from .anker.driver import AnkerDriver
+from .deye.driver import DeyeDriver
+from .marstek.driver import MarstekDriver
+from .sessy.driver import SessyDriver
+from .zendure.driver import ZendureDriver
 from .const import DOMAIN, PANEL_TITLE, Phase, watt_factor
-from .entity import EntityDevice, snakecase, unique_name
+from .entity import EntityDevice, device_by_identifier, snakecase, unique_name
 from .device import DistributionDevice
 from .distribution import Distribution
 
@@ -51,16 +55,19 @@ SUBENTRY_TYPES = {
     "pool_heat_pump": PoolHeatPump,
 }
 
+# every brand ZenMaster speaks to; the config flow asks them about a find before the entry exists
+DRIVERS = (ZendureDriver, MarstekDriver, AnkerDriver, SessyDriver, DeyeDriver)
+
 # per integration how its grid total is read: ("enum", power fragment, direction fragment, the state that means export),
 # or a list of (name fragment, sign) for the total and the phases; absent means the default produced/consumed name rules
 P1_PROFILES: dict[str, Any] = {
     "solaredge": ("enum", "grid_power", "grid_flow_direction", "export"),
     "enphase_envoy": [("net_consumption", 1)],
     "sma": [("metering_power_absorbed", 1), ("metering_power_supplied", -1), ("feed", -1), ("draw", 1)],
-    "zenmaster": [("grid_power", 1), ("total_power", 1)],  # our own meters: the Deye's grid total and the Zendure smart meter's; the other W sensors on a Deye are no grid reading
 }
 PHASE_FRAGS = ((), ("phase_1", "phase1", "_l1", "phase_a"), ("phase_2", "phase2", "_l2", "phase_b"), ("phase_3", "phase3", "_l3", "phase_c"))  # indexed on Phase: the name fragments that put a P1 entity on that phase
-NOT_METER = ("demand", "peak")  # P1 entities in W or kW that are no reading of the grid: the capacity tariff's monthly peak and quarter average (HomeWizard, DSMR in Belgium)
+# P1 entities in W or kW that are no reading of the grid: the capacity tariff, the meter's statistics and thresholds, a battery group
+NOT_METER = ("demand", "peak", "average", "min_power", "max_power", "threshold", "battery")
 
 
 def phase_of(eid: str) -> Phase:
@@ -294,7 +301,7 @@ class Coordinator:
                     name=sub.title,
                     manufacturer=PANEL_TITLE,
                     model=cls.__name__,
-                    via_device=(DOMAIN, PANEL_TITLE),  # the ZenMaster device's identifier
+                    via_device_id=(zen.id if (zen := device_by_identifier(self.hass, PANEL_TITLE)) else None),  # the ZenMaster device
                 )
                 EntityDevice.__init__(consumer, self.hass, sid, sub.title, subentry_id=sid)  # its own device: status, buttons and settings
                 consumer.device_load(self.config.section("devices", consumer.device_id))  # the settings as they stood before the restart

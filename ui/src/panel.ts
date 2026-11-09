@@ -39,7 +39,7 @@ class ZenMasterPanel extends LitElement {
   }
 }
 
-customElements.define('zenmaster-panel', ZenMasterPanel);
+if (!customElements.get('zenmaster-panel')) customElements.define('zenmaster-panel', ZenMasterPanel);
 
 // HA removes the whole custom panel during suspendWhenHidden, and its rebuild can die in an aborted
 // view transition (seen on frontend 20260527.6), leaving ha-panel-custom empty until a manual refresh.

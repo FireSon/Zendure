@@ -611,13 +611,14 @@ def test_a_solve_without_prices_holds_the_fleet_at_zero_while_optimize_is_on() -
 
 
 def test_a_battery_without_a_setpoint_hears_the_mode() -> None:
-    # a battery that regulates itself (EXTERNAL, charging 1500 W) and one at rest hear SMART_CHARGING; one that is starting up is left alone
-    regulating, resting, starting = FakeDevice("r", 50.0), FakeDevice("s", 50.0), FakeDevice("u", 50.0)
+    # a battery that regulates itself (EXTERNAL or CONTROLLER, charging 1500 W) and one at rest hear SMART_CHARGING; one that is starting up is left alone
+    regulating, controller, resting, starting = FakeDevice("r", 50.0), FakeDevice("c", 50.0), FakeDevice("s", 50.0), FakeDevice("u", 50.0)
     regulating.state, regulating.power_actual = DeviceState.EXTERNAL, -1500
+    controller.state, controller.power_actual = DeviceState.CONTROLLER, -1500
     starting.power_setpoint = -100
-    dist = make_distribution([regulating, resting, starting], DistributionMode.SMART_CHARGING)
+    dist = make_distribution([regulating, controller, resting, starting], DistributionMode.SMART_CHARGING)
     asyncio.run(dist._process_p1(0, [0.0, 0.0, 0.0, 0.0], 1000.0))
-    assert (regulating.heard, resting.heard, starting.heard) == (DistributionMode.SMART_CHARGING, DistributionMode.SMART_CHARGING, None)
+    assert (regulating.heard, controller.heard, resting.heard, starting.heard) == (DistributionMode.SMART_CHARGING, DistributionMode.SMART_CHARGING, DistributionMode.SMART_CHARGING, None)
     assert starting.power_setpoint == -100, "the start-up command stands"
 
 

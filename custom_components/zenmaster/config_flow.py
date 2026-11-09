@@ -9,7 +9,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.core import callback
 
 from .const import DOMAIN, PANEL_TITLE
-from .drivers import DRIVERS
+from .coordinator import DRIVERS
 from .entity import unique_name
 
 

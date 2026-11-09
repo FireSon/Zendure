@@ -22,7 +22,7 @@ from ..sensor import HaSensor
 
 if TYPE_CHECKING:
     from ..distribution import DistributionMode
-    from .driver import MarstekDriver
+    from .driver import MarstekDriver, Product
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class MarstekVenus(DistributionDevice):
 
     CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False), *FLEET, ConfigField("temp", {"entity": {}}, readonly=True)]
 
-    def __init__(self, hass: HomeAssistant, driver: MarstekDriver, subentry_id: str | None, name: str, data: dict[str, Any], pwr_max: int) -> None:
+    def __init__(self, hass: HomeAssistant, driver: MarstekDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
         self.driver = driver
         self.sn: str = data["sn"]  # the identity: the ip it was added with
         self.model: str = data["product"]  # the register generation: v2, v3, vA or vD
@@ -72,7 +72,7 @@ class MarstekVenus(DistributionDevice):
 
         # the registry entry first: the entities find their device there
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, self.sn)}, name=name, manufacturer=driver.manufacturer, model=f"Venus ({self.model})")
-        DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(pwr_max), ProfileCharge(-pwr_max)], name, subentry_id)
+        DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(product.pwr_max), ProfileCharge(-product.pwr_max)], name, subentry_id)
         self.entities["soc_min"].update_value(100 - DOD_DEFAULT)
         self.entities["soc_max"].update_value(100)
 
