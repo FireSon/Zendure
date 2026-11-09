@@ -1,8 +1,10 @@
 """Zonneplan OTP login: the two saves, the token exchange and what happens when a code is refused."""
 
 import asyncio
+from datetime import time
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from custom_components.zenmaster.solver.dynamicprice import DynamicPrice, ProviderError
@@ -50,7 +52,7 @@ def _dp():
     o = DynamicPrice()
     o.email = "user@example.com"
     o.provider = "ZonneplanProvider"
-    o.price_buy, o.price_sell = SimpleNamespace(known=None), SimpleNamespace(known=None)  # what entry_config sets up
+    o.price_buy, o.price_sell = SimpleNamespace(known=None, data=np.zeros(7 * 96)), SimpleNamespace(known=None, data=np.zeros(7 * 96))  # what entry_config sets up
     return o
 
 
@@ -134,7 +136,7 @@ def test_the_code_is_never_stored_and_the_attempt_is():
 
     dp = _dp()
     dp.auth_uuid, dp.code_verifier = "S1", "V"
-    Config().deserialize_poly([dp], {"id": "price", "otp": "123456"})
+    Config().deserialize_poly([dp], "price", {"otp": "123456"})
     assert not hasattr(dp, "otp"), "de code mag nooit op het object belanden"
     payload = {}
     Config().serialize(dp, "price", payload)
@@ -156,6 +158,7 @@ def test_saving_the_card_never_asks_for_a_code():
     class Fake:
         last_fetch = None
         known_until = 0
+        publish = time(13, 0)
 
         async def request_otp(self, dp):
             raise AssertionError("opslaan mag nooit een code aanvragen")
@@ -176,6 +179,7 @@ def test_the_button_asks_and_the_next_save_exchanges():
     class Fake:
         last_fetch = None
         known_until = 0
+        publish = time(13, 0)
 
         async def request_otp(self, dp):
             steps.append("request")
@@ -189,6 +193,7 @@ def test_the_button_asks_and_the_next_save_exchanges():
 
         async def fetch(self, dp, now):
             steps.append("fetch")
+            return dp.price_buy.data.copy(), dp.price_sell.data.copy()
 
     def wire(o):
         o._provider = Fake()
@@ -221,6 +226,7 @@ def test_a_refused_code_keeps_the_field_open():
     class Fake:
         last_fetch = None
         known_until = 0
+        publish = time(13, 0)
 
         async def submit_otp(self, dp, otp):
             raise ProviderError("Zonneplan: code rejected (HTTP 400)")
@@ -255,20 +261,18 @@ class _GetSession:
 def _fetch(monkeypatch, payload):
     from datetime import datetime
 
-    import numpy as np
-
     session = _GetSession(payload)
     monkeypatch.setattr(zonneplan, "async_get_clientsession", lambda *a, **k: session)
 
     async def wholesale(self, dp, now):  # the indicative base curve, replaced here so only the chart is under test
-        dp.price_buy.data[:] = dp.price_sell.data[:] = 0.20
+        return np.full(dp.price_buy.data.size, 0.20), np.full(dp.price_sell.data.size, 0.20)
 
     monkeypatch.setattr(zonneplan.Provider, "fetch", wholesale)
     dp = _dp()
     dp.token = {"access_token": "AT"}
     dp.price_buy = SimpleNamespace(data=np.zeros(7 * 96))
     dp.price_sell = SimpleNamespace(data=np.zeros(7 * 96))
-    asyncio.run(zonneplan.ZonneplanProvider().fetch(dp, datetime.now().astimezone()))
+    dp.price_buy.data[:], dp.price_sell.data[:] = asyncio.run(zonneplan.ZonneplanProvider().fetch(dp, datetime.now().astimezone()))
     return dp, session
 
 
@@ -322,6 +326,7 @@ def test_the_token_is_written_to_the_store():
     class Fake:
         last_fetch = None
         known_until = 0
+        publish = time(13, 0)
 
         async def request_otp(self, dp):
             raise AssertionError("met een code hoort hij niet opnieuw te vragen")
@@ -332,7 +337,7 @@ def test_the_token_is_written_to_the_store():
             return True
 
         async def fetch(self, dp, now):
-            pass
+            return dp.price_buy.data.copy(), dp.price_sell.data.copy()
 
     dp = _dp()
     dp._provider = Fake()

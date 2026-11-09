@@ -82,7 +82,6 @@ class DistributionEntry(SolverEntry):
         super().__init__()
         self.distribution = distribution
         self.id = "solver"
-        self.plan_power = 0.0  # setpoint from the plan; W, negative = charge
         self._units: list[BatteryUnit] = []  # one per battery, built in entry_config
         self.stock = 0.0  # kWh in the fleet whose cost basis we know
         self.basis = 0.0  # weighted average price paid for that stock
@@ -130,6 +129,10 @@ class DistributionEntry(SolverEntry):
         lp.rowQuarter({self._bat_charge: 1.0, **{u.charge: -1.0 for u in self._units}, **{u.dc_in: -1.0 for u in self._units}}, lo=0.0, hi=0.0)
         lp.rowQuarter({self._bat_discharge: 1.0, **{u.discharge: -1.0 for u in self._units}}, lo=0.0, hi=0.0)
 
+        # the regulatory cap on what the fleet delivers to the house (Germany: 800 W), in the plan as in the live setpoint
+        if d.max_output > 0:
+            lp.rowQuarter({**{u.discharge: 1.0 for u in self._units}, **{u.dc_out: 1.0 for u in self._units}}, hi=d.max_output / 1000)
+
     @staticmethod
     def _walk(stock: float, basis: float, charge: float, discharge: float, charge_grid: float, discharge_grid: float, buy: float, sell: float) -> tuple[float, float, float]:
         # one step of the stock: a charge sets its average price (grid at buy, own solar at sell), a discharge saves against that price
@@ -164,7 +167,7 @@ class DistributionEntry(SolverEntry):
                 delta[key] = max(0.0, fresh[key] - self._counters.get(key, fresh[key]))
             if len(delta) == 4 and self._counters:
                 charge, discharge = delta["charge_power"], delta["discharge_power"]
-                self.stock, self.basis, saving = self._walk(self.stock, self.basis, charge, discharge, min(charge, delta["grid_import"]), min(discharge, delta["grid_export"]), buy, sell)
+                self.stock, self.basis, saving = self._walk(self.stock, self.basis, charge, discharge, min(charge, delta["grid_import"]), min(discharge, delta["grid_export"]), float(lp.price_buy.data[lp.settle]), float(lp.price_sell.data[lp.settle]))
                 self.savings += saving
             self._counters.update(fresh)
 
@@ -209,8 +212,8 @@ class DistributionEntry(SolverEntry):
         # the mode implied by the solver plan for the current slot; trading with the grid gives every battery its planned setpoint
         if getattr(self, "_bat_charge", None) is None or self._bat_charge.dest is None:
             return DistributionMode.OFF
-        net = self._bat_charge.dest.data[12] - self._bat_discharge.dest.data[12]  # >0 charge, <0 discharge
-        self.plan_power = -net * 1000.0
+        # the AC side, as the setpoints count it: a pack filling from its own panels leaves the house surplus to the plan
+        net = sum(u.charge.dest.data[12] - u.discharge.dest.data[12] for u in self._units)  # >0 charge, <0 discharge
         if net > EPS_KW:
             return DistributionMode.INDIVIDUAL if self.grid_buy.dest.data[12] > EPS_KW else DistributionMode.SMART_CHARGING
         if net < -EPS_KW:

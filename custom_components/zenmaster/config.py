@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
@@ -8,6 +9,8 @@ from .device import DistributionDevice
 
 if TYPE_CHECKING:
     from homeassistant.helpers.storage import Store
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -23,6 +26,15 @@ class ConfigField:
     hidden: bool = False  # sent to the card but never drawn; only there to drive another field's visible_when
     visible_when: dict | None = None  # {field_id: value or [values]} -> field shown only when it matches
     section_key: str | None = None  # display grouping in the UI card; a technical key, the UI translates it
+
+
+def read_field(obj: Any, field: ConfigField, value: Any) -> Any:
+    # the value through the field's cast; one it cannot read is logged and the attribute keeps what it had
+    try:
+        return field.cast(value)
+    except (TypeError, ValueError):
+        _LOGGER.warning("%s %s: %r is not readable, %r kept", type(obj).__name__, field.id, value, getattr(obj, field.id, None))
+        return getattr(obj, field.id, None)
 
 
 # what every fleet device shows: its identity, and its battery; a brand puts its own fields around them
@@ -55,7 +67,7 @@ class Config:
         # every persisted field the payload holds goes onto the object, through its cast
         for field in fields:
             if field.cast is not None and not field.transient and field.id in payload:
-                setattr(obj, field.id, field.cast(payload[field.id]))
+                setattr(obj, field.id, read_field(obj, field, payload[field.id]))
 
     def deserialize(self, obj: Any, fields: list[ConfigField]) -> None:
         # get the key
@@ -67,13 +79,13 @@ class Config:
             return
         self._apply(obj, fields, payload)
 
-    def deserialize_poly(self, objects: list[Any], payload: dict) -> Any:
-        # find the member whose key field matches the payload, then update its attributes
+    def deserialize_poly(self, objects: list[Any], key: str, payload: dict) -> Any:
+        # find the member whose key field is the given key, then update its attributes
         for obj in objects:
             fields = fields_of(obj)
             if fields is None or not (fid := next((f for f in fields if f.is_key), None)):
                 continue
-            if payload.get(fid.id) != getattr(obj, fid.id, None):
+            if getattr(obj, fid.id, None) != key:
                 continue
             self._apply(obj, fields, payload)
             return obj
@@ -87,6 +99,10 @@ class Config:
             return
         schema[name] = [{k: v for k, v in asdict(f).items() if k != "cast"} for f in fields]
         self.serialize(obj, name, config)
+        # a secret never leaves the backend: the panel only learns that one is set
+        for field in fields:
+            if field.selector.get("text", {}).get("type") == "password" and field.id in config[name]:
+                config[name][field.id] = True
         config[name]["kind"] = type(obj).__name__  # the UI picks its card on this
         config[name]["fleet"] = isinstance(obj, DistributionDevice)  # the UI groups the battery fleet on this, not the class name
         if isinstance(obj, DistributionDevice):

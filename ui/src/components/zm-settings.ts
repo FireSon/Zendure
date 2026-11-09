@@ -2,7 +2,6 @@ import { LitElement, html, css } from 'lit';
 import { property } from 'lit/decorators.js';
 import { tokens } from '../tokens.js';
 import type { Schema } from '../types.js';
-import { readValue } from '../fields.js';
 import { t } from '../service/i18n.js';
 import './zm-group.js';
 
@@ -36,11 +35,9 @@ export class ZmSettings extends LitElement {
         ${groups.map((k) => {
           const m = GROUP_META[k] ?? { title: k, tag: '', icon: '' };
           const fields = this.schema![k].filter((f) => !f.is_key && !f.expert && !(f.readonly && f.selector?.entity));
-          // the ZenMaster card carries the dynamic price in a section of its own; those fields read and save on the price entry, its key rides along hidden
-          if (k === 'distribution') fields.push(...(this.schema!['price'] ?? []).filter((f) => !f.expert && !(f.readonly && f.selector?.entity)).map((f) => ({ ...f, entry: 'price', section_key: 'price', hidden: f.hidden || f.is_key })));
-          const keyField = this.schema![k].find((f) => f.is_key);
-          const keyPatch = keyField ? { [keyField.id]: readValue(this.config, k, keyField) } : {};
-          return html`<zm-group .entry=${k} .fields=${fields} .config=${this.config} .hass=${this.hass} .keyPatch=${keyPatch} heading=${t(`ui.group.${k}.title`, m.title)} tag=${t(`ui.group.${k}.tag`, m.tag)} iconKey=${m.icon}></zm-group>`;
+          // the ZenMaster card carries the dynamic price in a section of its own; those fields read and save on the price entry
+          if (k === 'distribution') fields.push(...(this.schema!['price'] ?? []).filter((f) => !f.is_key && !f.expert && !(f.readonly && f.selector?.entity)).map((f) => ({ ...f, entry: 'price', section_key: 'price' })));
+          return html`<zm-group .entry=${k} .fields=${fields} .config=${this.config} .hass=${this.hass} heading=${t(`ui.group.${k}.title`, m.title)} tag=${t(`ui.group.${k}.tag`, m.tag)} iconKey=${m.icon}></zm-group>`;
         })}
       </div>
     `;

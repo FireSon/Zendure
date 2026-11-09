@@ -42,7 +42,7 @@ def _house() -> Heating:
 def _house_lp(price: list[float], outdoor: float, now: datetime):
     grid = _Grid(price)
     h = _house()
-    lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    lp = LpSolver(track=lambda *a, **k: None, horizon=96)
     lp.hass = None
     lp.temp, lp.wind, lp.sun = (lp.data(n, u, 7, source="meteo") for n, u in (("temp", "C"), ("wind", "m/s"), ("sun", "W/m2")))  # the weather the house loses heat to
     lp.temp.data[12:108] = outdoor
@@ -86,7 +86,7 @@ def test_max_power_caps_the_draw() -> None:
     h.phase = Phase.l1
     h.temp_entity = ""
     h.max_power = 3.22
-    lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    lp = LpSolver(track=lambda *a, **k: None, horizon=96)
     lp.hass = None
     lp.init([_Grid([0.1] * 96), h])
 
@@ -129,7 +129,7 @@ def _boiler(temp: float = 38.0) -> BoilerHeatPump:
 
 
 def _run(h: BoilerHeatPump, buy: list[float], now: datetime, solar: list[float] | None = None, outside: list[float] | None = None) -> None:
-    lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    lp = LpSolver(track=lambda *a, **k: None, horizon=96)
     lp.hass = None  # offline: skips calibration in entry_prerun
     lp.init([_Grid([0.1] * 96), _Prices(buy, solar, outside), h])
     asyncio.run(lp.run(now))
@@ -335,7 +335,7 @@ def _balance_kwh(sun: float, wind: float) -> float:
     # production window of 192 quarters (a list sized for 96 crashed there): planned kWh over the two days
     h = _house()
     h.ua, h.ua_wind, h.sun_gain, h.q_int, h.ci, h.cm, h.him = 0.174, 0.0086, 0.0066, 0.39, 8.0, 12.5, 2.4
-    lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None)
+    lp = LpSolver(track=lambda *a, **k: None)
     lp.hass = None
     lp.temp, lp.wind, lp.sun = (lp.data(n, u, 7, source="meteo") for n, u in (("temp", "C"), ("wind", "m/s"), ("sun", "W/m2")))
     lp.temp.data[12:204], lp.wind.data[12:204], lp.sun.data[12:204] = 8.0, wind, sun
@@ -439,7 +439,7 @@ def test_the_house_fit_finds_a_known_house_back(monkeypatch) -> None:
 
     class _Get:
         async def __aenter__(self):
-            return SimpleNamespace(json=lambda: asyncio.sleep(0, {"hourly": {"time": times, "temperature_2m": list(te), "shortwave_radiation": list(sun), "wind_speed_10m": list(wind)}}))
+            return SimpleNamespace(raise_for_status=lambda: None, json=lambda: asyncio.sleep(0, {"hourly": {"time": times, "temperature_2m": list(te), "shortwave_radiation": list(sun), "wind_speed_10m": list(wind)}}))
         async def __aexit__(self, *a):
             return False
 

@@ -181,7 +181,7 @@ class LpColumn:
 
 
 class LpSolver:
-    def __init__(self, track: Callable[[str, callable]], state: Callable[[str, callable]], horizon: int = 192):
+    def __init__(self, track: Callable[[str, callable]], horizon: int = 192):
         self.horizon = horizon  # solve window in 15-min slots (192 = 48h); 12 history slots precede it
         self._data: list[SolverData] = []
         self._entries: list[SolverEntry] = []
@@ -189,7 +189,6 @@ class LpSolver:
         self._rows = []
         self._columns: list[LpColumn] = []
         self.track = track
-        self.state = state
         self.globals: dict[str, Any] = {}  # shared blackboard; entries publish/read by name in entry_config
         self.price_buy: SolverData = None  # set by DynamicPrice, read by baseload
         self.price_sell: SolverData = None  # set by DynamicPrice, read by forecast
@@ -199,6 +198,7 @@ class LpSolver:
         self.l2: np.array
         self.l3: np.array
         self._last_slot: int | None = None  # quarter index of the last run, drives shift()
+        self.settle = 12  # index of the quarter the measurements since the previous run belong to
 
     def init(self, entries):
         # one-time: build columns + rows. The structure stays fixed for the whole run; bounds are lambdas.
@@ -213,16 +213,18 @@ class LpSolver:
 
         self.rowQuarter({"supply": 1.0, "draw": -1.0}, lo=lambda t: self.l1[t] + self.l2[t] + self.l3[t], hi=lambda t: self.l1[t] + self.l2[t] + self.l3[t])
         self.limit = self.globals["phase_limit_kw"]
+        # per phase the draws in the room the fixed load leaves; a phase already full leaves none, never an infeasible plan
         for ph, name in ((1, "l1"), (2, "l2"), (3, "l3")):
             factors = {c: (1.0 if p == ph else 1.0 / 3) for c, p in self._phase_columns if p in (0, ph)}
-            self.rowQuarter(factors, hi=lambda t, n=name: self.limit - getattr(self, n)[t])
+            self.rowQuarter(factors, hi=lambda t, n=name: max(0.0, self.limit - getattr(self, n)[t]))
 
     async def run(self, now):
         # shift the history window one slot per elapsed quarter (re-runs within the same quarter don't shift)
         slot = int(now.timestamp()) // 900
-        if self._last_slot is not None:
-            for _ in range(min(max(0, slot - self._last_slot), 12)):
-                self.shift()
+        elapsed = max(0, slot - self._last_slot) if self._last_slot is not None else 0
+        self.shift(elapsed)
+        # what was measured since the previous run happened in its quarter: settlements take their price there, the oldest one kept after a long gap
+        self.settle = 12 - min(elapsed, 12)
         self._last_slot = slot
 
         # Create the arrays
@@ -329,9 +331,9 @@ class LpSolver:
         self._data.append(data)
         return data
 
-    def plan(self) -> list[dict]:
-        # UI get_plan: every SolverData as its full slot series (12 history slots first, index 12 = now)
-        return [{"id": sd.id, "uom": sd.uom, "source": sd.source, "known": sd.known, "values": list(sd.data)} for sd in self._data]
+    def plan(self) -> dict:
+        # UI get_plan: the quarter of index 12 (the last run), and every SolverData as its full slot series (12 history slots first)
+        return {"slot": self._last_slot, "series": [{"id": sd.id, "uom": sd.uom, "source": sd.source, "known": sd.known, "values": list(sd.data)} for sd in self._data]}
 
     def history(self) -> dict:
         # every series whole, history and plan, with the quarter of the last run
@@ -356,11 +358,11 @@ class LpSolver:
     def tagged(self, tag):
         return [c for c in self._columns if tag in c.tags]
 
-    def shift(self):
-        # every SolverData shifts one quarter (1 slot) back, whole array, last slot cleared
+    def shift(self, n: int = 1):
+        # every SolverData shifts n quarters back, whole array, the freed slots cleared; a gap longer than the array clears it all
         for sd in self._data:
-            sd.data[:-1] = sd.data[1:]
-            sd.data[-1] = 0
+            sd.data[: max(0, len(sd.data) - n)] = sd.data[n:]
+            sd.data[max(0, len(sd.data) - n):] = 0
 
     @staticmethod
     def _bound(b, t):

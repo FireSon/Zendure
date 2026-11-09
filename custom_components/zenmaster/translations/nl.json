@@ -398,50 +398,6 @@
       "abort": {
         "reconfigure_successful": "Instellingen opgeslagen"
       }
-    },
-    "solar_panel": {
-      "entry_type": "Zonnegroep",
-      "initiate_flow": {
-        "user": "Zonnegroep toevoegen",
-        "reconfigure": "Zonnegroep aanpassen"
-      },
-      "step": {
-        "user": {
-          "title": "Zonnegroep toevoegen",
-          "description": "Vul de naam en de koppelingen in. Alles is later ook in het ZenMaster-paneel aan te passen.",
-          "data": {
-            "name": "Naam",
-            "power_entity": "Vermogensmeting",
-            "derate_entity": "Begrenzing"
-          },
-          "data_description": {
-            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar.",
-            "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-            "derate_entity": "Number-entiteit waarmee de omvormer begrensd wordt; leeg betekent niet begrenzen."
-          }
-        },
-        "reconfigure": {
-          "title": "Zonnegroep aanpassen",
-          "description": "Pas de instellingen aan. Het paneel toont dezelfde velden.",
-          "data": {
-            "name": "Naam",
-            "power_entity": "Vermogensmeting",
-            "derate_entity": "Begrenzing"
-          },
-          "data_description": {
-            "name": "Naam; HA noemt het apparaat en zijn entiteiten ernaar.",
-            "power_entity": "Sensor met het elektrische vermogen of de stroom van dit apparaat. Ampere wordt met de fase naar watt omgerekend.",
-            "derate_entity": "Number-entiteit waarmee de omvormer begrensd wordt; leeg betekent niet begrenzen."
-          }
-        }
-      },
-      "error": {
-        "name_exists": "Deze naam is al in gebruik",
-        "name_required": "Geef een naam op"
-      },
-      "abort": {
-        "reconfigure_successful": "Instellingen opgeslagen"
-      }
     }
   },
   "entity": {
@@ -821,7 +777,8 @@
         "title": "Apparaat koppelen via Bluetooth",
         "unavailable": "Web Bluetooth is hier niet beschikbaar. Vereist HTTPS (of localhost) en Chrome/Edge.",
         "log_device": "Apparaat: {id}",
-        "broker": "Broker"
+        "broker": "Broker",
+        "wifi_psw": "Wifi-wachtwoord"
       },
       "chart": {
         "battery": "Accu",

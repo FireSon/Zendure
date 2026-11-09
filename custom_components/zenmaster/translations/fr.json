@@ -398,50 +398,6 @@
       "abort": {
         "reconfigure_successful": "Réglages enregistrés"
       }
-    },
-    "solar_panel": {
-      "entry_type": "Groupe solaire",
-      "initiate_flow": {
-        "user": "Ajouter un groupe solaire",
-        "reconfigure": "Reconfigurer le groupe solaire"
-      },
-      "step": {
-        "user": {
-          "title": "Ajouter un groupe solaire",
-          "description": "Saisissez le nom et les liaisons. Tout peut aussi être modifié plus tard dans le panneau ZenMaster.",
-          "data": {
-            "name": "Nom",
-            "power_entity": "Mesure de puissance",
-            "derate_entity": "Bridage"
-          },
-          "data_description": {
-            "name": "Nom ; HA nomme l'appareil et ses entités d'après lui.",
-            "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-            "derate_entity": "Entité number qui bride l'onduleur ; vide signifie qu'il ne peut pas être bridé."
-          }
-        },
-        "reconfigure": {
-          "title": "Reconfigurer le groupe solaire",
-          "description": "Ajustez les réglages. Le panneau affiche les mêmes champs.",
-          "data": {
-            "name": "Nom",
-            "power_entity": "Mesure de puissance",
-            "derate_entity": "Bridage"
-          },
-          "data_description": {
-            "name": "Nom ; HA nomme l'appareil et ses entités d'après lui.",
-            "power_entity": "Capteur de la puissance électrique ou du courant de cet appareil. Les ampères sont convertis en watts à l'aide de la phase.",
-            "derate_entity": "Entité number qui bride l'onduleur ; vide signifie qu'il ne peut pas être bridé."
-          }
-        }
-      },
-      "error": {
-        "name_exists": "Ce nom est déjà utilisé",
-        "name_required": "Saisissez un nom"
-      },
-      "abort": {
-        "reconfigure_successful": "Réglages enregistrés"
-      }
     }
   },
   "entity": {
@@ -821,7 +777,8 @@
         "title": "Associer un appareil via Bluetooth",
         "unavailable": "Web Bluetooth n'est pas disponible ici. Nécessite HTTPS (ou localhost) et Chrome/Edge.",
         "log_device": "Appareil : {id}",
-        "broker": "Broker"
+        "broker": "Broker",
+        "wifi_psw": "Mot de passe Wi-Fi"
       },
       "chart": {
         "battery": "Batterie",

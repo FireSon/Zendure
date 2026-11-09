@@ -32,6 +32,8 @@ def _dw() -> tuple[Appliance, _Hass]:
     h = _Hass()
     d = Appliance()
     d.hass = h
+    # a cycle of known size, so it can be armed
+    d.kind = "dishwasher"
     d.switch_entity = "switch.dw"
     return d, h
 
@@ -112,7 +114,9 @@ def test_the_button_hands_the_appliance_back() -> None:
     d, h = _dw()
     d.armed = True
     asyncio.run(d.command(h, "arm_off"))
-    assert d.manage is False and d.armed is False
+    # handed back: the switch the arming cut goes back on
+    assert d.manage is False and d.armed is False and h.turned_off == [("turn_on", "switch.dw")]
+    h.turned_off.clear()
     d.on_power(0.0, now=1000.0)
     d.on_power(200.0, now=1000.0 + _QUIET_S)
     assert h.turned_off == []  # arming is off, so the switch is left alone
@@ -219,7 +223,7 @@ def _latest(armed: str, slots: int = 6) -> int:
     d.armed_at = now.timestamp()
     lp = SimpleNamespace(
         hass=None,
-        price_buy=SimpleNamespace(data=[0.2] * 250),
+        price_buy=SimpleNamespace(data=[0.2] * 250), settle=12,
         globals={},
         place_block=lambda phase, profile, latest: seen.setdefault("latest", latest),
     )
@@ -264,7 +268,7 @@ def test_the_arming_survives_a_restart() -> None:
 
     back, _ = _dw()
     back.id = "vaatwasser"
-    Config().deserialize_poly([back], {"id": "vaatwasser", **payload["vaatwasser"]})
+    Config().deserialize_poly([back], "vaatwasser", payload["vaatwasser"])
     assert back.armed is True and back.armed_at == 1788100000.0
 
     fields = {f.id: f for f in Appliance.CONFIG}
@@ -283,7 +287,8 @@ def test_a_lost_switch_command_is_sent_again() -> None:
     d._profile = [0.5] * 4          # place_block puts this at slot 12, so the plan wants it on now
     now = datetime.now().astimezone()
     d.armed, d._last_cal = True, now
-    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), globals={}, place_block=lambda *a: 0)  # the plan puts the block at 'now'
+    # the plan puts the block at 'now'
+    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 0)
 
     asyncio.run(d.entry_prerun(lp, now))
     asyncio.run(d.entry_prerun(lp, now))
@@ -308,7 +313,7 @@ def test_the_switch_being_on_voids_the_arming() -> None:
     d.data = SimpleNamespace(data=np.zeros(204))
     now = datetime.now().astimezone()
     d.armed, d.armed_at, d._last_cal, d._profile = True, now.timestamp(), now, [0.5] * 4
-    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), globals={}, place_block=lambda *a: 0)
+    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 0)
 
     asyncio.run(d.entry_prerun(lp, now))
     assert d.armed is False and d.status.name == "none"
@@ -324,7 +329,7 @@ def test_the_status_waits_for_real_power() -> None:
     d.data = SimpleNamespace(data=np.zeros(204))
     now = datetime.now().astimezone()
     d.armed, d.armed_at, d._last_cal, d._profile = True, now.timestamp(), now, [0.5] * 4
-    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), globals={}, place_block=lambda *a: 0)
+    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 0)
 
     asyncio.run(d.entry_prerun(lp, now))
     assert d.status.name == "planned", "aangezet maar nog geen stroom: gepland, niet draaiend"
@@ -343,7 +348,7 @@ def test_an_unavailable_switch_is_left_alone() -> None:
     d.data = SimpleNamespace(data=np.zeros(204))
     now = datetime.now().astimezone()
     d.armed, d.armed_at, d._last_cal, d._profile = True, now.timestamp(), now, [0.5] * 4
-    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), globals={}, place_block=lambda *a: 0)
+    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 0)
 
     asyncio.run(d.entry_prerun(lp, now))
     assert d.armed is True, "onbekende stand mag de arming niet wissen"

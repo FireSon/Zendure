@@ -48,8 +48,8 @@ class ZendureSmartMeter(ZendureDevice, EntityDevice):
             HaSensor(self, f"phase{phase}_current", uom="A", device_class="current", state_class="measurement", convert=centi_convert)
             HaSensor(self, f"phase{phase}_voltage", uom="V", device_class="voltage", state_class="measurement", convert=centi_convert)
 
-    def update_properties(self, payload: dict, now: float, on_ha: bool = False) -> None:
-        """Handle incoming MQTT telemetry: flat properties and the per-phase circuits array; it creates no entities, so the thread does not matter."""
+    def update_properties(self, payload: dict, now: float) -> None:
+        """Handle incoming MQTT telemetry: flat properties and the per-phase circuits array."""
         # Flat properties: {totalPower: watts, ...}
         if properties := payload.get("properties"):
             for key, value in properties.items():

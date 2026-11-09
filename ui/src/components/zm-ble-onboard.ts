@@ -26,7 +26,7 @@ export class ZmBleOnboard extends LitElement {
     return this._mode === 'local' ? (this._driver.mqtt_host ?? '') : (this._driver.cloud_url ?? '');
   }
   private get _ssid(): string { return this._driver.wifi_ssid ?? ''; }
-  private get _pwd(): string { return this._driver.wifi_psw ?? ''; }
+  @state() private _pwd = '';
 
   static styles = [
     tokens,
@@ -44,6 +44,7 @@ export class ZmBleOnboard extends LitElement {
       .seg button.on { background: var(--zm-primary); color: #fff; border-color: var(--zm-primary); }
       .seg button:disabled { opacity: 0.5; cursor: default; }
       .hint { font-family: var(--zm-font-body); font-size: var(--zm-fs-m); color: var(--zm-text-dim); margin: 4px 0 12px; word-break: break-all; }
+      input.zin { width: 100%; background: var(--zm-card); color: var(--zm-text); border: 1px solid var(--zm-border); border-radius: 7px; font-family: var(--zm-font-body); font-weight: 700; font-size: var(--zm-fs-m); padding: 4px 9px; text-align: right; box-sizing: border-box; }
       .btn { width: 100%; border: none; border-radius: 11px; background: var(--zm-primary); color: #fff; font-family: var(--zm-font-display); font-weight: 600; font-size: var(--zm-fs-m); padding: 11px; cursor: pointer; box-shadow: 0 2px 8px var(--zm-primary-soft); }
       .btn:disabled { opacity: 0.5; cursor: default; }
       .log { margin-top: 12px; max-height: 220px; overflow: auto; background: var(--zm-card-2); border-radius: 10px; padding: 8px 10px; font-family: ui-monospace, monospace; font-size: var(--zm-fs-s); color: var(--zm-text-dim); white-space: pre-wrap; word-break: break-all; }
@@ -64,7 +65,8 @@ export class ZmBleOnboard extends LitElement {
     const token = Array.from({ length: 16 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
     let deviceId = '', deviceSn = '';
-    this._ble.onSend = (m) => this._say('→ ' + JSON.stringify(m));
+    // what goes to the device, with the Wi-Fi password and the token masked, so the log can be shown or shared
+    this._ble.onSend = (m) => this._say('→ ' + JSON.stringify(m, (k, v) => (k === 'password' || k === 'token' ? '***' : v)));
     this._ble.onMessage = (m) => {
       if (m && (m.deviceId || m.deviceSn)) { deviceId = m.deviceId ?? deviceId; deviceSn = m.deviceSn ?? deviceSn; }
       if (m?.method === 'BLESPP') void this._ble.write({ method: 'BLESPP_OK' });
@@ -127,6 +129,10 @@ export class ZmBleOnboard extends LitElement {
                   </div>
                 </div>
                 <div class="hint">iotUrl: ${this._iotUrl || t('ui.ble.no_url', '(niet beschikbaar, cloud-sync nog niet gedraaid)')}${this.bleName ? ' · ' + this.bleName : ''}</div>
+                <div class="row">
+                  <label>${t('ui.ble.wifi_psw', 'Wifi-wachtwoord')}</label>
+                  <input class="zin" type="password" autocomplete="new-password" .value=${this._pwd} @input=${(e: Event) => (this._pwd = (e.target as HTMLInputElement).value)} />
+                </div>
                 <button class="btn" ?disabled=${this._busy} @click=${this._start}>${this._busy ? t('ui.ble.busy', 'Bezig…') : this._done ? t('ui.app.retry', 'Opnieuw') : t('ui.ble.connect', 'Verbinden')}</button>
                 ${this._log.length ? html`<div class="log">${this._log.join('\n')}</div>` : nothing}
               `}

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import logging
 import time
@@ -14,7 +13,7 @@ from homeassistant.helpers import device_registry as dr
 
 from ..config import FLEET, IDENTITY, ConfigField
 from ..const import DOMAIN, PhaseModi
-from ..device import DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
+from ..device import DeviceState, PolledDevice, ProfileCharge, ProfileDischarge
 from ..number import HaNumber
 from ..select import HaSelect
 from ..sensor import HaSensor
@@ -25,13 +24,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-POLL_S = 5.0  # power status every 5 s, like ha-sessy; the dongle's HTTP server seems fragile
-HOLD_S = 2.0  # a device is left alone this long after a command
 SLOW_EVERY = 12  # the active strategy once per this many polls
-OFFLINE_POLLS = 3  # failed polls before the device counts as offline
 POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
 POWER_MAX_TIME = 65  # s: or this long after the command; from standby a Sessy takes up to 60 s to start (Omnibattery discussion 129)
-RESEND_S = 90  # s: an accepted setpoint goes again only after this long, past the start from standby; on a lost network the dongle resets it to 0 (Sessy API docs)
 TIMEOUT = aiohttp.ClientTimeout(total=10)
 API = "POWER_STRATEGY_API"  # the strategy in which the setpoint applies; on a lost network connection Sessy sets the setpoint to 0 itself (Sessy API docs)
 SOC_LIMIT = {"SYSTEM_STATE_BATTERY_FULL": 1, "SYSTEM_STATE_BATTERY_EMPTY": 2}  # system_state to the device's own verdict, like Zendure's socLimit
@@ -44,8 +39,11 @@ def basic_auth(username: str, password: str) -> str:
     return "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
 
 
-class SessyBattery(DistributionDevice):
+class SessyBattery(PolledDevice):
     """A Sessy dongle with its battery; positive power is delivered to the house, negative charges (Sessy API docs)."""
+
+    POLL_S = 5.0  # power status every 5 s, like ha-sessy; the dongle's HTTP server seems fragile
+    RESEND_S = 90  # s: an accepted setpoint goes again only after this long, past the start from standby; on a lost network the dongle resets it to 0 (Sessy API docs)
 
     CONFIG = [*IDENTITY, ConfigField("ip", {"text": {}}, cast=str), ConfigField("username", {"text": {}}, cast=str), ConfigField("password", {"text": {"type": "password"}}, cast=str), *FLEET, *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("system_state", "strategy_overridden"))]
 
@@ -58,41 +56,21 @@ class SessyBattery(DistributionDevice):
         self.password: str = data.get("password", "")
         self.on_config_changed: Any = None
         self.home_input = self.home_output = self.battery_input = self.battery_output = 0
-        self.blocked = False  # the system state says the battery cannot follow
         self.strategy: str | None = data.get("strategy")  # the strategy before we took control, put back when we hand it back; kept in the subentry, the API offers no way to read it back after a crash
 
         # the registry entry first: the entities find their device there
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, self.sn)}, name=name, manufacturer=driver.manufacturer, model=f"Sessy {self.model}")
-        DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(product.discharge_w), ProfileCharge(-product.charge_w)], name, subentry_id)
+        PolledDevice.__init__(self, hass, self.sn, [ProfileDischarge(product.discharge_w), ProfileCharge(-product.charge_w)], name, subentry_id)
         self.kwhsensor.update_value(product.kwh)
 
         # a fresh connection per request: the dongle closes kept-alive sockets without saying so (Omnibattery sessy.py)
         self.session = aiohttp.ClientSession(headers={"Authorization": basic_auth(self.username, self.password)}, connector=aiohttp.TCPConnector(force_close=True), timeout=TIMEOUT)
-        self._pending: tuple[str, int] | None = None  # ("power", W) or ("off", 0)
-        self._control = False  # the API strategy is ours since the last power()
-        self._silent = 0
-        self._polls = 0
-        self._wake = asyncio.Event()
-        self.device_task = asyncio.get_running_loop().create_task(self.device_loop())
-
-    def unload(self) -> None:
-        # the loop stops; a battery under our control is handed back on its way out, then the session closes
-        self.device_task.cancel()
-        self.hass.async_create_task(self.close())
-
-    async def close(self) -> None:
-        try:
-            if self._control:
-                await self.send("off", 0)
-        finally:
-            await self.session.close()
 
     def subentry_data(self) -> dict[str, Any]:
         return {"product": self.model, "sn": self.sn, "ip": self.ip, "username": self.username, "password": self.password, "strategy": self.strategy}
 
-    def config_changed(self) -> None:
-        if self.on_config_changed is not None:
-            self.on_config_changed(self)
+    async def disconnect(self) -> None:
+        await self.session.close()
 
     def entity_create(self) -> None:
         HaSensor(self, "soc", uom="%", device_class="battery", state_class="measurement", precision=1)
@@ -118,59 +96,6 @@ class SessyBattery(DistributionDevice):
         setattr(self, entity.attr, value)
         if self.on_invalidate is not None:
             self.on_invalidate()
-
-    def power(self, watts: int, mode: DistributionMode) -> int:
-        watts = max(self.power_profile[1].power, min(self.power_profile[0].power, watts))  # clamp to rated power, both directions
-
-        # the device is busy with its last command, or unreachable
-        if time.time() - self.power_since < HOLD_S or self.state == DeviceState.OFFLINE or self.blocked:
-            return self.power_actual
-
-        # an accepted setpoint is not sent again while the power is on its way; after RESEND_S once more, in case the device lost it
-        if watts == self.power_setpoint and self.state >= DeviceState.CONFIRM and time.time() - self.state_since < RESEND_S:
-            return self.power_actual
-
-        # no new command while both the measured power and the last setpoint sit within 10 W of the new target
-        if abs(self.power_actual - watts) < 10 and abs(self.power_setpoint - watts) < 10:
-            return self.power_actual
-        if self.power_setpoint != watts:
-            self.power_since = time.time()
-        self.setpoint.update_value(watts)  # publish the setpoint we are about to send, so the recorder holds the command side too
-        self._pending = ("power", watts)
-        self._wake.set()
-        self.set_state(DeviceState.SENT)  # SENT, CONFIRM once accepted, ACTIVE once the power follows
-        return self.power_actual
-
-    def power_off(self) -> None:
-        # the battery returns to the strategy it had before we took control
-        self._pending = ("off", 0)
-        self._wake.set()
-        self.setpoint.update_value(0)
-        if self.state != DeviceState.OFFLINE:
-            self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
-
-    async def device_loop(self) -> None:
-        while True:
-            try:
-                if (command := self._pending) is not None:
-                    self._pending = None
-                    await self.send(*command)
-                else:
-                    await self.poll()
-
-                # a new command wakes the loop at once
-                try:
-                    async with asyncio.timeout(POLL_S):
-                        await self._wake.wait()
-                except TimeoutError:
-                    pass
-                self._wake.clear()
-
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                # the task must never die
-                _LOGGER.exception("device task %s", self.device_id)
 
     async def get(self, path: str) -> dict[str, Any]:
         async with self.session.get(f"http://{self.ip}/api/v1/{path}") as response:
@@ -213,11 +138,7 @@ class SessyBattery(DistributionDevice):
             if self._polls % SLOW_EVERY == 1 and not self._control:
                 await self.learn_strategy()
         except (aiohttp.ClientError, TimeoutError, ValueError) as err:
-            self._silent += 1
-            _LOGGER.debug("Sessy %s: poll failed (%s)", self.name, err)
-            if self._silent >= OFFLINE_POLLS and self.state != DeviceState.OFFLINE:
-                self.power_actual = 0
-                self.set_state(DeviceState.OFFLINE)
+            self.poll_failed(err)
             return
         self._silent = 0
         self.update_status(status.get("sessy") or {})

@@ -148,7 +148,7 @@ class Distribution(EntityDevice):
         HaButton(self, "detect_phases", press=self.detect_phases)  # every device's phase from its power jumps in the recorder
 
     async def export_replay(self, _entity: Any = None, hours: float = REPLAY_HOURS) -> str | None:
-        """Pull the P1 total and every device's power, solar and soc from the recorder into www/, in the replay JSON shape."""
+        """Pull the P1 total and every device's power, solar and soc from the recorder into the zenmaster folder of the configuration, in the replay JSON shape."""
         if not self.p1_entities[Phase.all]:
             persistent_notification.async_create(self.hass, "No P1 meter configured, nothing to export", PANEL_TITLE, f"{DOMAIN}_replay")
             return None
@@ -229,7 +229,6 @@ class Distribution(EntityDevice):
         return timeline, p1, pv, meta, power, solar, soc
 
     async def replay_write(self, start, end, hours: float, timeline: list[float], p1: list[float], pv: list[float], meta: list, power: dict, solar: dict, soc: dict) -> str:
-        # the replay JSON into www/, with a notification that links to it
         payload = {
             "meta": {
                 "source": f"{DOMAIN}-recorder",
@@ -247,13 +246,11 @@ class Distribution(EntityDevice):
             "solar": solar,
             "soc": soc,
         }
+        # the replay JSON outside www, so it is never served without login; the notification says where it is
         name = f"{DOMAIN}_replay_{dt_util.now():%Y%m%d_%H%M}.json"
-        www = Path(self.hass.config.path("www"))
-        existed = await self.hass.async_add_executor_job(www.is_dir)
-        await self.hass.async_add_executor_job(lambda: (www.mkdir(exist_ok=True), (www / name).write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")))
-        message = f"Replay data written to www/{name}: {len(timeline)} samples over {hours:.0f} h, {len(meta)} devices. Download: /local/{name}"
-        if not existed:
-            message += ". The www folder was just created: restart Home Assistant once before the link works."
+        folder = Path(self.hass.config.path(DOMAIN))
+        await self.hass.async_add_executor_job(lambda: (folder.mkdir(exist_ok=True), (folder / name).write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")))
+        message = f"Replay data written to {folder / name}: {len(timeline)} samples over {hours:.0f} h, {len(meta)} devices. Fetch it with the File editor or Samba."
         persistent_notification.async_create(self.hass, message, PANEL_TITLE, f"{DOMAIN}_replay")
         _LOGGER.info("Replay export: %s", message)
         return name
@@ -291,9 +288,9 @@ class Distribution(EntityDevice):
     def on_invalidate(self) -> None:
         self.order_date = 0
         capacity = sum(0 if d.state <= DeviceState.OFFLINE else d.kwh * (d.soc_max - d.soc_min) / 100 for d in self.devices)
-        # a battery joined or left the regulation, also at the start when they report after the first solve: plan again, from the loop since this can come from the MQTT thread
+        # a battery joined or left the regulation, also at the start when they report after the first solve: plan again
         if capacity != self.capacity and self.on_capacity is not None:
-            self.hass.loop.call_soon_threadsafe(self.on_capacity)
+            self.on_capacity()
         self.capacity = capacity
         self.entities["capacity_kwh"].update_value(self.capacity)
 
@@ -374,7 +371,7 @@ class Distribution(EntityDevice):
         return power_actual
 
     def update_setpoint(self, mode: DistributionMode, setpoint: int, solar: int, now: float, elapsed: float) -> int:
-        """The fleet setpoint: manual is the knob, the other modes clamp and cap; idle and a pending reversal hold the fleet at 0."""
+        """The fleet setpoint: manual is the knob, the other modes clamp, every mode is capped; idle and a pending reversal hold the fleet at 0."""
         if mode == DistributionMode.MANUAL:
             setpoint = int(self.manual_power)
         else:
@@ -385,9 +382,9 @@ class Distribution(EntityDevice):
             elif mode == DistributionMode.STORE_SOLAR:
                 setpoint = min(setpoint, 0) if solar > 0 else 0
 
-            # the regulatory cap on what the fleet delivers to the house (Germany: 800 W); the app limit per device is not enough with several devices
-            if self.max_output > 0:
-                setpoint = min(setpoint, self.max_output)
+        # the regulatory cap on what the fleet delivers to the house (Germany: 800 W); the app limit per device is not enough with several devices
+        if self.max_output > 0:
+            setpoint = min(setpoint, self.max_output)
 
         # idle holds the fleet at 0; a reversal holds it at 0 while the watt-seconds of opposite demand count down, a flip back to charging within minutes costs up to five times as much
         charging = setpoint < 0
@@ -430,11 +427,12 @@ class Distribution(EntityDevice):
                 room[phase] = max(0, room[phase])
                 total += room[phase]
 
-        # the three-phase devices: limited while they help, released with the last limited phase
+        # the three-phase devices: what is needed as far as they can, limited while they help, released with the last limited phase
         if sp_all != self.sp[Phase.all]:
+            sp_all = min(sp_all, self.available[Phase.all])
             self.phase_limited[Phase.all] = True
-            self.distribute_power(min(0, sp_all), self.profile[charging].phases[Phase.all])
-            setpoint -= min(0, sp_all)
+            self.distribute_power(sp_all, self.profile[sp_all < 0].phases[Phase.all])
+            setpoint -= sp_all
         elif self.phase_limited[Phase.all]:
             self.phase_limited[Phase.all] = True in self.phase_limited[1:]
             if self.phase_limited[Phase.all]:
@@ -615,8 +613,11 @@ class Distribution(EntityDevice):
             if last[d][0] >= PHASE_SURE_EVENTS and getattr(d, key) != phase:
                 lines.append(f"{d.name}: {phase.name}, changed from {PhaseModi[getattr(d, key)]}")
                 d.entities[key].update_value(phase)
+                # the hook a chosen phase fires: a consumer reaches the LP through a rebuild, a battery regroups the fleet and the LP
                 if key == "phase":
-                    d._setting(None, phase)  # a consumer's phase reaches the LP through a rebuild
+                    d._setting(None, phase)
+                else:
+                    await d.update_phase()
         if lines:
             persistent_notification.async_create(self.hass, "\n".join(lines), f"{PANEL_TITLE} phases", f"{DOMAIN}_phases")
             if self.on_save is not None:

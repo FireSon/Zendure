@@ -117,7 +117,7 @@ class DynamicPrice(SolverEntry):
         self.price_sell = lp.price_sell = lp.data("price_sell", "euro", 7, source=self.provider)
         providers = {c.__name__.removesuffix("Provider").casefold(): c for c in Provider.__subclasses__()}
         name = self.provider.removesuffix("Provider").casefold()
-        if name not in providers and self.provider != "none":
+        if name not in providers and self.provider not in _SPOT_PROVIDERS and self.provider != "none":
             _LOGGER.warning("Unknown price provider %r, falling back to energycharts (wholesale)", self.provider)
         self._provider = providers.get(name, providers["energycharts"])()
         self._provider.init(self)
@@ -133,7 +133,8 @@ class DynamicPrice(SolverEntry):
         if self.hass is not None:
             if p.last_fetch is None:
                 await self._refresh(now)
-            elif p.last_fetch < datetime.combine(now.date(), p.publish, now.tzinfo) <= now:
+            # after the publish time a refresh, and again every quarter until tomorrow is in
+            elif (publish := datetime.combine(now.date(), p.publish, now.tzinfo)) <= now and (p.last_fetch < publish or not p.complete(now)):
                 self.hass.async_create_task(self._refresh(now))
         lp.globals["price_valid"] = self._provider.last_fetch is not None
         if self.saldering:  # net metering: exported kWh are settled at the import price
@@ -190,16 +191,20 @@ class DynamicPrice(SolverEntry):
     async def _refresh(self, now: datetime) -> None:
         # last_fetch marks a FULLY completed refresh; any failure leaves it unset so the next tick retries
         try:
-            await self._provider.fetch(self, now)
+            buy, sell = await self._provider.fetch(self, now)
         except ProviderError as err:
             _LOGGER.warning("price refresh: %s", err)
             return
+        # the whole fetch succeeded: only now the new prices replace the last good ones
+        self.price_buy.data[:], self.price_sell.data[:] = buy, sell
+        # buy and sell never cross, for every provider and every quarter: crossing reads as free money to the solver
+        np.minimum(self.price_sell.data, self.price_buy.data, out=self.price_sell.data)
         self.price_buy.known = self.price_sell.known = self._provider.known_until  # the outlook dashes the prices past this point
         self._provider.last_fetch = now
 
 class Provider:
     def __init__(self):
-        # buy = (spot * import_factor + import_markup + energy_tax + tou) * (1 + vat/100) + fixed_cost_per_day/96, energy_tax incl. the grid fee
+        # buy = (spot * import_factor + import_markup + energy_tax + tou) * (1 + vat/100), energy_tax incl. the grid fee
         # sell = spot * export_factor + export_markup, unless saldering settles export at the buy price
         self.import_factor: float = 1.0
         self.import_markup: float = 0.0
@@ -374,12 +379,14 @@ class Provider:
             _LOGGER.info("price shape model %s: window %d days, MAE %.4f on the last %d days, %d fit hours",
                          key, chosen, best, _FIT_SCORE_DAYS, int(train.sum()))
 
+    def complete(self, now: datetime) -> bool:
+        # the real prices run through tomorrow, or the provider has none at all
+        return not self.known_until or self.known_until >= datetime.combine(now.date() + timedelta(days=2), time(0), now.tzinfo).timestamp()
+
     def extend_buy(self, buy: np.ndarray, sell: np.ndarray, tail: int, base_ts: int) -> None:
         self.known_until = base_ts + tail * 900  # the real prices end here, past this the shape model fills in
-        # the buy tail already carries the level the provider derived; give it its own fitted shape,
-        # then make sure the two series cannot cross, which would read as free money to the solver
+        # the buy tail already carries the level the provider derived; give it its own fitted shape
         self.extend_tail(buy, tail, base_ts, "buy")
-        np.minimum(sell[tail:], buy[tail:], out=sell[tail:])
 
     async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
         # read the tariff information for this provider
@@ -416,13 +423,13 @@ class Provider:
                 d = await resp.json(content_type=None)
         except (ClientError, asyncio.TimeoutError, KeyError) as err:
             raise ProviderError(f"EpexPredictor fetch failed: {err}") from err
-        # write the raw EpexPredictor wholesale price into buy and sell; the provider turns buy into an all-in price
+        # the raw EpexPredictor wholesale price in working copies of buy and sell; the provider turns buy into an all-in price
+        buy, sell = dynamicPrice.price_buy.data.copy(), dynamicPrice.price_sell.data.copy()
         base = int(now.timestamp()) // 900 * 900 - 12 * 900  # slot 12 = current quarter (12 history slots before now)
         for ts, val in zip(d.get("s") or [], d.get("t") or []):
             idx = (int(ts) - base) // 900
             if val is not None and 0 <= idx < size:
-                dynamicPrice.price_buy.data[idx] = val
-                dynamicPrice.price_sell.data[idx] = val
+                buy[idx] = sell[idx] = val
 
         # a time-of-use grid fee (FR TURPE): off-peak in the address's hours, else peak, winter or summer by month; zero elsewhere
         self.tou = np.zeros(size)
@@ -438,6 +445,7 @@ class Provider:
                 minute, season = local.hour * 60 + local.minute, 0 if local.month in tou["winter"] else 1
                 offpeak = any(a <= minute < b if a < b else minute >= a or minute < b for a, b in spans[season])
                 self.tou[i] = tou["offpeak_fee" if offpeak else "peak_fee"][season]
+        return buy, sell
 
 
 class ProviderError(Exception):

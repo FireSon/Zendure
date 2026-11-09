@@ -2,7 +2,7 @@ from custom_components.zenmaster.solver.solver import LpSolver, LinExpr
 
 
 def _lp():
-    return LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    return LpSolver(track=lambda *a, **k: None, horizon=96)
 
 
 def test_linexpr_ops():

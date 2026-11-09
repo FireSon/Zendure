@@ -398,50 +398,6 @@
       "abort": {
         "reconfigure_successful": "Einstellungen gespeichert"
       }
-    },
-    "solar_panel": {
-      "entry_type": "Solargruppe",
-      "initiate_flow": {
-        "user": "Solargruppe hinzufügen",
-        "reconfigure": "Solargruppe neu konfigurieren"
-      },
-      "step": {
-        "user": {
-          "title": "Solargruppe hinzufügen",
-          "description": "Gib den Namen und die Verknüpfungen ein. Alles lässt sich später auch im ZenMaster-Panel ändern.",
-          "data": {
-            "name": "Name",
-            "power_entity": "Leistungsmessung",
-            "derate_entity": "Abregelung"
-          },
-          "data_description": {
-            "name": "Name; HA benennt das Gerät und seine Entitäten danach.",
-            "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-            "derate_entity": "Number-Entität, die den Wechselrichter drosselt; leer bedeutet, dass er nicht abgeregelt werden kann."
-          }
-        },
-        "reconfigure": {
-          "title": "Solargruppe neu konfigurieren",
-          "description": "Passe die Einstellungen an. Das Panel zeigt dieselben Felder.",
-          "data": {
-            "name": "Name",
-            "power_entity": "Leistungsmessung",
-            "derate_entity": "Abregelung"
-          },
-          "data_description": {
-            "name": "Name; HA benennt das Gerät und seine Entitäten danach.",
-            "power_entity": "Sensor mit der elektrischen Leistung oder dem Strom dieses Geräts. Ampere wird über die Phase in Watt umgerechnet.",
-            "derate_entity": "Number-Entität, die den Wechselrichter drosselt; leer bedeutet, dass er nicht abgeregelt werden kann."
-          }
-        }
-      },
-      "error": {
-        "name_exists": "Dieser Name wird bereits verwendet",
-        "name_required": "Gib einen Namen ein"
-      },
-      "abort": {
-        "reconfigure_successful": "Einstellungen gespeichert"
-      }
     }
   },
   "entity": {
@@ -821,7 +777,8 @@
         "title": "Gerät über Bluetooth koppeln",
         "unavailable": "Web Bluetooth ist hier nicht verfügbar. Erfordert HTTPS (oder localhost) und Chrome/Edge.",
         "log_device": "Gerät: {id}",
-        "broker": "Broker"
+        "broker": "Broker",
+        "wifi_psw": "WLAN-Passwort"
       },
       "chart": {
         "battery": "Batterie",

@@ -105,13 +105,6 @@ class BoilerHeatPump(Heating):
         lp.track(self.power_entity, self.on_power, phase=self.phase)
         lp.track(self.bottom_entity, self.on_bottom)
         lp.track(self.top_entity, self.on_top)
-        # the readings as they are now: a sensor only reports a change, and the model starts from them
-        for entity, handler in ((self.temp_entity, self.on_temp), (self.bottom_entity, self.on_bottom), (self.top_entity, self.on_top)):
-            if self.hass is not None and (state := self.hass.states.get(entity)) is not None:
-                try:
-                    handler(float(state.state))
-                except ValueError:
-                    pass
         self._room = self.ambient
         lp.track(self.ambient_entity, lambda v: setattr(self, "_room", v))
 

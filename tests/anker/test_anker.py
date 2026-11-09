@@ -79,7 +79,7 @@ class FakeModbus:
 
 def start(monkeypatch, sn: str = SN):
     # the driver with one device on a fake client; the pauses shrunk so a test runs in tenths of a second
-    monkeypatch.setattr(solarbank_module, "POLL_S", 0.01)
+    monkeypatch.setattr(solarbank_module.AnkerSolarbank, "POLL_S", 0.01)
     loop = asyncio.get_running_loop()
     hass = fake_hass()
     hass.async_create_task = loop.create_task
@@ -184,7 +184,7 @@ def test_an_accepted_setpoint_is_not_repeated_while_the_power_lags(monkeypatch) 
         assert fake.writes == [] and d.state == DeviceState.CONFIRM
 
         # after RESEND_S it goes once more, in case the device lost it
-        monkeypatch.setattr(solarbank_module, "RESEND_S", 0.0)
+        monkeypatch.setattr(solarbank_module.AnkerSolarbank, "RESEND_S", 0.0)
         d.power(800, DistributionMode.MANUAL)
         assert await wait_for(lambda: fake.writes == [(MODE, THIRD_PARTY), (SETPOINT, encode(800, "int32"))])
         d.unload()
@@ -242,7 +242,7 @@ def test_a_mode_change_under_our_control_is_not_learned(monkeypatch) -> None:
 def test_after_a_crash_the_saved_mode_is_handed_back(monkeypatch) -> None:
     async def scenario() -> None:
         # HA died while in control: the device still sits in mode 3, the subentry holds mode 7
-        monkeypatch.setattr(solarbank_module, "POLL_S", 0.01)
+        monkeypatch.setattr(solarbank_module.AnkerSolarbank, "POLL_S", 0.01)
         hass = fake_hass()
         hass.async_create_task = asyncio.get_running_loop().create_task
         driver = AnkerDriver(hass, "entry", [], types.SimpleNamespace(devices=[], on_invalidate=lambda: None))

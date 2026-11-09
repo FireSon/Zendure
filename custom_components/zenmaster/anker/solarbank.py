@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -14,7 +13,7 @@ from pymodbus.exceptions import ModbusException
 
 from ..config import FLEET, IDENTITY, ConfigField
 from ..const import DOMAIN, PhaseModi
-from ..device import DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
+from ..device import DeviceState, PolledDevice, ProfileCharge, ProfileDischarge
 from ..modbus import decode, encode
 from ..number import HaNumber
 from ..select import HaSelect
@@ -27,13 +26,9 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 PORT = 502
-POLL_S = 2.0  # telemetry every 2 s; Anker's own integration polls every 5 s
-HOLD_S = 2.0  # a device is left alone this long after a command; Anker applies a setpoint at once (anker-charging#91), Omnibattery counts 1 s
 SLOW_EVERY = 15  # temperature, capacity, limits and operating mode once per this many polls
-OFFLINE_POLLS = 3  # failed polls before the device counts as offline
 POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
 POWER_MAX_TIME = 10  # s: or this long after the command
-RESEND_S = 30  # s: an accepted setpoint goes again only after this long, in case a reboot reset it to 0 (anker-charging#91)
 MIN_W = 100  # 1 to 99 W is refused by the device (anker-charging#103): such a request becomes 0
 PWR_MAX = 3500  # W both ways until the device reports its own limits (10036/10038); Omnibattery's envelope for the family
 
@@ -53,8 +48,12 @@ FAST = {"soc": (10014, "uint16", 1), "battery_power": (10008, "int32", 1), "pv":
 SLOW = {"temp": (10156, "int16", 0.1), "kwh": (10250, "uint32", 0.1), "charge_max": (10036, "int32", 1), "discharge_max": (10038, "int32", 1)}
 
 
-class AnkerSolarbank(DistributionDevice):
+class AnkerSolarbank(PolledDevice):
     """A Solarbank Max AC, XE AC or 4 E5000 Pro on its own Modbus TCP connection."""
+
+    POLL_S = 2.0  # telemetry every 2 s; Anker's own integration polls every 5 s
+    HOLD_S = 2.0  # a device is left alone this long after a command; Anker applies a setpoint at once (anker-charging#91), Omnibattery counts 1 s
+    RESEND_S = 30  # s: an accepted setpoint goes again only after this long, in case a reboot reset it to 0 (anker-charging#91)
 
     CONFIG = [*IDENTITY, ConfigField("sn", {"text": {}}, cast=str, readonly=True), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False), *FLEET, ConfigField("temp", {"entity": {}}, readonly=True)]
 
@@ -72,29 +71,10 @@ class AnkerSolarbank(DistributionDevice):
 
         # the registry entry first: the entities find their device there
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, self.sn)}, name=name, manufacturer=driver.manufacturer, model=f"Solarbank ({self.model})")
-        DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(PWR_MAX), ProfileCharge(-PWR_MAX)], name, subentry_id)
+        PolledDevice.__init__(self, hass, self.sn, [ProfileDischarge(PWR_MAX), ProfileCharge(-PWR_MAX)], name, subentry_id)
 
-        # the loop sends a pending command first, else polls
+        # its own Modbus TCP connection, which the loop of PolledDevice polls and commands over
         self.client = AsyncModbusTcpClient(self.ip, port=self.port)
-        self._pending: tuple[str, int] | None = None  # ("power", W) or ("off", 0)
-        self._control = False  # Third-Party Control is ours since the last power()
-        self._silent = 0
-        self._polls = 0
-        self._wake = asyncio.Event()
-        self.device_task = asyncio.get_running_loop().create_task(self.device_loop())
-
-    def unload(self) -> None:
-        # the loop stops; a device under our control is handed back on its way out, then the connection closes.
-        # This matters more here than anywhere: the Solarbank keeps running its last setpoint without a timeout (anker-charging#150)
-        self.device_task.cancel()
-        self.hass.async_create_task(self.close())
-
-    async def close(self) -> None:
-        try:
-            if self._control:
-                await self.send("off", 0)
-        finally:
-            self.client.close()
 
     def moved(self, ip: str) -> None:
         # mDNS found the device on a new address: a new connection there, and the subentry follows
@@ -106,9 +86,14 @@ class AnkerSolarbank(DistributionDevice):
     def subentry_data(self) -> dict[str, Any]:
         return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "mode": self.mode}
 
-    def config_changed(self) -> None:
-        if self.on_config_changed is not None:
-            self.on_config_changed(self)
+    # the hand back in close() matters more here than anywhere: the Solarbank keeps running its last setpoint without a timeout (anker-charging#150)
+    async def disconnect(self) -> None:
+        self.client.close()
+
+    def clamp(self, watts: int) -> int:
+        # within the base limits, and 1 to 99 W becomes 0: the device refuses those (anker-charging#103)
+        watts = super().clamp(watts)
+        return 0 if abs(watts) < MIN_W else watts
 
     def entity_create(self) -> None:
         HaSensor(self, "soc", uom="%", device_class="battery", state_class="measurement")
@@ -126,61 +111,6 @@ class AnkerSolarbank(DistributionDevice):
 
         self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
         HaSensor(self, "rte", uom="%", state_class="measurement", precision=1)
-
-    def power(self, watts: int, mode: DistributionMode) -> int:
-        watts = max(self.power_profile[1].power, min(self.power_profile[0].power, watts))  # clamp to the device limits, both directions
-        if abs(watts) < MIN_W:
-            watts = 0
-
-        # the device is busy with its last command, or unreachable
-        if time.time() - self.power_since < HOLD_S or self.state == DeviceState.OFFLINE:
-            return self.power_actual
-
-        # an accepted setpoint is not sent again while the power is on its way; after RESEND_S once more, in case the device lost it
-        if watts == self.power_setpoint and self.state >= DeviceState.CONFIRM and time.time() - self.state_since < RESEND_S:
-            return self.power_actual
-
-        # no new command while both the measured power and the last setpoint sit within 10 W of the new target
-        if abs(self.power_actual - watts) < 10 and abs(self.power_setpoint - watts) < 10:
-            return self.power_actual
-        if self.power_setpoint != watts:
-            self.power_since = time.time()
-        self.setpoint.update_value(watts)  # publish the setpoint we are about to send, so the recorder holds the command side too
-        self._pending = ("power", watts)
-        self._wake.set()
-        self.set_state(DeviceState.SENT)  # SENT, CONFIRM once the writes are accepted, ACTIVE once the power follows
-        return self.power_actual
-
-    def power_off(self) -> None:
-        # the device returns to the operating mode it had before we took control
-        self._pending = ("off", 0)
-        self._wake.set()
-        self.setpoint.update_value(0)
-        if self.state != DeviceState.OFFLINE:
-            self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
-
-    async def device_loop(self) -> None:
-        while True:
-            try:
-                if (command := self._pending) is not None:
-                    self._pending = None
-                    await self.send(*command)
-                else:
-                    await self.poll()
-
-                # a new command wakes the loop at once
-                try:
-                    async with asyncio.timeout(POLL_S):
-                        await self._wake.wait()
-                except TimeoutError:
-                    pass
-                self._wake.clear()
-
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                # the task must never die
-                _LOGGER.exception("device task %s", self.device_id)
 
     async def read(self, address: int, kind: str, holding: bool = False) -> int:
         count = 2 if kind in ("int32", "uint32") else 1
@@ -239,11 +169,7 @@ class AnkerSolarbank(DistributionDevice):
                 values["mode_mask"] = await self.read(MODE_MASK, "uint16")
         except (ModbusException, OSError, TimeoutError) as err:
             self.client.close()  # a late reply left in the buffer fails every next read on its transaction id (anker-charging#81): start clean
-            self._silent += 1
-            _LOGGER.debug("Anker %s: poll failed (%s)", self.name, err)
-            if self._silent >= OFFLINE_POLLS and self.state != DeviceState.OFFLINE:
-                self.power_actual = 0
-                self.set_state(DeviceState.OFFLINE)
+            self.poll_failed(err)
             return
         self._silent = 0
         self.update_status(values)

@@ -52,7 +52,7 @@ async def _async_register_frontend(hass) -> None:
         module_url=f"{STATIC_URL}/ZenMaster-panel.js?v={version}",
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        require_admin=False,
+        require_admin=True,
         config={},
     )
 

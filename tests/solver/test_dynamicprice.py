@@ -89,8 +89,6 @@ def fake_session(payload, status=200):
 
 
 async def _stub_base(self, dynamicPrice, now):
-    dynamicPrice.price_buy.data[:] = RAW
-    dynamicPrice.price_sell.data[:] = RAW
     self.import_markup = 0.0
     self.energy_tax = 0.09
     self.vat = 21.0
@@ -98,6 +96,12 @@ async def _stub_base(self, dynamicPrice, now):
     self.zone = "NL"
     self.tou = np.zeros(dynamicPrice.price_buy.data.size)  # no time-of-use grid fee in NL
     self.last_fetch = now
+    return np.full(SIZE, RAW), np.full(SIZE, RAW)
+
+
+def fetch(provider, o):
+    # the provider's working copies written back, as DynamicPrice._refresh does after a complete fetch
+    o.price_buy.data[:], o.price_sell.data[:] = asyncio.run(provider.fetch(o, NOW))
 
 
 def stub_base(monkeypatch):
@@ -110,7 +114,7 @@ def test_base_fills_raw_and_sets_overlay(monkeypatch):
     monkeypatch.setattr(dp, "async_get_clientsession", fake_session(payload))
     o = make_dp("FrankProvider")
     p = Provider()
-    asyncio.run(p.fetch(o, NOW))
+    fetch(p, o)
     assert o.price_buy.data[12] == pytest.approx(0.05)   # raw at slot 12 (now), no overlay
     assert o.price_sell.data[12] == pytest.approx(0.05)
     assert o.price_buy.data[15] == pytest.approx(0.08)
@@ -128,7 +132,7 @@ def test_offset_override_wins(monkeypatch):
     o = make_dp("anwb")        # anwb table default: import_markup 0.0149, fixed_cost_per_day 0.28
     o.import_markup = 0.055    # user override from the card
     p = Provider()
-    asyncio.run(p.fetch(o, NOW))
+    fetch(p, o)
     assert p.import_markup == pytest.approx(0.055)       # override wins
     assert p.fixed_cost_per_day == pytest.approx(0.28)   # not overridden -> anwb table default
 
@@ -144,12 +148,12 @@ def test_frank(monkeypatch):
     ]
     monkeypatch.setattr(frank, "async_get_clientsession", fake_session({"data": {"marketPrices": {"electricityPrices": rows}}}))
     o = make_dp("FrankProvider")
-    asyncio.run(frank.FrankProvider().fetch(o, NOW))
+    fetch(frank.FrankProvider(), o)
     buy, sell = o.price_buy.data, o.price_sell.data
     assert buy[12] == pytest.approx(0.38)   # 0.20 + 0.04 + 0.02 + 0.12
     assert buy[16] == pytest.approx(0.50)   # 0.30 + 0.06 + 0.02 + 0.12
     assert sell[12] == pytest.approx(0.20) and sell[16] == pytest.approx(0.30)
-    assert buy[20] == pytest.approx((RAW + 0.12 + 0.02) * 1.21)   # tail: last sourcing + etx, VAT%
+    assert buy[20] == pytest.approx(RAW * 1.21 + 0.02 + 0.12)   # tail: market plus VAT, then the last sourcing + etx, as the real rows
     assert buy[0] == pytest.approx(RAW) and buy[11] == pytest.approx(RAW)   # first 12 untouched
 
 
@@ -159,7 +163,7 @@ def test_energycharts(monkeypatch):
     payload = {"unix_seconds": [ts0, ts0 + 3600], "price": [100.0, 200.0]}   # hourly, EUR/MWh
     monkeypatch.setattr(energycharts, "async_get_clientsession", fake_session(payload))
     o = make_dp("EnergyChartsProvider")
-    asyncio.run(energycharts.EnergyChartsProvider().fetch(o, NOW))
+    fetch(energycharts.EnergyChartsProvider(), o)
     buy, sell = o.price_buy.data, o.price_sell.data
     assert buy[12] == pytest.approx((0.10 + 0.09) * 1.21)   # step 4, w = 0.10, markup 0.09, VAT
     assert buy[16] == pytest.approx((0.20 + 0.09) * 1.21)
@@ -178,7 +182,7 @@ def test_tibber(monkeypatch):
     payload = {"data": {"viewer": {"homes": [{"currentSubscription": {"priceInfo": {"today": today, "tomorrow": []}}}]}}}
     monkeypatch.setattr(tibber, "async_get_clientsession", fake_session(payload))
     o = make_dp("TibberProvider")
-    asyncio.run(tibber.TibberProvider().fetch(o, NOW))
+    fetch(tibber.TibberProvider(), o)
     buy, sell = o.price_buy.data, o.price_sell.data
     assert buy[12] == pytest.approx(0.30) and sell[12] == pytest.approx(0.18)
     assert buy[16] == pytest.approx(0.40) and sell[16] == pytest.approx(0.25)
@@ -201,7 +205,7 @@ def test_zonneplan(monkeypatch):
 
     monkeypatch.setattr(zonneplan.ZonneplanProvider, "_chart", fake_chart)
     o = make_dp("ZonneplanProvider")
-    asyncio.run(zonneplan.ZonneplanProvider().fetch(o, NOW))
+    fetch(zonneplan.ZonneplanProvider(), o)
     buy, sell = o.price_buy.data, o.price_sell.data
     now_hour = NOW.astimezone(ZoneInfo("Europe/Amsterdam")).hour
     assert buy[12] == pytest.approx((now_hour + 1) / 100.0) and sell[12] == pytest.approx(0.05)   # slot 12 = the hour containing now
@@ -216,7 +220,7 @@ def test_zonneplan(monkeypatch):
 def test_nextenergy(monkeypatch):
     stub_base(monkeypatch)
     o = make_dp("NextEnergyProvider")
-    asyncio.run(nextenergy.NextEnergyProvider().fetch(o, NOW))
+    fetch(nextenergy.NextEnergyProvider(), o)
     buy, sell = o.price_buy.data, o.price_sell.data
     assert buy[0] == pytest.approx(RAW) and buy[11] == pytest.approx(RAW)   # no day-ahead, first 12 untouched
     assert buy[12] == pytest.approx((RAW + 0.09) * 1.21)
@@ -229,7 +233,7 @@ def test_frank_malformed_raises(monkeypatch):
     monkeypatch.setattr(frank, "async_get_clientsession", fake_session({"data": {}}))
     o = make_dp("FrankProvider")
     with pytest.raises(ProviderError):
-        asyncio.run(frank.FrankProvider().fetch(o, NOW))
+        fetch(frank.FrankProvider(), o)
 
 
 def test_frank_aligns_rows_to_wall_clock_slot(monkeypatch):
@@ -245,6 +249,6 @@ def test_frank_aligns_rows_to_wall_clock_slot(monkeypatch):
                      "marketPrice": h / 100.0, "marketPriceTax": 0.0, "sourcingMarkupPrice": 0.0, "energyTaxPrice": 0.0})
     monkeypatch.setattr(frank, "async_get_clientsession", fake_session({"data": {"marketPrices": {"electricityPrices": rows}}}))
     o = make_dp("FrankProvider")
-    asyncio.run(frank.FrankProvider().fetch(o, NOW))
+    fetch(frank.FrankProvider(), o)
     now_hour = NOW.astimezone(tz).hour  # slot 12 = the quarter containing 'now'
     assert o.price_sell.data[12] == pytest.approx(now_hour / 100.0)

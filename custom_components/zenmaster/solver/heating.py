@@ -31,7 +31,8 @@ def _min_kw(outdoor: float) -> float:
 
 def _cop(outdoor: float, indoor: float) -> float:
     # Carnot between the air inside (+10 K at the condenser) and outside (-5 K at the evaporator) at 39 % efficiency, less the defrosts: fitted with the knee on the MHI's air-side heat
-    carnot = (indoor + 283.15) / (indoor - outdoor + 15)
+    # the lift between condenser and evaporator, at least 1 K: warm outdoor air gives the cap, never a division by zero
+    carnot = (indoor + 283.15) / max(1.0, indoor - outdoor + 15)
     return min(6.0, max(1.5, 0.39 * carnot * (1 - next(d for top, d in _DEFROST if outdoor < top))))
 
 
@@ -95,17 +96,17 @@ class Heating(SolverEntry, ConsumerDevice):
         self.slack: LpColumn = None  # soft-floor shortfall column (house only)
         self.over: LpColumn = None  # soft-ceiling excess column (house only)
 
+    @property
+    def _floor(self) -> float:
+        # the hard floor from the comfort floor of this moment: a house keeps it _ABS_MARGIN under, a tank the band itself
+        return self.t_min - _ABS_MARGIN if self.SOFT_FLOOR else self.t_min
+
     def entry_config(self, lp: LpSolver) -> None:
         self.phase = Phase(self.phase)  # accept the plain int value coming from the config
         soft = self.SOFT_FLOOR
-        hard_min = self.t_min - _ABS_MARGIN if soft else self.t_min  # house keeps a hard floor below the soft comfort floor
-        self._floor = hard_min
         if soft:
             self._outdoor = lp.temp  # house loses heat to the outdoor forecast
         lp.track(self.temp_entity, lambda v: setattr(self, "_temp0", v))  # keep the live temperature fresh
-        # start from the live temperature: track only hears the next change
-        if lp.hass is not None and (state := lp.hass.states.get(self.temp_entity)) is not None and state.state not in ("unknown", "unavailable"):
-            self._temp0 = float(state.state)
         lp.track(self.power_entity, self.on_power, phase=self.phase)  # measured energy, for the realised saving
 
         # electrical draw column, tagged on its phase so the solver's phase-limit row includes it, capped at max_power
@@ -113,8 +114,8 @@ class Heating(SolverEntry, ConsumerDevice):
             self.slope = self.volume / (_TANK_K * self.tau)
         self.power = lp.column(hi=self.max_power, tags=("draw",), dest=lp.data(f"{self.id}_power", "kW", name=self.name), phase=self.phase)
         # temperature state. House has no hard upper bound: with no cooling path a ceiling is infeasible in summer, so it gets a soft one below.
-        # Boiler/pool keep the hard band [hard_min, t_max]. Slot 0 is pinned to the live temp in prerun.
-        self.temp = lp.column(lo=hard_min, dest=lp.data(f"{self.id}_temp", "C", name=self.name)) if soft else lp.column(lo=hard_min, hi=self.t_max, dest=lp.data(f"{self.id}_temp", "C", name=self.name))
+        # Boiler/pool keep the hard band [floor, t_max]. Slot 0 is pinned to the live temp in prerun.
+        self.temp = lp.column(lo=self._floor, dest=lp.data(f"{self.id}_temp", "C", name=self.name)) if soft else lp.column(lo=self._floor, hi=self.t_max, dest=lp.data(f"{self.id}_temp", "C", name=self.name))
         # The floor is a row, not a bound: a store that sits under it cannot always climb back inside the phase limit,
         # and a bound it cannot reach makes the whole LP infeasible. Falling short costs _COMFORT_PENALTY per degC.
         self.slack = lp.column(cost=_COMFORT_PENALTY, lo=0.0)
@@ -151,20 +152,20 @@ class Heating(SolverEntry, ConsumerDevice):
 
     async def entry_prerun(self, lp: LpSolver, now: datetime) -> None:
         # The house is used as a heat buffer, so the saving is the same heat bought at a better moment:
-        # the energy of this quarter against the average buy price over the coming day.
+        # the energy since the last run, at the price of its quarter, against the average buy price over the coming day.
         if self._pending_kwh and getattr(lp, "price_buy", None) is not None:
             window = lp.price_buy.data[12 : 12 + 96]
             reference = float(sum(window) / len(window)) if len(window) else 0.0
-            price = float(lp.price_buy.data[12])
+            price = float(lp.price_buy.data[lp.settle])
             if (booked := lp.globals.get("savings_pending")) is not None:
                 booked.append(self._pending_kwh * (reference - price))
             self._pending_kwh = 0.0
 
         self._tmin = [self.t_min] * lp.horizon
         if self.SOFT_FLOOR:
-            # the house floor per hour of the day, then per quarter of the plan
+            # the house floor per hour of the day, then per quarter of the plan; the hour from the real time, also when the clock changes
             floors = [self.t_min_night] * _MORNING + [self.t_min_day] * (_EVENING - _MORNING) + [self.t_min] * (_NIGHT - _EVENING) + [self.t_min_night] * (24 - _NIGHT)
-            self._tmin = [floors[(now + timedelta(minutes=15 * t)).hour] for t in range(lp.horizon)]
+            self._tmin = [floors[datetime.fromtimestamp(now.timestamp() + 900 * t, now.tzinfo).hour] for t in range(lp.horizon)]
             # the COP of each quarter follows the outdoor forecast
             self._cops = [_cop(self._outdoor.data[12 + t], self._tmin[t]) for t in range(lp.horizon)]  # the room at the floor of that quarter
             self._mins = [_min_kw(self._outdoor.data[12 + t]) for t in range(lp.horizon)]
@@ -382,12 +383,13 @@ async def fit_house(hass, power_id: str, temp_id: str, solar_ids: list, lat: flo
     p, t, solar = kw(power_id, phase), {floor_hour(r["start"]): r["mean"] for r in stats.get(temp_id, []) if r.get("mean") is not None}, [kw(i, Phase.all) for i in solar_ids]
     standby = float(np.median([v for v in p.values() if v < 0.1] or [0.0]))
 
-    # outdoor temperature, global irradiance and wind of the same hours from the weather archive
+    # outdoor temperature, global irradiance and wind of the same hours from the weather archive; a failed fetch keeps the current fit
     params = {"latitude": lat, "longitude": lon, "start_date": begin.date().isoformat(), "end_date": now.date().isoformat(), "hourly": "temperature_2m,shortwave_radiation,wind_speed_10m", "wind_speed_unit": "ms", "timezone": "UTC"}
     try:
         async with async_get_clientsession(hass).get("https://archive-api.open-meteo.com/v1/archive", params=params) as r:
+            r.raise_for_status()
             h = (await r.json())["hourly"]
-    except (aiohttp.ClientError, KeyError):
+    except (aiohttp.ClientError, TimeoutError, ValueError, KeyError):
         return None
     wx = {datetime.fromisoformat(s).replace(tzinfo=timezone.utc): (o, sun or 0.0, w or 0.0) for s, o, sun, w in zip(h["time"], h["temperature_2m"], h["shortwave_radiation"], h["wind_speed_10m"]) if o is not None}
 
@@ -414,6 +416,7 @@ async def fit_house(hass, power_id: str, temp_id: str, solar_ids: list, lat: flo
     # the first hour after the heat pump stops at night only the air cools, by ua / ci of the indoor-outdoor difference
     hour, on = timedelta(hours=1), lambda k: p.get(k, 0.0) > standby + 0.1
     drops = [(t[k] - t[k + hour]) / (t[k] - wx[k][0]) for k in t if k + hour in t and k in wx and wx[k][1] == 0.0 and t[k] - wx[k][0] > 5.0 and on(k - hour) and not on(k) and not on(k + hour)]
-    if len(drops) < 10 or not 0 < (ci := ua / np.median(drops)) < c:
+    # a fit the physics cannot be is kept out: too few drops, an air store out of range, or wind, sun or free heat below zero
+    if len(drops) < 10 or not 0 < (ci := ua / np.median(drops)) < c or min(w, g, q) < 0:
         return None
     return float(ci), c - ci, float(ci * (c - ci) / (c * _MASS_HOURS)), float(ua), float(w), float(g), float(q)

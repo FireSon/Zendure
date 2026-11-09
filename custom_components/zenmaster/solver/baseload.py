@@ -3,6 +3,7 @@ import logging
 from datetime import datetime, timedelta
 
 import homeassistant.util.dt as dt_util
+import numpy as np
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import statistics_during_period
 
@@ -23,6 +24,7 @@ class BaseLoad(SolverEntry):
             lp.data("load_l3", "kW", 2, source="ha"),
         ]
         self.load = lp.data("load", "kW", 2, source="ha")  # aggregate house load (sum l1/l2/l3) for UI/plan
+        self.profile = np.zeros((3, 7, 24))  # background load per phase, weekday and hour (kW), from load_history
         self._loaded = None  # local date load_history last ran (None = not yet)
 
     async def entry_prerun(self, lp: LpSolver, now: datetime):
@@ -32,6 +34,13 @@ class BaseLoad(SolverEntry):
             await self.load_history(lp, now)
         if self._loaded != today:  # cold start, then again at local midnight
             lp.hass.async_create_task(self.load_history(lp, now))
+
+        # every coming quarter its background load from the weekday-hour profile, so the whole horizon is filled
+        slot0 = int(now.timestamp()) // 900 * 900
+        local = [dt_util.as_local(dt_util.utc_from_timestamp(slot0 + 900 * i)) for i in range(self.load.data.size - 12)]
+        weekdays, hours = [t.weekday() for t in local], [t.hour for t in local]
+        for ph, load in enumerate(self.loads[1:]):
+            load.data[12:] = self.profile[ph, weekdays, hours]
 
         end = 12 + lp.horizon
         lp.l1[0:lp.horizon] = self.loads[1].data[12:end]
@@ -50,7 +59,6 @@ class BaseLoad(SolverEntry):
         if not p1:
             return
         slots = (p1["l1"], p1["l2"], p1["l3"])  # each: [(entity_id, signed watt factor)]
-        bufs = (self.loads[1].data, self.loads[2].data, self.loads[3].data)
         solar_ac = lp.globals.get("solar_ac", [])  # AC roof PV entity ids (Zendure DC solar excluded)
         batteries = lp.globals.get("batteries", [])  # PowerDevice list; home_output/home_input are AC W
 
@@ -76,7 +84,6 @@ class BaseLoad(SolverEntry):
             sw, cw = s[(wd, h)]
             return (sa + sw) / (ca + cw) if (ca + cw) else 0.0
 
-        base = dt_util.as_local(now)
         for ph in range(3):
             slot = slots[ph]
             cons = [(e.power_entity, 1.0) for e in lp._entries if e.power_entity and e.phase - 1 == ph]
@@ -91,17 +98,12 @@ class BaseLoad(SolverEntry):
                 weight = 1.0 if (dph is not None and int(dph) - 1 == ph) else (1.0 / 3 if (dph is None or int(dph) == 0) else 0.0)
                 if weight:
                     batt.append((out, inp, weight))
-            buf = bufs[ph]
-            buf[12:] = 0.0
-            for k in range((len(buf) - 12) // 4):  # hours from now
-                t = base + timedelta(hours=k)
-                wd, h = t.weekday(), t.hour
-                house = sum(sign * avg(eid, wd, h) for eid, sign in slot)
-                house += sum(avg(s, wd, h) for s in solar_ac) / 3.0  # roof PV split evenly (no per-panel phase)
-                house += sum((avg(out, wd, h) - avg(inp, wd, h)) * w for out, inp, w in batt)  # battery AC net
-                bg = max(0.0, house - sum(abs(avg(c, wd, h)) * w for c, w in cons))  # abs: a reversed consumer meter must still subtract
-                for q in range(4):  # one hourly value fills 4 quarters
-                    buf[12 + k * 4 + q] = bg
+            for wd in range(7):
+                for h in range(24):
+                    house = sum(sign * avg(eid, wd, h) for eid, sign in slot)
+                    house += sum(avg(s, wd, h) for s in solar_ac) / 3.0  # roof PV split evenly (no per-panel phase)
+                    house += sum((avg(out, wd, h) - avg(inp, wd, h)) * w for out, inp, w in batt)  # battery AC net
+                    self.profile[ph, wd, h] = max(0.0, house - sum(abs(avg(c, wd, h)) * w for c, w in cons))  # abs: a reversed consumer meter must still subtract
 
     async def history_buckets(self, lp, p1_ids, all_ids):
         # 28 days of hourly means per entity in kW, summed and counted per (weekday, hour-of-day)

@@ -9,7 +9,7 @@ from custom_components.zenmaster.const import Phase
 
 
 def _lp() -> LpSolver:
-    return LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    return LpSolver(track=lambda *a, **k: None, horizon=96)
 
 
 def _placement_lp(phase_limit: float = 17 / 3) -> LpSolver:

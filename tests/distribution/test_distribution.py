@@ -414,8 +414,9 @@ def test_update_wear_computes_cycles_and_rte(monkeypatch) -> None:
 
 
 def _plan(dist: Distribution, charge: float, discharge: float, buy: float, sell: float) -> None:
-    # the four plan columns the mode derives from, all reading slot 12 = now
+    # the plan columns the mode derives from, all reading slot 12 = now: one battery's AC flows, the fleet sums and the grid
     col = lambda v: SimpleNamespace(dest=SimpleNamespace(data=[0.0] * 12 + [v]))
+    dist.solver_entry._units = [SimpleNamespace(charge=col(charge), discharge=col(discharge))]
     dist.solver_entry._bat_charge, dist.solver_entry._bat_discharge = col(charge), col(discharge)
     dist.solver_entry.grid_buy, dist.solver_entry.grid_sell = col(buy), col(sell)
 
@@ -425,14 +426,12 @@ def test_selling_to_the_grid_forces_the_plan_setpoint() -> None:
     dist = make_distribution([FakeDevice("d1", 60.0)])
     _plan(dist, 0.0, 8.55, 0.0, 8.55)
     assert dist.solver_entry._plan_direction() is DistributionMode.INDIVIDUAL
-    assert dist.solver_entry.plan_power == pytest.approx(8550.0)
 
 
 def test_charging_out_of_the_grid_forces_the_plan_setpoint() -> None:
     dist = make_distribution([FakeDevice("d1", 60.0)])
     _plan(dist, 9.75, 0.0, 9.70, 0.0)
     assert dist.solver_entry._plan_direction() is DistributionMode.INDIVIDUAL
-    assert dist.solver_entry.plan_power == pytest.approx(-9750.0)
 
 
 def test_without_grid_trade_the_matching_modes_stay() -> None:
@@ -574,7 +573,7 @@ def test_an_empty_pack_does_not_let_the_other_phases_charge_for_it() -> None:
 def _solve(dist: Distribution, buy: list[float], sell: list[float], meters: dict | None = None, load: list[float] | None = None) -> None:
     # one real solve over 96 quarters: buy per quarter from now, sell per quarter from now including what lies past the horizon,
     # the forecast of the batteries' own panels per meter, and house load on L1
-    lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    lp = LpSolver(track=lambda *a, **k: None, horizon=96)
 
     class _Inputs(SolverEntry):
         def entry_config(self, lp: LpSolver) -> None:
@@ -597,7 +596,7 @@ def test_a_solve_without_prices_holds_the_fleet_at_zero_while_optimize_is_on() -
     d1.power_setpoint = 500
     dist = make_distribution([d1], DistributionMode.INDIVIDUAL)
     dist.optimize = True
-    lp = LpSolver(track=lambda *a, **k: None, state=lambda *a, **k: None, horizon=96)
+    lp = LpSolver(track=lambda *a, **k: None, horizon=96)
 
     class _NoPrices(SolverEntry):
         def entry_config(self, lp: LpSolver) -> None:
