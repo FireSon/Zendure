@@ -55,6 +55,7 @@ class AnkerDriver(Driver):
 
     id = "anker"  # the settings section and the subentry type of the devices
     manufacturer = "Anker"
+    LOGO = "anker_solix"
     PRODUCTS = PRODUCTS
     DEVICE = AnkerSolarbank
     ZEROCONF = [{"type": SERVICE}]  # the coordinator browses it and hands every find to zeroconf_found

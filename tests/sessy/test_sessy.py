@@ -259,7 +259,7 @@ def test_coordinator_builds_a_sessy() -> None:
         d = coord.drivers["sessy"].devices["sessy-ab12.local"]
         assert d in coord.distribution.devices and d.kwh == 10.0
         coord.hass.async_create_task = asyncio.get_running_loop().create_task
-        entry.subentries = {sid: s for sid, s in entry.subentries.items() if s is not sub}
+        entry.subentries = {sid: s for sid, s in entry.subentries.items() if sid != sub.subentry_id}
         assert coord.sync_devices() is True and not coord.drivers["sessy"].devices
         await asyncio.sleep(0.05)  # the session closes on its way out
 

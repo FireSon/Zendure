@@ -348,7 +348,7 @@ def test_coordinator_builds_an_anker() -> None:
         d = coord.drivers["anker"].devices[SN]
         assert d in coord.distribution.devices and not d.dc_pv
         coord.hass.async_create_task = asyncio.get_running_loop().create_task
-        entry.subentries = {sid: s for sid, s in entry.subentries.items() if s is not sub}
+        entry.subentries = {sid: s for sid, s in entry.subentries.items() if sid != sub.subentry_id}
         assert coord.sync_devices() is True and not coord.drivers["anker"].devices
 
     asyncio.run(scenario())

@@ -83,6 +83,7 @@ class ZendureDriver(Driver):
 
     id = "zendure"  # the settings section and the subentry type of the devices
     manufacturer = "Zendure"
+    LOGO = "zendure_ha"
     ZEROCONF = [{"type": "_http._tcp.local.", "name": "zendure-*"}, {"type": "_zendure._tcp.local.", "name": "zendure-*"}]
     BLUETOOTH = [{"local_name": "Zen*", "connectable": True}]
     CONFIG = [
@@ -204,7 +205,7 @@ class ZendureDriver(Driver):
         if (old := self.devices.get(data["sn"])) is not None:
             self.remove_device(old)
 
-        # an address mDNS saw before the device was built; it reaches the subentry with the device's next config change
+        # an address mDNS saw before the device was built; the coordinator writes it to the subentry right after the build
         if not data.get("ip") and (ip := self._ips.pop(data["sn"], None) or self._ips.pop(data.get("device_id", ""), None)):
             data = {**data, "ip": ip}
         powers = (row.pwr_max, row.pwr_min) if issubclass(row.cls, DistributionDevice) else ()

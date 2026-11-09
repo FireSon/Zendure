@@ -27,6 +27,7 @@ class DeyeDriver(Driver):
 
     id = "deye"  # the settings section and the subentry type of the devices
     manufacturer = "Deye"
+    LOGO = "solarman"  # Deye has none of its own, its logger stick is a Solarman
     PRODUCTS = PRODUCTS
     DEVICE = DeyeInverter
     ADD = [  # the battery type picks the scales, the stick's serial is the identity, the capacity is the battery's: the inverter does not know it
