@@ -89,7 +89,7 @@ async def ws_get_schema(hass, connection, msg):
 
     # the add dialog: a tile per consumer type, per driver and for the solar group, each with the form it opens
     add = [{"id": k, "group": "consumer", "type": t, "data": {"kind": kind} if kind else {}, "color": color, "icon": icon, "fields": _form(SUBENTRY_TYPES[t].CONFIG)} for k, (t, kind, color, icon) in CONSUMER_TILES.items()]
-    add += [{"id": d.id, "group": "device", "type": d.id, "label": d.manufacturer, "fields": _form(d.ADD)} for d in coord.drivers.values()]
+    add += [{"id": d.id, "group": "device", "type": d.id, "label": d.manufacturer, "logo": d.LOGO, "fields": _form(d.ADD)} for d in coord.drivers.values()]
     add.append({"id": "solar_panel", "group": "solar", "type": "solar_panel", "fields": fields})
 
     connection.send_result(msg["id"], {"schema": schema, "config": config, "actions": actions, "tiles": tiles, "add": add})
@@ -139,8 +139,11 @@ async def ws_save_schema(hass, connection, msg):
         return
     coord.config.serialize(device, msg["section"], coord.config.payload)
     await coord.config.save()
-    if getattr(device, "subentry_id", None):
-        coord.persist_device(device)  # what a device is reached on (ip, port, credentials) lives in its subentry
+    if getattr(device, "subentry_id", None) and coord.persist_device(device):
+        # its connection is built with the device: a new address needs a new build, and only a reload replaces its entities with it
+        hass.async_create_task(hass.config_entries.async_reload(coord.entry_id))
+        connection.send_result(msg["id"], {"ok": True})
+        return
     if device in coord.drivers.values():
         await device.connect()
     if device is coord.prices and (otp := str((msg.get("payload") or {}).get("otp") or "")):

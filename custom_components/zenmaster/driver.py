@@ -21,6 +21,7 @@ _LOGGER = logging.getLogger(__name__)
 class Driver:
     id: str  # the settings section and the subentry type of the devices
     manufacturer: str
+    LOGO = ""  # its icon's domain on Home Assistant's brands CDN; empty keeps the battery icon
     PRODUCTS: dict[str, Any]  # product key -> the brand's Product row; its family names the device
     DEVICE: type  # the device class the brand builds, called with the product row
     CONFIG = [ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True)]  # the settings section of the driver: only its id

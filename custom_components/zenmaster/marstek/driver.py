@@ -28,6 +28,7 @@ class MarstekDriver(Driver):
 
     id = "marstek"  # the settings section and the subentry type of the devices
     manufacturer = "Marstek"
+    LOGO = "marstek"
     PRODUCTS = PRODUCTS
     DEVICE = MarstekVenus
     ADD = [ConfigField("product", {"select": {"options": list(PRODUCTS)}}, cast=str), ConfigField("ip", {"text": {}}, cast=str), ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False)]  # the register generation

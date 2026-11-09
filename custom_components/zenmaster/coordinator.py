@@ -191,6 +191,7 @@ class Coordinator:
                 device.on_phase = lambda: self.setting_changed(None)  # its phase is fixed in the LP structure
             device.on_config_changed = self.persist_device
             device.device_load(self.config.section("devices", device.device_id))
+            self.persist_device(device)  # what the build learned on its own (an ip mDNS saw before) reaches the subentry now
         for sid, device in built.items():
             if sid not in self.entry.subentries:
                 device.driver.remove_device(device)  # HA already cleared its registry device and entities along with the subentry
@@ -209,13 +210,15 @@ class Coordinator:
         self.hass.config_entries.async_add_subentry(self.entry, sub)
         return sub.subentry_id
 
-    def persist_device(self, device: EntityDevice) -> None:
-        # ip, blemac and the pack names back into the device's subentry; a no-op when nothing changed
+    def persist_device(self, device: EntityDevice) -> bool:
+        # ip, blemac and the pack names back into the device's subentry; False when nothing changed
         if self.entry is None or (sub := self.entry.subentries.get(device.subentry_id or "")) is None:
-            return
+            return False
         data = {**sub.data, **device.subentry_data()}
-        if dict(sub.data) != data:
-            self.hass.config_entries.async_update_subentry(self.entry, sub, data=data)
+        if dict(sub.data) == data:
+            return False
+        self.hass.config_entries.async_update_subentry(self.entry, sub, data=data)
+        return True
 
     async def _listen(self) -> None:
         # after setup HA starts no discovery flows for us (single instance): one mDNS browser for every driver's service types,

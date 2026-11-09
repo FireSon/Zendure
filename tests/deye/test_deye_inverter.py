@@ -208,7 +208,7 @@ def test_coordinator_builds_a_deye_in_the_fleet() -> None:
         d = coord.drivers["deye"].devices[str(SERIAL)]
         assert d in coord.devices and d in coord.distribution.devices and d.kwh == 10.24
         coord.hass.async_create_task = asyncio.get_running_loop().create_task  # unload hands back on a task of its own
-        entry.subentries = {sid: s for sid, s in entry.subentries.items() if s is not sub}
+        entry.subentries = {sid: s for sid, s in entry.subentries.items() if sid != sub.subentry_id}
         assert coord.sync_devices() is True and not coord.drivers["deye"].devices and d not in coord.devices
 
     asyncio.run(scenario())

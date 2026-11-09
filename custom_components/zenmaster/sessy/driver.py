@@ -30,6 +30,7 @@ class SessyDriver(Driver):
 
     id = "sessy"  # the settings section and the subentry type of the devices
     manufacturer = "Sessy"
+    LOGO = "sessy"
     PRODUCTS = PRODUCTS
     DEVICE = SessyBattery
     ADD = [ConfigField("product", {"select": {"options": list(PRODUCTS)}}, cast=str), ConfigField("ip", {"text": {}}, cast=str), ConfigField("username", {"text": {}}, cast=str), ConfigField("password", {"text": {"type": "password"}}, cast=str)]  # the model sets the capacity: the API reports none

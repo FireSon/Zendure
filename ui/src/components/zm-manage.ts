@@ -71,6 +71,7 @@ export class ZmManage extends LitElement {
       .type:hover { border-color: var(--zm-text-faint); }
       .type span { font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-dim); text-align: center; line-height: 1.25; }
       .type .ic { width: 42px; height: 42px; border-radius: 999px; display: flex; align-items: center; justify-content: center; }
+      .type .ic img { width: 28px; height: 28px; object-fit: contain; }
       .pills { display: flex; gap: 8px; flex-wrap: wrap; }
       .pill { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: var(--zm-card); border: 1px solid var(--zm-ctl-border); color: #13967d; font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 800; text-decoration: none; cursor: pointer; }
       .fld { display: flex; flex-direction: column; gap: 4px; font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-faint); }
@@ -133,7 +134,7 @@ export class ZmManage extends LitElement {
     // solar groups have one kind only: the plus opens their form straight away
     const tiles = this.add.filter((a) => a.group === this.tab);
     return html`<div class="types">${tiles.map((a) => html`<button class="type" @click=${() => this._start(a)}>
-      <span class="ic" style="background:color-mix(in srgb, ${a.color ?? '#1fb89a'} 15%, transparent)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke=${a.color ?? '#1fb89a'} stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[a.icon] ?? ICONS.battery}</svg></span>
+      <span class="ic" style="background:color-mix(in srgb, ${a.color ?? '#1fb89a'} 15%, transparent)">${a.logo ? html`<img src="https://brands.home-assistant.io/${a.logo}/icon.png" alt="" />` : html`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke=${a.color ?? '#1fb89a'} stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${ICONS[a.icon] ?? ICONS.battery}</svg>`}</span>
       <span>${this._label(a)}</span>
     </button>`)}</div>`;
   }
