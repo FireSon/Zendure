@@ -78,7 +78,8 @@ class DynamicPrice(SolverEntry):
         ConfigField("offpeak_hours_summer", {"text": {}}, cast=str, required=False, visible_when={"country": ["FR"]}),
         ConfigField("export_factor", {"number": {"step": 0.001}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"country": ["DE", "FR", "AT"]}),
         ConfigField("export_markup", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"country": ["DE", "FR", "AT"]}),
-        ConfigField("email", {"text": {}}, cast=str, required=False, visible_when={"provider": ["ZonneplanProvider"]}),
+        ConfigField("email", {"text": {}}, cast=str, required=False, visible_when={"provider": ["ZonneplanProvider", "FrankProvider"]}),
+        ConfigField("password", {"text": {"type": "password"}}, cast=str, required=False, transient=True, visible_when={"provider": ["FrankProvider"]}),
         ConfigField("access_token", {"text": {"type": "password"}}, cast=str, required=False, visible_when={"provider": ["TibberProvider"]}),
         ConfigField("request_code", {"button": {"label": "Vraag code aan", "command": "price_auth", "icon": "mail"}}, cast=None, required=False, readonly=True, visible_when={"provider": ["ZonneplanProvider"]}),
         ConfigField("needcode", {"boolean": {}}, cast=bool, required=False, readonly=True, hidden=True),
@@ -150,12 +151,12 @@ class DynamicPrice(SolverEntry):
             await provider.submit_otp(self, otp.strip())
         except ProviderError as err:
             _LOGGER.warning("price authorisation: %s", err)
-            persistent_notification.async_create(hass, f"Code afgewezen: {err}", "ZenMaster", f"{DOMAIN}_auth")
+            persistent_notification.async_create(hass, f"Koppelen mislukt: {err}", "ZenMaster", f"{DOMAIN}_auth")
             return
         self.needcode = False
         await self._store(hass)
         _LOGGER.info("price authorisation: token received")
-        persistent_notification.async_create(hass, "Zonneplan is gekoppeld.", "ZenMaster", f"{DOMAIN}_auth")
+        persistent_notification.async_create(hass, f"{type(provider).__name__.removesuffix('Provider')} is gekoppeld.", "ZenMaster", f"{DOMAIN}_auth")
         await self._refresh(datetime.now().astimezone())  # pull the prices now, not at the next tick
 
     async def request_code(self, hass) -> bool:

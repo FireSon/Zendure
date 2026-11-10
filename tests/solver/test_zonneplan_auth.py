@@ -141,7 +141,7 @@ def test_the_code_is_never_stored_and_the_attempt_is():
     payload = {}
     Config().serialize(dp, "price", payload)
     assert "otp" not in payload["price"], "de code mag nooit opgeslagen worden"
-    assert {f.id for f in DynamicPrice.CONFIG} == {"id", "provider", "saldering", "import_markup", "fixed_cost_per_day", "country", "grid_fee", "offpeak_hours", "offpeak_hours_summer", "export_factor", "export_markup", "email", "access_token", "request_code", "needcode", "otp"}
+    assert {f.id for f in DynamicPrice.CONFIG} == {"id", "provider", "saldering", "import_markup", "fixed_cost_per_day", "country", "grid_fee", "offpeak_hours", "offpeak_hours_summer", "export_factor", "export_markup", "email", "password", "access_token", "request_code", "needcode", "otp"}
 
 
 def test_needcode_drives_the_code_field():

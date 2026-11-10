@@ -204,9 +204,10 @@ class Appliance(SolverEntry, ConsumerDevice):
 
         # armed means we cut the power; with the switch on there is nothing to wait for, so the flag is void.
         # unavailable says nothing (the switch comes back late after a restart), so then we neither void nor act.
-        switch = lp.hass.states.get(self.switch_entity) if self._switched and lp.hass is not None else None
-        switch = switch.state if switch is not None else ""
-        if self.armed and switch == "on":
+        state = lp.hass.states.get(self.switch_entity) if self._switched and lp.hass is not None else None
+        switch = state.state if state is not None else ""
+        # turned on after the arming: the user let it run. Still on from before is our switch-off on its way
+        if self.armed and switch == "on" and state.last_changed.timestamp() > self.armed_at:
             self.armed = False
             if not self.busy:
                 self.status = EntryStatus.none
