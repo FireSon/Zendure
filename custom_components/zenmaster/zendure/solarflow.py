@@ -318,7 +318,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
 
                 # a status change since the previous round; going offline or losing the grid is always notified
                 if self.state != state:
-                    if self.state in (DeviceState.OFFLINE, DeviceState.NOGRID):
+                    if self.state in (DeviceState.OFFLINE, DeviceState.NOGRID) and state != DeviceState.CREATED:
                         persistent_notification.async_create(self.hass, f"{self.name}: {self.state.name.lower()} since {time.strftime('%H:%M')}", PANEL_TITLE, f"{DOMAIN}_grid_{self.sn}")
                     state = self.state
 
