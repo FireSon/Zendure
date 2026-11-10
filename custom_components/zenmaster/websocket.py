@@ -150,7 +150,8 @@ async def ws_save_schema(hass, connection, msg):
         return
     if device in coord.drivers.values():
         await device.connect()
-    if device is coord.prices and (otp := str((msg.get("payload") or {}).get("otp") or "")):
+    payload = msg.get("payload") or {}
+    if device is coord.prices and (otp := str(payload.get("otp") or payload.get("password") or "")):
         hass.async_create_task(coord.prices.authorise(hass, otp))  # the code rides along with this save and is never stored
     if device is coord.distribution and coord.distribution.p1_device:
         coord._track_p1(coord.distribution.p1_device)  # a different P1 meter is read from now on

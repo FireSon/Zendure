@@ -34,6 +34,7 @@ def make_dp(provider):
     o.price_buy = _SD()
     o.price_sell = _SD()
     o.access_token = "tok"
+    o.token = {}  # no login: Frank fetches the public prices
     o.provider = provider
     o.country = "NL"
     o.hass = None
