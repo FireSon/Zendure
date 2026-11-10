@@ -527,6 +527,9 @@
       },
       "export_replay": {
         "name": "Replay-data exporteren"
+      },
+      "arm": {
+        "name": "Klaarzetten"
       }
     }
   },
@@ -691,6 +694,14 @@
       "headroom": {
         "name": "Ruimte boven setpoint",
         "description": "Zoveel graden boven het setpoint mag de solver het huis verwarmen om warmte op te slaan."
+      },
+      "switch_type": {
+        "name": "Schakeltype",
+        "description": "Hoe ZenMaster een cyclus vasthoudt en laat lopen: de stekker, de eigen pauze- en hervatknop van het apparaat, of een eigen automation op de status."
+      },
+      "pause_entity": {
+        "name": "Pauzeknop",
+        "description": "De eigen pauzeknop van het apparaat; Vrijgave is dan de hervatknop."
       }
     },
     "section": {
@@ -709,7 +720,8 @@
       "pause": "Pauze",
       "skip": "Overslaan",
       "start": "Start",
-      "stop": "Stop"
+      "stop": "Stop",
+      "arm": "Klaarzetten"
     },
     "button": {
       "detect_phase": "Bepaal fase uit de historie",
@@ -739,6 +751,11 @@
         "boven": "Boven",
         "midden": "Midden",
         "onder": "Onder"
+      },
+      "switch_type": {
+        "plug": "Stekker",
+        "pause": "Pauze/hervat",
+        "automation": "Automation"
       }
     },
     "ui": {

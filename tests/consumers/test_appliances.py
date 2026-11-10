@@ -202,7 +202,7 @@ def test_hands_off_shows_as_its_own_status() -> None:
 def test_the_row_buttons_come_from_the_appliance() -> None:
     # the override is the manage switch on the device, so the row keeps only the moment-to-moment actions
     ids = [a.id for a in Appliance.ACTIONS]
-    assert ids == ["start", "stop", "skip"]
+    assert ids == ["arm", "start", "stop", "skip"]
     when = {a.id: a.when for a in Appliance.ACTIONS}
     assert "running" in when["stop"] and "running" not in when["start"]
 
@@ -376,3 +376,50 @@ def test_power_while_unmanaged_keeps_its_own_status() -> None:
     assert d.status.name == "unmanaged" and h.turned_off == [], "niet beheerd: geen armen, geen andere status"
     d.on_power(0.0, now=1200.0)
     assert d.status.name == "unmanaged"
+
+
+def _planned_now(d: Appliance, h: _Hass):
+    # the plan puts the armed cycle at 'now', so entry_prerun wants it running
+    from datetime import datetime
+
+    import numpy as np
+
+    d.data = SimpleNamespace(data=np.zeros(204))
+    d._profile = [0.5] * 4
+    now = datetime.now().astimezone()
+    d._last_cal = now
+    return SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 0), now
+
+
+def test_with_a_pause_button_the_start_is_paused_and_resumed() -> None:
+    # the appliance holds its own program: arming presses pause, the planned moment presses resume, the plug is never touched
+    d, h = _dw()
+    d.switch_type, d.switch_entity, d.pause_entity = "pause", "button.dw_resume", "button.dw_pause"
+    h.states = SimpleNamespace(get=lambda eid: SimpleNamespace(state="2026-11-10T00:00:00+00:00"))  # a button's state is when it was last pressed
+    d.on_power(0.0, now=1000.0)
+    d.on_power(200.0, now=1000.0 + _QUIET_S)
+    assert d.armed is True and h.turned_off == [("press", "button.dw_pause")]
+
+    # resumed, also though a button never reads "off"
+    lp, now = _planned_now(d, h)
+    asyncio.run(d.entry_prerun(lp, now))
+    assert h.turned_off[-1] == ("press", "button.dw_resume")
+
+
+def test_with_an_automation_nothing_is_switched() -> None:
+    # the automation acts on the status: armed, then planned; ZenMaster calls nothing, also with a switch still filled in
+    d, h = _dw()
+    d.switch_type = "automation"
+    d.on_power(0.0, now=1000.0)
+    d.on_power(200.0, now=1000.0 + _QUIET_S)
+    assert d.armed is True and d.status.name == "armed"
+    lp, now = _planned_now(d, h)
+    asyncio.run(d.entry_prerun(lp, now))
+    assert d.status.name == "planned" and h.turned_off == []
+
+
+def test_the_arm_action_arms_without_switching() -> None:
+    # an appliance that waits without drawing (a remote start) is armed by the button an automation presses
+    d, h = _dw()
+    asyncio.run(d.command(h, "arm"))
+    assert d.armed is True and d.armed_at > 0 and d.status.name == "armed" and h.turned_off == []

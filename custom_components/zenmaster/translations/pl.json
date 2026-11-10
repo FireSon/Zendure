@@ -527,6 +527,9 @@
       },
       "export_replay": {
         "name": "Eksportuj dane replay"
+      },
+      "arm": {
+        "name": "Przygotuj"
       }
     }
   },
@@ -691,6 +694,14 @@
       "headroom": {
         "name": "Zapas powyżej nastawy",
         "description": "O tyle stopni powyżej nastawy solver może ogrzać dom, aby zmagazynować ciepło."
+      },
+      "switch_type": {
+        "name": "Typ przełączania",
+        "description": "Jak ZenMaster wstrzymuje cykl i pozwala mu działać: gniazdko, własne przyciski pauzy i wznowienia urządzenia lub własna automatyzacja na podstawie statusu."
+      },
+      "pause_entity": {
+        "name": "Przycisk pauzy",
+        "description": "Własny przycisk pauzy urządzenia; Zezwolenie jest wtedy przyciskiem wznowienia."
       }
     },
     "section": {
@@ -709,7 +720,8 @@
       "pause": "Pauza",
       "skip": "Pomiń",
       "start": "Start",
-      "stop": "Stop"
+      "stop": "Stop",
+      "arm": "Przygotuj"
     },
     "button": {
       "detect_phase": "Ustal fazę z historii",
@@ -739,6 +751,11 @@
         "boven": "Góra",
         "midden": "Środek",
         "onder": "Dół"
+      },
+      "switch_type": {
+        "plug": "Gniazdko",
+        "pause": "Pauza/wznowienie",
+        "automation": "Automatyzacja"
       }
     },
     "ui": {

@@ -86,6 +86,28 @@ Every brand other than Zendure is experimental: written against the vendor's reg
 - **Dishwasher, washing machine, dryer and custom appliances**: once armed, the cycle is placed in the cheapest window before its deadline, within the phase limits.
 - **EV charger**: off, solar (opportunistic while it pays), plan (reach a target SoC before departure) or fast.
 
+#### Appliance switch types
+
+An appliance is armed when it starts drawing power after a rest. The switch type sets how ZenMaster holds that cycle and lets it run:
+
+- **Plug**: the smart plug is switched off at arming and on again in the cheapest window. The appliance has to resume after a power cut.
+- **Pause/resume**: the appliance's own pause button is pressed at arming, its resume button in the cheapest window (for example Miele, or Home Connect washers and dryers).
+- **Automation**: ZenMaster switches nothing and only publishes the status on `sensor.<appliance>_state`; your own automation holds the cycle on `armed` and lets it run on the change from `armed` to `planned` or `running` (the latter covers a direct start):
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: sensor.vaatwasser_state
+    from: armed
+    to: [planned, running]
+actions:
+  - action: button.press
+    target:
+      entity_id: button.vaatwasser_resume   # the appliance's own resume or start
+```
+
+An appliance that waits without drawing power, such as one set to remote start, is armed by pressing `button.<appliance>_arm`, for example from an automation on its remote start sensor.
+
 ### Prices, solar and base load
 
 - **Dynamic prices** from Zonneplan, Tibber, Frank Energie, EnergyCharts or NextEnergy, or the wholesale price with the tariffs of a supplier in the Netherlands, Belgium, Germany, France or Austria (energy tax, grid fees, VAT and the feed-in rule per country). Net metering (saldering) is supported. Beyond the day-ahead prices a price model fitted on the price history fills in the rest of the 48 hours.

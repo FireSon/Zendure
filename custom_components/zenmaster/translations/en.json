@@ -527,6 +527,9 @@
       },
       "export_replay": {
         "name": "Export replay data"
+      },
+      "arm": {
+        "name": "Arm"
       }
     }
   },
@@ -691,6 +694,14 @@
       "headroom": {
         "name": "Room above setpoint",
         "description": "This many degrees above the setpoint the solver may heat the house to store heat."
+      },
+      "switch_type": {
+        "name": "Switch type",
+        "description": "How ZenMaster holds a cycle and lets it run: the plug, the appliance's own pause and resume buttons, or your own automation on the status."
+      },
+      "pause_entity": {
+        "name": "Pause button",
+        "description": "The appliance's own pause button; Release is then its resume button."
       }
     },
     "section": {
@@ -709,7 +720,8 @@
       "pause": "Pause",
       "skip": "Skip",
       "start": "Start",
-      "stop": "Stop"
+      "stop": "Stop",
+      "arm": "Arm"
     },
     "button": {
       "detect_phase": "Determine phase from history",
@@ -739,6 +751,11 @@
         "boven": "Top",
         "midden": "Middle",
         "onder": "Bottom"
+      },
+      "switch_type": {
+        "plug": "Plug",
+        "pause": "Pause/resume",
+        "automation": "Automation"
       }
     },
     "ui": {

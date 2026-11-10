@@ -507,6 +507,9 @@
       }
     },
     "button": {
+      "arm": {
+        "name": "Arm"
+      },
       "start": {
         "name": "Start"
       },
