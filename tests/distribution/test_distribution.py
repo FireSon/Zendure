@@ -794,3 +794,15 @@ def test_individual_stops_a_battery_that_cannot_help_its_limited_phase() -> None
     run(dist, 0, 1010.0, 1)
     assert (d1.power_setpoint, d2.power_setpoint) == (0, 500)
 
+
+
+def test_phase_detection_finds_a_device_that_reports_late(monkeypatch) -> None:  # noqa: ANN001
+    # d1's meter reports every 15 s, so its step shows up to 15 s after L2 already moved: the window reaches back that far
+    jumps: dict[str, list[tuple[float, float]]] = {"sensor.d1_home_output": [], "sensor.l2": []}
+    for k in range(1, 13):
+        t = 1000.0 * k
+        jumps["sensor.l2"] += [(t, -500.0), (t + 16, -60.0)]
+        jumps["sensor.d1_home_output"] += [(t + 14, 500.0), (t + 29, 60.0)]
+    dist, d1, _ = phase_fleet(monkeypatch, jumps)
+    asyncio.run(dist.detect_phases())
+    assert d1.power_phase is Phase.l2

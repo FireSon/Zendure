@@ -205,7 +205,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
 
     def power(self, watts: int, mode: DistributionMode) -> int:
         # an offline device is not steered: nothing is sent, the setpoint stays as it was
-        if self.state == DeviceState.OFFLINE:
+        if self.state in (DeviceState.OFFLINE, DeviceState.NOGRID):
             return self.power_actual
         watts = self.clamp(watts)
         watts = max(-self.charge_max_power, watts)
@@ -246,7 +246,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             self.device_queue.put_nowait((Command.POWER, _limits(0)))
             self.device_queue.put_nowait((Command.WRITE, {"properties": {"hemsState": 0}}))
         self.setpoint.update_value(0)
-        if self.state != DeviceState.OFFLINE:
+        if self.state not in (DeviceState.OFFLINE, DeviceState.NOGRID):
             self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
 
     def update_properties(self, payload: dict, now: float) -> None:
@@ -273,16 +273,13 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
 
             if k in ["outputHomePower", "gridInputPower"]:
                 self.power_actual = self.home_output - self.home_input
-                if abs(self.power_actual - self.power_setpoint) < POWER_SET or (now - self.state_since) > POWER_MAX_TIME:
+                if self.grid_state != 0 and (abs(self.power_actual - self.power_setpoint) < POWER_SET or (now - self.state_since) > POWER_MAX_TIME):
                     self.set_state(DeviceState.ACTIVE)
             elif k == "inverseMaxPower":
                 self.power_profile[0].power = v  # the discharge limit as configured in the Zendure app
                 self.power_profile[0].__post_init__()  # floor and bands follow the new limit
                 self.entities["output_limit"].update_range(0, v)
             elif k == "gridState":
-                # the AC side lost the grid (a tripped group): notify once on the drop, the inverter cannot deliver or charge from the grid until it is back
-                if v == 0 and self.grid_state == 1:
-                    persistent_notification.async_create(self.hass, f"{self.name}: no grid on the AC side since {time.strftime('%H:%M')}, check its group", PANEL_TITLE, f"{DOMAIN}_grid_{self.sn}")
                 self.grid_state = v
             elif k in ["chargeLimit", "chargeMaxLimit"]:
                 self.entities["input_limit"].update_range(0, v)
@@ -296,6 +293,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
 
     async def device_loop(self) -> None:
         timeout = 2
+        state = self.state  # the status at the end of the previous round
         while True:
             try:
                 # get next item from queue
@@ -310,6 +308,16 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
                     self.connection = ConnectionType.OFFLINE
                     self.power_actual = 0
                     self.set_state(DeviceState.OFFLINE)
+                # no grid on its AC side: it can neither deliver nor charge from the grid, its connection stays
+                elif self.grid_state == 0:
+                    self.power_actual = 0
+                    self.set_state(DeviceState.NOGRID)
+
+                # a status change since the previous round; going offline or losing the grid is always notified
+                if self.state != state:
+                    if self.state in (DeviceState.OFFLINE, DeviceState.NOGRID):
+                        persistent_notification.async_create(self.hass, f"{self.name}: {self.state.name.lower()} since {time.strftime('%H:%M')}", PANEL_TITLE, f"{DOMAIN}_grid_{self.sn}")
+                    state = self.state
 
                 # then act on that state
                 match self.connection:

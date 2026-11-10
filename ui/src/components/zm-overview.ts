@@ -202,8 +202,7 @@ export class ZmOverview extends LitElement {
       const rated = net < 0 ? Math.abs(Number(e.power_charge) || 0) : Number(e.power_discharge) || 0;
       const load = net !== 0 && rated > 0 ? Math.abs(net) / rated : 0;
       const temp = this._optNum(e.temp);
-      const gridOff = e.grid_state ? this._ent(e.grid_state)?.state === 'off' : false;  // no grid on the AC side: shown as offline
-      const offline = [0, 2].includes(Number(e.state ?? 0)) || gridOff;  // CREATED or OFFLINE: never heard or unreachable
+      const offline = [0, 3].includes(Number(e.state ?? 0));  // CREATED or OFFLINE
       return {
         id, name: e.name || id, model: e.model ?? '', eid: e.home_output ?? '', hasPack: kwhCap > 0,
         net, wattColor: net === 0 ? 'var(--zm-text-dim)' : load >= 0.97 ? '#e8645a' : load >= 0.85 ? '#f5a623' : '#13967d',
