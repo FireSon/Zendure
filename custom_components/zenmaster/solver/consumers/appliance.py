@@ -41,7 +41,9 @@ class Appliance(SolverEntry, ConsumerDevice):
         ConfigField("kind", {"select": {"options": [{"value": "dishwasher", "label": "Vaatwasser"}, {"value": "dryer", "label": "Droger"}, {"value": "washingmachine", "label": "Wasmachine"}, {"value": "custom", "label": "Overig"}]}}, cast=str, readonly=True),
         ConfigField("armed", {"boolean": {}}, cast=bool, hidden=True),
         ConfigField("armed_at", {"number": {}}, cast=float, required=False, hidden=True),
-        ConfigField("switch_entity", {"entity": {}}, cast=str, section_key="link"),
+        ConfigField("switch_type", {"select": {"options": [{"value": "plug", "label": "Stekker"}, {"value": "pause", "label": "Pauze/hervat"}, {"value": "automation", "label": "Automation"}]}}, cast=str, section_key="link"),
+        ConfigField("switch_entity", {"entity": {}}, cast=str, section_key="link", visible_when={"switch_type": ["plug", "pause"]}),
+        ConfigField("pause_entity", {"entity": {"domain": "button"}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
         ConfigField("power_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("manage", {"boolean": {}}, section_key="behaviour"),
         ConfigField("latest_start_time", {"time": {}}, section_key="behaviour"),
@@ -53,6 +55,7 @@ class Appliance(SolverEntry, ConsumerDevice):
 
     # the override (manage) is a switch on the device; these are the moment-to-moment actions
     ACTIONS = [
+        Action("arm", "Klaarzetten", "check", ("none", "ready", "aborted")),
         Action("start", "Start", "play", ("none", "armed", "planned", "ready")),
         Action("stop", "Stop", "stop", ("running",)),
         Action("skip", "Overslaan", "skip", ("armed", "planned")),
@@ -63,6 +66,8 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.id = ""
         self.kind = "custom"
         self.switch_entity = ""
+        self.switch_type = "plug"  # how a cycle is held and let run: the plug, the appliance's pause and resume buttons, or an automation
+        self.pause_entity = ""
         self.power_rating = 0.0
         self.cycle_duration_slots = 0
         self.latest_start_time = ""
@@ -94,9 +99,20 @@ class Appliance(SolverEntry, ConsumerDevice):
 
     def release(self) -> None:
         # hands off: nothing waits for a cheap window any more, and a switch the arming cut goes back on
-        if self.armed and self.switch_entity and self.hass is not None:
-            self.hass.async_create_task(self.hass.services.async_call("homeassistant", "turn_on", {"entity_id": self.switch_entity}, blocking=False))
+        if self.armed and self._switched and self.hass is not None:
+            self.hass.async_create_task(self._switch(self.hass, True))
         self.armed = False
+
+    @property
+    def _switched(self) -> bool:
+        # ZenMaster switches the appliance itself; with an automation it only publishes the status
+        return self.switch_type != "automation" and bool(self.switch_entity) and (self.switch_type != "pause" or bool(self.pause_entity))
+
+    def _switch(self, hass, on: bool):
+        # off holds the cycle, on lets it run: the plug, or the appliance's own pause and resume buttons
+        if self.switch_type == "pause":
+            return hass.services.async_call("button", "press", {"entity_id": self.switch_entity if on else self.pause_entity}, blocking=False)
+        return hass.services.async_call("homeassistant", "turn_on" if on else "turn_off", {"entity_id": self.switch_entity}, blocking=False)
 
     def cycle(self) -> list[float]:
         # the cycle to plan: the learned profile, else flat on the rating and duration, a missing one the default of its kind
@@ -136,8 +152,8 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.armed = True
         self.armed_at = now
         self.status = EntryStatus.armed
-        if self.switch_entity:
-            self.hass.async_create_task(self.hass.services.async_call("homeassistant", "turn_off", {"entity_id": self.switch_entity}, blocking=False))
+        if self._switched:
+            self.hass.async_create_task(self._switch(self.hass, False))
         # armed: kept at once, so a restart does not forget it, and planned at once, so the user sees the window now
         if self.on_action is not None:
             self.hass.async_create_task(self.on_action(self, "armed"))
@@ -175,7 +191,7 @@ class Appliance(SolverEntry, ConsumerDevice):
 
         # armed means we cut the power; with the switch on there is nothing to wait for, so the flag is void.
         # unavailable says nothing (the switch comes back late after a restart), so then we neither void nor act.
-        switch = lp.hass.states.get(self.switch_entity) if self.switch_entity and lp.hass is not None else None
+        switch = lp.hass.states.get(self.switch_entity) if self._switched and lp.hass is not None else None
         switch = switch.state if switch is not None else ""
         if self.armed and switch == "on":
             self.armed = False
@@ -206,24 +222,29 @@ class Appliance(SolverEntry, ConsumerDevice):
                 self.data.data[12 + start : 12 + start + len(profile)] = profile
         # the plan wants it on now: keep asking until the appliance actually draws, so a command lost while the
         # switch was unavailable is simply sent again. busy follows the measurement, in on_power.
-        if self.manage and self.armed and not self.busy and self.data.data[12] > 0 and (switch == "off" or not self.switch_entity):
+        if self.manage and self.armed and not self.busy and self.data.data[12] > 0 and (switch == "off" or self.switch_type == "pause" or not self._switched):
             self.status = EntryStatus.planned  # running only once power is actually measured, in on_power
-            if self.switch_entity:
-                await lp.hass.services.async_call("homeassistant", "turn_on", {"entity_id": self.switch_entity}, blocking=False)
+            if self._switched:
+                await self._switch(lp.hass, True)
 
     async def command(self, hass, action: str) -> None:
         if action == "start":
             self.armed = False
             self.busy = True
             self.status = EntryStatus.running
-            if self.switch_entity:
-                await hass.services.async_call("homeassistant", "turn_on", {"entity_id": self.switch_entity}, blocking=False)
+            if self._switched:
+                await self._switch(hass, True)
         elif action == "stop":
             self.armed = False
             self.busy = False
             self.status = EntryStatus.aborted
-            if self.switch_entity:
-                await hass.services.async_call("homeassistant", "turn_off", {"entity_id": self.switch_entity}, blocking=False)
+            if self._switched:
+                await self._switch(hass, False)
+        elif action == "arm":
+            # armed by an automation or by hand, for an appliance that waits without drawing (a remote start): nothing is switched
+            self.armed = True
+            self.armed_at = time.time()
+            self.status = EntryStatus.armed
         elif action == "skip":
             self.armed = False
             self.busy = False

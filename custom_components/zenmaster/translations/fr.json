@@ -527,6 +527,9 @@
       },
       "export_replay": {
         "name": "Exporter les données de replay"
+      },
+      "arm": {
+        "name": "Préparer"
       }
     }
   },
@@ -691,6 +694,14 @@
       "headroom": {
         "name": "Marge au-dessus de la consigne",
         "description": "De combien de degrés au-dessus de la consigne le solveur peut chauffer la maison pour stocker de la chaleur."
+      },
+      "switch_type": {
+        "name": "Type de commutation",
+        "description": "Comment ZenMaster retient un cycle et le laisse tourner : la prise, les boutons pause et reprise de l'appareil, ou votre propre automatisation sur le statut."
+      },
+      "pause_entity": {
+        "name": "Bouton pause",
+        "description": "Le bouton pause de l'appareil ; Autorisation est alors le bouton de reprise."
       }
     },
     "section": {
@@ -709,7 +720,8 @@
       "pause": "Pause",
       "skip": "Passer",
       "start": "Démarrer",
-      "stop": "Arrêter"
+      "stop": "Arrêter",
+      "arm": "Préparer"
     },
     "button": {
       "detect_phase": "Déterminer la phase depuis l'historique",
@@ -739,6 +751,11 @@
         "boven": "Haut",
         "midden": "Milieu",
         "onder": "Bas"
+      },
+      "switch_type": {
+        "plug": "Prise",
+        "pause": "Pause/reprise",
+        "automation": "Automatisation"
       }
     },
     "ui": {
