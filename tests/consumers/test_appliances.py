@@ -309,15 +309,33 @@ def test_the_switch_being_on_voids_the_arming() -> None:
     import numpy as np
 
     d, h = _dw()
-    h.states = SimpleNamespace(get=lambda eid: SimpleNamespace(state="on"))
-    d.data = SimpleNamespace(data=np.zeros(204))
     now = datetime.now().astimezone()
-    d.armed, d.armed_at, d._last_cal, d._profile = True, now.timestamp(), now, [0.5] * 4
+    h.states = SimpleNamespace(get=lambda eid: SimpleNamespace(state="on", last_changed=now))  # turned on after the arming
+    d.data = SimpleNamespace(data=np.zeros(204))
+    d.armed, d.armed_at, d._last_cal, d._profile = True, now.timestamp() - 3600, now, [0.5] * 4
     lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 0)
 
     asyncio.run(d.entry_prerun(lp, now))
     assert d.armed is False and d.status.name == "none"
     assert h.turned_off == [], "met de schakelaar aan hoort er niets geschakeld te worden"
+
+
+def test_the_switch_still_on_from_before_the_arming_keeps_it() -> None:
+    # the switch-off is on its way: the plug still reports on from before the arming, which must not void it
+    from datetime import datetime, timedelta
+
+    import numpy as np
+
+    d, h = _dw()
+    now = datetime.now().astimezone()
+    h.states = SimpleNamespace(get=lambda eid: SimpleNamespace(state="on", last_changed=now - timedelta(hours=1)))
+    d.data = SimpleNamespace(data=np.zeros(204))
+    d.armed, d.armed_at, d._last_cal, d._profile = True, now.timestamp(), now, [0.5] * 4
+    lp = SimpleNamespace(hass=h, price_buy=SimpleNamespace(data=[0.2] * 250), settle=12, globals={}, place_block=lambda *a: 8)
+
+    asyncio.run(d.entry_prerun(lp, now))
+    assert d.armed is True, "het uit-commando is onderweg: de arming blijft staan"
+    assert d.data.data[12 + 8] == 0.5, "en de cyclus wordt gepland"
 
 
 def test_the_status_waits_for_real_power() -> None:
