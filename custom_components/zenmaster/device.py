@@ -33,11 +33,12 @@ class DeviceState(IntEnum):
 
     CREATED = 0  # just built, the device has never reported
     CONTROLLER = 1  # regulates itself and is not steered by us: in no capacity, plan or regulation
-    OFFLINE = 2  # unreachable: the vendor machinery is probing
-    EXTERNAL = 3  # own behavior, not under our control
-    SENT = 4  # command sent, awaiting the transport ack
-    CONFIRM = 5  # acked, awaiting the output to follow
-    ACTIVE = 6  # under control at a confirmed setpoint (0 W included)
+    NOGRID = 2  # reachable, but no grid on its AC side: it can neither deliver nor charge from the grid
+    OFFLINE = 3  # unreachable: the vendor machinery is probing
+    EXTERNAL = 4  # own behavior, not under our control
+    SENT = 5  # command sent, awaiting the transport ack
+    CONFIRM = 6  # acked, awaiting the output to follow
+    ACTIVE = 7  # under control at a confirmed setpoint (0 W included)
 
 
 @dataclass
