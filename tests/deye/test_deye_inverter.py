@@ -183,7 +183,7 @@ def test_individual_goes_through_every_tou_program(monkeypatch) -> None:
 
         # charge 2000 W from the grid: 2000 W over 401.2 V is 5 A, the SOC target, the grid bit next to the Sell bit
         d.power(-2000, DistributionMode.INDIVIDUAL)
-        assert await wait_for(lambda: stick.registers[GRID_CHARGE_A] == 5)
+        assert await wait_for(lambda: d.sent == (-2000, DistributionMode.INDIVIDUAL)) and stick.registers[GRID_CHARGE_A] == 5
         assert stick.registers[GRID_CHARGE] == 1 and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
         d.power_off()
         d.unload()

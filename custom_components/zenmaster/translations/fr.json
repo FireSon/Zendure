@@ -702,6 +702,10 @@
       "pause_entity": {
         "name": "Bouton pause",
         "description": "Le bouton pause de l'appareil ; Autorisation est alors le bouton de reprise."
+      },
+      "duration_entity": {
+        "name": "Durée du programme",
+        "description": "Facultatif : l'estimation par l'appareil de la durée du programme choisi. Le cycle appris est étiré ou raccourci à cette durée ; sans valeur, le cycle appris s'applique."
       }
     },
     "section": {

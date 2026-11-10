@@ -20,6 +20,7 @@ _EVENING_MIN = 17 * 60  # armed at or after this, or before _MORNING_MIN: the cy
 _MORNING_MIN = 8 * 60  # armed after this: done within four hours and never past 17:00, so it stays clear of dinner
 _DIRECT_S = 900.0  # a short click on the room button: what is armed starts, and a new start runs at once, for this long
 _DEFAULTS = {"dishwasher": (0.9, 7), "washingmachine": (0.3, 7), "dryer": (1.6, 7)}  # kW and quarters per kind, measured here and rounded: used while power_rating or cycle_duration_slots is not set
+_DURATION_H = {"d": 24.0, "h": 1.0, "min": 1 / 60, "s": 1 / 3600}  # a duration sensor's unit in hours
 
 
 def _time_to_slot(time_str: str) -> int | None:
@@ -45,6 +46,7 @@ class Appliance(SolverEntry, ConsumerDevice):
         ConfigField("switch_entity", {"entity": {}}, cast=str, section_key="link", visible_when={"switch_type": ["plug", "pause"]}),
         ConfigField("pause_entity", {"entity": {"domain": "button"}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
         ConfigField("power_entity", {"entity": {}}, cast=str, section_key="link"),
+        ConfigField("duration_entity", {"entity": {"domain": "sensor", "device_class": "duration"}}, cast=str, required=False, section_key="link"),
         ConfigField("manage", {"boolean": {}}, section_key="behaviour"),
         ConfigField("latest_start_time", {"time": {}}, section_key="behaviour"),
         ConfigField("power_rating", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, section_key="expert"),
@@ -68,6 +70,7 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.switch_entity = ""
         self.switch_type = "plug"  # how a cycle is held and let run: the plug, the appliance's pause and resume buttons, or an automation
         self.pause_entity = ""
+        self.duration_entity = ""  # the appliance's own estimate of the selected program's length, read at planning
         self.power_rating = 0.0
         self.cycle_duration_slots = 0
         self.latest_start_time = ""
@@ -117,7 +120,17 @@ class Appliance(SolverEntry, ConsumerDevice):
     def cycle(self) -> list[float]:
         # the cycle to plan: the learned profile, else flat on the rating and duration, a missing one the default of its kind
         kw, slots = _DEFAULTS.get(self.kind, (0.0, 0))
-        return self._profile or [self.power_rating if self.power_rating > 0 else kw] * (self.cycle_duration_slots if self.cycle_duration_slots > 0 else slots)
+        profile = self._profile or [self.power_rating if self.power_rating > 0 else kw] * (self.cycle_duration_slots if self.cycle_duration_slots > 0 else slots)
+
+        # the appliance's own estimate of the program sets the length: the profile stretched or shortened to it, its levels kept
+        state = self.hass.states.get(self.duration_entity) if self.duration_entity and self.hass is not None else None
+        try:
+            n = round(float(state.state) * _DURATION_H[state.attributes.get("unit_of_measurement")] * 4) if state is not None else 0
+        except (ValueError, KeyError):
+            n = 0
+        if profile and n > 0:
+            profile = np.interp(np.linspace(0, len(profile) - 1, n), np.arange(len(profile)), profile).tolist()
+        return profile
 
     def entry_config(self, lp: LpSolver) -> None:
         self.data = lp.data(self.id + "_power", "kW", 2, source="lp")   # placed profile (12 history + 192)

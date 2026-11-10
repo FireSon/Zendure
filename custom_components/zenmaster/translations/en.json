@@ -702,6 +702,10 @@
       "pause_entity": {
         "name": "Pause button",
         "description": "The appliance's own pause button; Release is then its resume button."
+      },
+      "duration_entity": {
+        "name": "Program duration",
+        "description": "Optional: the appliance's own estimate of the selected program's length. The learned cycle is stretched or shortened to it; without a value the learned cycle is used."
       }
     },
     "section": {

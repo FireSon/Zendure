@@ -106,7 +106,7 @@ actions:
       entity_id: button.vaatwasser_resume   # the appliance's own resume or start
 ```
 
-An appliance that waits without drawing power, such as one set to remote start, is armed by pressing `button.<appliance>_arm`, for example from an automation on its remote start sensor.
+An appliance that waits without drawing power, such as one set to remote start, is armed by pressing `button.<appliance>_arm`, for example from an automation on its remote start sensor. With a program duration sensor (for example Home Connect's estimated total program time) the learned cycle is stretched or shortened to the selected program's length.
 
 ### Prices, solar and base load
 
@@ -122,6 +122,8 @@ If you find this project helpful and want to support its development, consider b
 ## Installation
 
 ### Through HACS (recommended)
+
+[![Open your Home Assistant instance and open the ZenMaster repository inside HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=FireSon&repository=ZenMaster&category=integration)
 
 1. Open HACS in Home Assistant and search for **ZenMaster**. Not listed yet? Add `https://github.com/FireSon/ZenMaster` under the three dots, **Custom repositories**, with the type **Integration**.
 2. Install **ZenMaster** and restart Home Assistant.

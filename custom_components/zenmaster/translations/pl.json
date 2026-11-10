@@ -702,6 +702,10 @@
       "pause_entity": {
         "name": "Przycisk pauzy",
         "description": "Własny przycisk pauzy urządzenia; Zezwolenie jest wtedy przyciskiem wznowienia."
+      },
+      "duration_entity": {
+        "name": "Czas programu",
+        "description": "Opcjonalnie: szacowany przez urządzenie czas trwania wybranego programu. Wyuczony cykl jest do niego rozciągany lub skracany; bez wartości obowiązuje wyuczony cykl."
       }
     },
     "section": {
