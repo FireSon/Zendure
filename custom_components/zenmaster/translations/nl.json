@@ -702,6 +702,10 @@
       "pause_entity": {
         "name": "Pauzeknop",
         "description": "De eigen pauzeknop van het apparaat; Vrijgave is dan de hervatknop."
+      },
+      "duration_entity": {
+        "name": "Programmaduur",
+        "description": "Optioneel: de eigen schatting van het apparaat van de lengte van het gekozen programma. De geleerde cyclus wordt daarnaar uitgerekt of ingekort; zonder waarde geldt de geleerde cyclus."
       }
     },
     "section": {

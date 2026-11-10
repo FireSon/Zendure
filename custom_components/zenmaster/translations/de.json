@@ -702,6 +702,10 @@
       "pause_entity": {
         "name": "Pausetaste",
         "description": "Die eigene Pausetaste des Geräts; Freigabe ist dann die Fortsetzen-Taste."
+      },
+      "duration_entity": {
+        "name": "Programmdauer",
+        "description": "Optional: die eigene Schätzung des Geräts für die Dauer des gewählten Programms. Der gelernte Zyklus wird darauf gestreckt oder gekürzt; ohne Wert gilt der gelernte Zyklus."
       }
     },
     "section": {

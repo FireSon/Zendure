@@ -423,3 +423,14 @@ def test_the_arm_action_arms_without_switching() -> None:
     d, h = _dw()
     asyncio.run(d.command(h, "arm"))
     assert d.armed is True and d.armed_at > 0 and d.status.name == "armed" and h.turned_off == []
+
+
+def test_the_program_duration_sets_the_cycle_length() -> None:
+    # the appliance's own estimate stretches the learned profile to its length; minutes count too, no value keeps the learned cycle
+    d, h = _dw()
+    d._profile, d.duration_entity = [1.0, 0.5], "sensor.dw_program_time"
+    for state, unit, length in (("1.0", "h", 4), ("45", "min", 3), ("unavailable", "h", 2)):
+        h.states = SimpleNamespace(get=lambda eid, s=state, u=unit: SimpleNamespace(state=s, attributes={"unit_of_measurement": u}))
+        assert len(d.cycle()) == length
+    h.states = SimpleNamespace(get=lambda eid: SimpleNamespace(state="1.0", attributes={"unit_of_measurement": "h"}))
+    assert d.cycle()[0] == 1.0 and d.cycle()[-1] == 0.5, "de niveaus blijven, alleen de lengte verandert"
