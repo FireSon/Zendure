@@ -105,22 +105,29 @@ def test_power_cloud_publishes_like_local() -> None:
     asyncio.run(scenario())
 
 
-def test_power_hyper_publishes_hemsep() -> None:
-    # the Hyper is steered over hemsEP: RAM on the device, no flash wear like deviceAutomation
+def test_power_hyper_publishes_the_limits() -> None:
+    # the Hyper takes the limits like a SolarFlow: RAM and backup registers on the device, no flash wear like hemsEP or deviceAutomation
     async def scenario() -> None:
         d = make_device(model="Hyper2000", cls=ZendureHyper)
         d.connection = ConnectionType.LOCAL
 
         d.power(600, DistributionMode.MANUAL)
         topic, cmd = d.mqtt.published[0]
-        assert topic == "iot/gDa3tb/simdev/properties/write" and cmd["properties"] == {"hemsState": 1}  # raised once
-        _, cmd = d.mqtt.published[1]
-        assert cmd["function"] == "hemsEP" and cmd["arguments"]["outputPower"] == 600
+        assert topic == "iot/gDa3tb/simdev/properties/write" and cmd["properties"] == {"smartMode": 1, "acMode": 2, "outputLimit": 600, "inputLimit": 0}
+        assert len(d.mqtt.published) == 1  # no hemsState write while the device does not report it up
 
+        # a raised hems flag is lowered once, before the limits
+        d.hems_state = True
         d.power_since = 0.0  # the hold after the last command has passed
         d.power(-400, DistributionMode.MANUAL)
+        _, cmd = d.mqtt.published[1]
+        assert cmd["properties"] == {"hemsState": 0}
         _, cmd = d.mqtt.published[2]
-        assert cmd["function"] == "hemsEP" and cmd["arguments"]["chargePower"] == 400  # no second hemsState write
+        assert cmd["properties"] == {"smartMode": 1, "acMode": 1, "outputLimit": 0, "inputLimit": 400}
+
+        d.power_since = 0.0
+        d.power(300, DistributionMode.MANUAL)
+        assert len(d.mqtt.published) == 4  # no second hemsState write
         d.unload()
 
     asyncio.run(scenario())
@@ -133,8 +140,13 @@ def test_power_off_publishes_off_command() -> None:
         d.power_off()
         topic, cmd = d.mqtt.published[0]
         assert topic == "iot/gDa3tb/simdev/properties/write" and cmd["properties"] == {"smartMode": 0, "acMode": 2, "outputLimit": 0, "inputLimit": 0}  # 0 W first
-        topic, cmd = d.mqtt.published[1]
-        assert topic == "iot/gDa3tb/simdev/properties/write" and cmd["properties"] == {"hemsState": 0}  # then the hems flag down
+        assert len(d.mqtt.published) == 1  # no hemsState write while the device does not report it up
+
+        # a raised hems flag goes down on its own write after the 0 W
+        d.hems_state = True
+        d.power_off()
+        topic, cmd = d.mqtt.published[2]
+        assert topic == "iot/gDa3tb/simdev/properties/write" and cmd["properties"] == {"hemsState": 0}
         d.unload()
 
     asyncio.run(scenario())

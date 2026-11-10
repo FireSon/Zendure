@@ -85,6 +85,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         self.input_limit: int = 0  # the limits the device reports it works with: the echo of our last command
         self.output_limit: int = 0
         self.grid_state: int | None = None  # the last gridState, to notify once when the AC side loses the grid
+        self.hems_state = False  # the reported hemsState: on a Hyper each write of it is a flash write, so it is only lowered when it is up
         self.device_queue: asyncio.Queue[tuple[Command, Any]] = asyncio.Queue()
         self.device_task = asyncio.get_running_loop().create_task(self.device_loop())
 
@@ -241,10 +242,12 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         # hems overrules the settings while its flag is up: 0 W first, then the flag down on its own write
         if self.connection in [ConnectionType.CLOUD, ConnectionType.LOCAL]:
             self.mqtt_power_off()
-            self.mqtt_publish("properties/write", {"properties": {"hemsState": 0}})
         elif self.connection != ConnectionType.OFFLINE:
             self.device_queue.put_nowait((Command.POWER, _limits(0)))
-            self.device_queue.put_nowait((Command.WRITE, {"properties": {"hemsState": 0}}))
+        # the hems flag down on its own write after the 0 W, only when the device reports it up
+        if self.hems_state:
+            self.hems_state = False
+            self.entity_write(self.entities["hemsState"], 0)
         self.setpoint.update_value(0)
         if self.state not in (DeviceState.OFFLINE, DeviceState.NOGRID):
             self.set_state(DeviceState.EXTERNAL)  # an offline device stays offline: it counts in no capacity until it reports again
@@ -417,9 +420,7 @@ class ZendureHub(ZendureLegacy):
 
 
 class ZendureHyper(ZendureSolarFlow):
-    """Hyper 2000: steered over hemsEP, which the device applies from RAM. Not deviceAutomation: its charge path writes the Hyper flash on every power change."""
-
-    _hems_active = False  # hemsState is raised once; power_off lowers it again
+    """Hyper 2000: steered over properties/write of the limits, kept in RAM and the backup registers. Not hemsEP or deviceAutomation: both write the Hyper flash."""
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
@@ -427,14 +428,8 @@ class ZendureHyper(ZendureSolarFlow):
         self.ble_name = f"Zen{self.sn[0]}{self.sn[2]}_{self.sn[-2:]}" if len(self.sn) >= 3 else None
 
     def mqtt_power(self, watts: int) -> None:
-        # hemsEP behind hemsState=1; charge carries chargePower, discharge outputPower, freq 0 applies at once
-        if not self._hems_active:
-            self.mqtt_publish("properties/write", {"properties": {"hemsState": 1}})
-            self._hems_active = True
-        arguments = {"outputPower": 0, "chargePower": -watts, "freq": 0, "mode": 9, "chargeMode": 3} if watts < 0 else {"outputPower": watts, "chargePower": 0, "freq": 0, "minSoc": int(self.soc_min * 10), "mode": 9}
-        self.mqtt_publish("function/invoke", {"function": "hemsEP", "arguments": arguments})
-
-    def mqtt_power_off(self) -> None:
-        # 0 W over hemsEP; the base power_off then lowers hemsState
-        self.mqtt_publish("function/invoke", {"function": "hemsEP", "arguments": {"outputPower": 0, "chargePower": 0, "freq": 0, "mode": 9, "chargeMode": 3}})
-        self._hems_active = False
+        # a raised hems flag overrules the limits: lowered once, a next report raises it again if the device holds on to it
+        if self.hems_state:
+            self.hems_state = False
+            self.entity_write(self.entities["hemsState"], 0)
+        super().mqtt_power(watts)

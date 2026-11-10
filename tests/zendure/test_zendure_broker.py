@@ -30,7 +30,7 @@ DEVICE_ID = "9RUB1mW7"
 
 
 class SimFirmware:
-    """Simulated Hyper2000 firmware: own paho client, answers function/invoke and reports periodically."""
+    """Simulated Hyper2000 firmware: own paho client, takes the limits as a property write and reports periodically."""
 
     def __init__(self) -> None:
         self.target = 0
@@ -48,12 +48,10 @@ class SimFirmware:
         self.client.loop_stop()
 
     def _on_message(self, client, userdata, msg) -> None:
-        command = json.loads(msg.payload.decode())
-        if not msg.topic.endswith("function/invoke"):
-            return
-        args = command["arguments"]
-        self.target = args["outputPower"] - args["chargePower"]
-        client.publish(f"/{PRODKEY}/{DEVICE_ID}/function/invoke/reply", json.dumps({"messageId": command["messageId"]}))
+        # the limits as a property write: outputLimit discharges, inputLimit charges
+        props = json.loads(msg.payload.decode()).get("properties", {})
+        if msg.topic.endswith("properties/write") and "outputLimit" in props:
+            self.target = props["outputLimit"] - props["inputLimit"]
 
     def report(self) -> None:
         props = {"electricLevel": self.soc, "hyperTmp": 3131, "outputHomePower": max(0, self.target), "gridInputPower": max(0, -self.target)}
@@ -116,10 +114,10 @@ def test_full_mqtt_loop() -> None:
             assert await wait_for(lambda: device.connection == ConnectionType.LOCAL and device.mqtt is not None)
             assert device.soc == 55 and device.temp == 40.0
 
-            # power command travels over the broker; the firmware reply confirms it
+            # power command travels over the broker; the report shows the power follow
             device.power(600, DistributionMode.MANUAL)
             assert device.power_setpoint == 600
-            assert await wait_for(lambda: device.state == DeviceState.CONFIRM)
+            assert await wait_for(lambda: firmware.target == 600)
             firmware.report()
             assert await wait_for(lambda: device.state == DeviceState.ACTIVE and device.power_actual == 600)
             assert firmware.target == 600
