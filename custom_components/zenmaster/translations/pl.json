@@ -418,6 +418,9 @@
       }
     },
     "select": {
+      "ev_charge_mode": {
+        "name": "Tryb ładowania"
+      },
       "power_phase": {
         "name": "Faza"
       },
@@ -468,6 +471,9 @@
       },
       "ev_max_soc": {
         "name": "Docelowy stan naładowania"
+      },
+      "soc_target": {
+        "name": "Cel na wyjazd"
       },
       "charge_compensation_eur_kwh": {
         "name": "Limit ceny"
@@ -659,13 +665,21 @@
         "name": "Godzina wyjazdu",
         "description": "Godzina (GG:MM), do której auto musi być naładowane."
       },
+      "ev_charge_mode": {
+        "name": "Tryb ładowania",
+        "description": "Obowiązuje do odłączenia kabla, potem powrót do Price."
+      },
       "ev_max_soc": {
         "name": "Docelowy stan naładowania",
-        "description": "Stan naładowania (0-1), do którego auto jest ładowane."
+        "description": "Stan naładowania w procentach, do którego auto jest ładowane."
+      },
+      "soc_target": {
+        "name": "Cel na wyjazd",
+        "description": "Stan naładowania w procentach, do którego Ready by ładuje przed godziną wyjazdu, nigdy powyżej docelowego stanu naładowania."
       },
       "charge_compensation_eur_kwh": {
         "name": "Limit ceny",
-        "description": "Cena za kWh, poniżej której ładowanie się opłaca; z PV tylko poniżej jednej trzeciej tej ceny."
+        "description": "Cena za kWh, poniżej której Price ładuje."
       },
       "capacity_kwh": {
         "name": "Pojemność baterii",

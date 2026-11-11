@@ -390,6 +390,7 @@ class Coordinator:
         self.solver.globals["request_solve"] = lambda: self.hass.async_create_task(self._tick())
         dev_solar = {getattr(d.entities.get("solar"), "entity_id", None) for d in self.distribution.devices}
         self.solver.globals["solar_ac"] = [p.power_entity for p in self.forecast.solar_panels if p.power_entity and p.power_entity not in dev_solar]
+        self.solver.globals["consumers"] = self.consumers  # the baseload subtracts every metered consumer, managed or not
 
         # the live solar of the panels: every reading lands as the sum of all panel power entities on the distribution
         solar: dict[str, float] = {}
