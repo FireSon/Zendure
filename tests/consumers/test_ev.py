@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime
 from math import sqrt
 from types import SimpleNamespace
@@ -149,6 +150,19 @@ def test_solar_follows_the_surplus_at_most_once_per_step_and_never_under_the_min
     ev._stepped -= 31
     ev.on_surplus(-5000.0)
     assert ev.hass.written[-1] == round(4200 / _AMPERE_W, 2)
+
+
+def test_solar_steps_on_the_mean_surplus_of_the_step() -> None:
+    lp = _lp()
+    ev = _ev(lp, ChargeMode.solar)
+    ev.ev_power.data[12], ev._written_kw = 6.0, 6.0
+    ev._stepped = time.time()  # a step just happened: the readings collect
+
+    # 1000 W and 3000 W within the step, then the step is due: the car gets the mean of 2 kW on top
+    ev.on_surplus(1000.0)
+    ev._stepped -= 31
+    ev.on_surplus(3000.0)
+    assert ev.hass.written == [round(8000 / _AMPERE_W, 2)]
 
 
 def test_only_solar_follows_the_surplus() -> None:
