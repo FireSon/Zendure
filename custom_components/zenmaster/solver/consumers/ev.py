@@ -1,22 +1,24 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from enum import IntEnum
 
-from ..solver import LpSolver, SolverEntry
+from ..solver import EntryStatus, LpSolver, SolverEntry
 from ...config import ConfigField
 from ...consumer import ConsumerDevice
-from ...const import Phase
+from ...const import Phase, watt_factor
 
 _CHARGER_MIN_KW = 4.2          # the wallbox cannot charge below this power
-_SOLAR_PRICE_FRACTION = 0.33   # solar charges while the blended price stays under this fraction of the compensation
+_STEP_S = 30  # Solar follows the surplus at most once per this many seconds
 
 
 class ChargeMode(IntEnum):
-    off = 0     # not controlled
-    solar = 1   # opportunistic up to ev_max while it pays, no deadline
-    plan = 2    # reach ev_max_soc before departure, then opportunistic
-    fast = 3    # straight to max, ignores price and solar
+    maximum = 1   # straight to max, ignores price and solar
+    ready_by = 2  # reach soc_target before departure, whatever the price
+    price = 3     # opportunistic up to ev_max while it pays, no deadline
+    solar = 4     # the solar surplus into the car, at least 4.2 kW
+    v2h = 5       # the car as house battery; not built yet, plans like price
 
 
 class ElectricVehicle(SolverEntry, ConsumerDevice):
@@ -31,7 +33,9 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         ConfigField("power_entity", {"entity": {}}, cast=str, required=False, section_key="link"),
         ConfigField("manage", {"boolean": {}}, section_key="behaviour"),
         ConfigField("departure_time", {"time": {}}, section_key="behaviour"),
+        ConfigField("ev_charge_mode", {"select": {"options": [{"value": "1", "label": "Maximum"}, {"value": "2", "label": "Ready by"}, {"value": "3", "label": "Price"}, {"value": "4", "label": "Solar"}, {"value": "5", "label": "V2H"}]}}, section_key="behaviour"),
         ConfigField("ev_max_soc", {"number": {"mode": "box", "step": 0.1}}, section_key="behaviour"),
+        ConfigField("soc_target", {"number": {"mode": "box", "step": 0.1}}, section_key="behaviour"),
         ConfigField("charge_compensation_eur_kwh", {"number": {"mode": "box", "step": 0.01}}, section_key="behaviour"),
         ConfigField("capacity_kwh", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kWh"}}, section_key="expert"),
         ConfigField("max_power_kw", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, section_key="expert"),
@@ -49,14 +53,24 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         self.capacity_kwh = 0.0
         self.max_power_kw = 0.0
         self.ev_max_soc = 0.0
+        self.soc_target = 0.0
         self.charge_compensation_eur_kwh = 0.0
         self.departure_time = ""
         self.phase = Phase.all
-        self.mode = ChargeMode.solar
+        self.ev_charge_mode = ChargeMode.price
+        self._stepped = 0.0  # when on_surplus last wrote the charger
+        self._written_kw = 0.0  # the last power written: the car's draw, since the cloud power lags
+
+    @property
+    def charge_target(self) -> float:
+        # Ready by charges to its own departure target, every mode stays under the upper bound
+        return min(self.soc_target, self.ev_max_soc) if self.ev_charge_mode is ChargeMode.ready_by else self.ev_max_soc
 
     def _write(self, kw: float):
-        # the charge power on the charger: a number and an input_number have their own set_value
-        return self.hass.services.async_call(self.charge_power_entity.split(".")[0], "set_value", {"entity_id": self.charge_power_entity, "value": round(kw, 2)}, blocking=False)
+        # the charge power in the charger's own unit (W, kW or A per phase), from the entity's unit and the car's phase
+        self._written_kw = kw
+        factor = watt_factor(self.hass.states.get(self.charge_power_entity), self.phase)
+        return self.hass.services.async_call(self.charge_power_entity.split(".")[0], "set_value", {"entity_id": self.charge_power_entity, "value": round(1000 * kw / factor, 2)}, blocking=False)
 
     def release(self) -> None:
         # hand the charger back: without a plan there is no limit on it, so it may charge at full power
@@ -64,9 +78,19 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
             self.hass.async_create_task(self._write(self.max_power_kw))
 
     def entry_config(self, lp: LpSolver):
-        self.mode = ChargeMode(self.mode)  # accept the plain int value coming from the config
+        self.ev_charge_mode = ChargeMode(self.ev_charge_mode)  # accept the plain int value coming from the config
         self.ev_power = lp.data(self.id + "_power", "kW")
         lp.track(self.soc_entity, lambda v: setattr(self, "current_soc", v / 100.0))  # HA reports %, we hold a 0-1 fraction
+        # Solar follows the live surplus of the distribution within the quarter
+        if (distribution := lp.globals.get("price_device")) is not None:
+            lp.track(distribution.entities["surplus"].entity_id, self.on_surplus)
+
+    def on_surplus(self, watts: float) -> None:
+        # Solar in a planned quarter: the car takes its draw plus the surplus, at least 4.2 kW, at most once per 30 s
+        if self.ev_charge_mode is not ChargeMode.solar or self.ev_power.data[12] <= 0 or not self.charge_power_entity or time.time() - self._stepped < _STEP_S:
+            return
+        self._stepped = time.time()
+        self.hass.async_create_task(self._write(max(_CHARGER_MIN_KW, min(self.max_power_kw, self._written_kw + watts / 1000))))
 
     async def apply_power(self) -> None:
         # the planned charge power for this quarter
@@ -79,13 +103,18 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         self.ev_power.data[12:] = 0.0
         # the cable as the entity shows it now: no copy that can miss a change
         connected = (s := lp.hass.states.get(self.connected_entity)) is not None and s.state == "on"
-        if self.mode is not ChargeMode.off and connected:
+        if connected:
             self.plan(lp, now)
+        else:
+            self.entity_update("ev_charge_mode", ChargeMode.price)  # a mode holds for one session: back to the default once the cable is out
+        # the status from the plan: charging this quarter, later, at its target, or nothing to do
+        self.status = (EntryStatus.running if self.ev_power.data[12] > 0 else EntryStatus.planned if self.ev_power.data[12:].any()
+            else EntryStatus.ready if connected and self.current_soc >= self.charge_target / 100 else EntryStatus.none)
         await self.apply_power()
 
     def plan(self, lp: LpSolver, now: datetime) -> None:
         # the charge power per quarter until departure, as far as the car still takes it
-        max_kwh = (self.ev_max_soc - self.current_soc) * self.capacity_kwh
+        max_kwh = (self.charge_target / 100 - self.current_soc) * self.capacity_kwh  # the target in %, current_soc a 0-1 fraction
         if max_kwh <= 0.0:
             return
 
@@ -96,19 +125,24 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         except (ValueError, AttributeError):
             slots_until_departure = 96
 
-        if self.mode is ChargeMode.fast:
+        # the solar left after the planned house load per quarter (kW), index 0 = slot 12
+        surplus = [max(0.0, lp.solar.data[c] - sum(load[c - 12] for load in lp.loads[Phase.all])) for c in range(12, 12 + slots_until_departure)]
+
+        if self.ev_charge_mode in (ChargeMode.maximum, ChargeMode.solar):
             for c in range(12, 12 + slots_until_departure):
-                if max_kwh > 0:
-                    kwh = lp.phase_room(self.phase, c - 12, min(max_kwh, self.max_power_kw * 0.25))
+                # Maximum takes the full charger power, Solar only the solar surplus of the quarter
+                cap = self.max_power_kw if self.ev_charge_mode is ChargeMode.maximum else min(self.max_power_kw, surplus[c - 12])
+                # wallbox cannot modulate below 4.2 kW: a quarter or remainder under it is left out
+                if max_kwh > 0 and (kwh := lp.phase_room(self.phase, c - 12, min(max_kwh, cap * 0.25))) >= _CHARGER_MIN_KW * 0.25:
                     max_kwh -= kwh
                     self.ev_power.data[c] = kwh * 4
         else:
-            limit = self.charge_compensation_eur_kwh * (1 if self.mode is ChargeMode.plan else _SOLAR_PRICE_FRACTION)
+            limit = float("inf") if self.ev_charge_mode is ChargeMode.ready_by else self.charge_compensation_eur_kwh
             max_kw = self.max_power_kw * 0.25
 
             def affordable(i, sell, buy):
-                # kW -> kWh for this quarter
-                solar = lp.solar.data[i] * 0.25  
+                # the solar surplus, kW -> kWh for this quarter
+                solar = surplus[i - 12] * 0.25
                 if sell >= limit:
                     return 0.0, sell
                 kwh = lp.phase_room(self.phase, i - 12, max_kw if buy <= limit else min(max_kw, solar * (buy - sell) / (buy - limit)))
@@ -122,8 +156,8 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
 
             costs = [(i, affordable(i, lp.price_sell.data[i], lp.price_buy.data[i])) for i in range(12, 12 + slots_until_departure)]
             for i, (kwh, price) in sorted(costs, key=lambda t: t[1][1]):
-                if max_kwh > 0:
-                    kwh = min(max_kwh, kwh)
+                # wallbox cannot modulate below 4.2 kW: a remainder under it is left out
+                if max_kwh > 0 and (kwh := min(max_kwh, kwh)) >= _CHARGER_MIN_KW * 0.25:
                     self.ev_power.data[i] = kwh * 4
                     max_kwh -= kwh
 

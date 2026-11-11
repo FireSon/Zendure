@@ -67,7 +67,8 @@ class BaseLoad(SolverEntry):
 
         p1_ids = {eid for s in slots for eid, _ in s}
         batt_ids = {i for d in batteries for i in (eid(d, "home_output"), eid(d, "home_input")) if i}
-        cons_ids = {e.power_entity for e in lp._entries if e.power_entity}
+        consumers = [c for c in lp.globals.get("consumers", []) if c.power_entity]  # every metered consumer, also one without manage
+        cons_ids = {c.power_entity for c in consumers}
         all_ids = p1_ids | set(solar_ac) | batt_ids | cons_ids
         if not p1_ids:
             return
@@ -86,8 +87,8 @@ class BaseLoad(SolverEntry):
 
         for ph in range(3):
             slot = slots[ph]
-            cons = [(e.power_entity, 1.0) for e in lp._entries if e.power_entity and e.phase - 1 == ph]
-            cons += [(e.power_entity, 1.0 / 3) for e in lp._entries if e.power_entity and e.phase == Phase.all]
+            cons = [(c.power_entity, 1.0) for c in consumers if c.phase - 1 == ph]
+            cons += [(c.power_entity, 1.0 / 3) for c in consumers if c.phase == Phase.all]
             # battery net on this phase: a phase-bound device counts fully, an all/unset device splits over 3
             batt = []
             for d in batteries:
@@ -111,7 +112,7 @@ class BaseLoad(SolverEntry):
         inst = get_instance(lp.hass)
         stats = await inst.async_add_executor_job(statistics_during_period, lp.hass, start, end, all_ids, "hour", None, {"mean"})
         # each entity to kW: the P1 slots carry their own signed factor, the others get it from their unit and phase
-        phase_of = {e.power_entity: e.phase for e in lp._entries if e.power_entity}
+        phase_of = {c.power_entity: c.phase for c in lp.globals.get("consumers", []) if c.power_entity}
         factor = {sid: 0.001 if sid in p1_ids else watt_factor(lp.hass.states.get(sid), phase_of.get(sid, Phase.all)) / 1000 for sid in all_ids}
         # bucket each entity by (weekday, hour-of-day), skipping hours without a mean
         buckets = {}

@@ -138,6 +138,7 @@ class Distribution(EntityDevice):
         # System totals from the live P1 telemetry
         HaSensor(self, "house_load", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "house_solar", uom="W", device_class="power", state_class="measurement", aggr=True)
+        HaSensor(self, "surplus", uom="W", device_class="power", state_class="measurement")  # export plus what the fleet charges now
         HaSensor(self, "grid_import", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "grid_export", uom="W", device_class="power", state_class="measurement", aggr=True)
         # what the P1 meter shows per phase as the distribution computes it, any brand: + import, - export
@@ -367,6 +368,7 @@ class Distribution(EntityDevice):
         entities["charge_power"].update_value(max(0, -power_actual))
         entities["house_load"].update_value(max(0, p1 + self.solar + power_actual))  # consumption = grid import + solar + fleet delivery
         entities["house_solar"].update_value(self.solar)
+        entities["surplus"].update_value(-(p1 + power_actual))  # + export, + fleet charging
         entities["available_kwh"].update_value(kwh)
         entities["soc"].update_value(kwh / self.capacity * 100 if self.capacity else 0)
         return power_actual

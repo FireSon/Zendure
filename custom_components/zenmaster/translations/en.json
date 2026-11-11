@@ -418,6 +418,9 @@
       }
     },
     "select": {
+      "ev_charge_mode": {
+        "name": "Charge mode"
+      },
       "power_phase": {
         "name": "Phase"
       },
@@ -468,6 +471,9 @@
       },
       "ev_max_soc": {
         "name": "Target state of charge"
+      },
+      "soc_target": {
+        "name": "Departure target"
       },
       "charge_compensation_eur_kwh": {
         "name": "Price limit"
@@ -659,13 +665,21 @@
         "name": "Departure time",
         "description": "Time (HH:MM) by which the car must be charged."
       },
+      "ev_charge_mode": {
+        "name": "Charge mode",
+        "description": "Holds until the cable is disconnected, then back to Price."
+      },
       "ev_max_soc": {
         "name": "Target state of charge",
-        "description": "State of charge (0-1) to charge up to."
+        "description": "State of charge in percent to charge up to."
+      },
+      "soc_target": {
+        "name": "Departure target",
+        "description": "State of charge in percent that Ready by charges to before the departure time, never above the target state of charge."
       },
       "charge_compensation_eur_kwh": {
         "name": "Price limit",
-        "description": "Price per kWh under which charging pays; on solar only under a third of it."
+        "description": "Price per kWh under which Price charges."
       },
       "capacity_kwh": {
         "name": "Battery capacity",
