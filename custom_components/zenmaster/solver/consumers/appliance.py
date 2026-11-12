@@ -38,6 +38,7 @@ class Appliance(SolverEntry, ConsumerDevice):
         ConfigField("switch_type", {"select": {"options": [{"value": "plug", "label": "Stekker"}, {"value": "pause", "label": "Pauze/hervat"}, {"value": "automation", "label": "Automation"}]}}, cast=str, section_key="link"),
         ConfigField("switch_entity", {"entity": {}}, cast=str, section_key="link", visible_when={"switch_type": ["plug", "pause"]}),
         ConfigField("pause_entity", {"entity": {"domain": "button"}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
+        ConfigField("status_entity", {"entity": {}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
         ConfigField("power_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("duration_entity", {"entity": {"domain": "sensor", "device_class": "duration"}}, cast=str, required=False, section_key="link"),
         MANAGE,
@@ -62,6 +63,7 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.switch_entity = ""
         self.switch_type = "plug"  # how a cycle is held and let run: the plug, the appliance's pause and resume buttons, or an automation
         self.pause_entity = ""
+        self.status_entity = ""  # the appliance's own operation state: a program held in pause arms it
         self.duration_entity = ""  # the appliance's own estimate of the selected program's length, read at planning
         self.power_rating = 0.0
         self.cycle_duration_slots = 0
@@ -203,6 +205,10 @@ class Appliance(SolverEntry, ConsumerDevice):
             self.armed = False
             if not self.busy:
                 self.status = EntryStatus.none
+
+        # pause/resume: a program the appliance holds in pause is armed, as a witnessed start would be
+        if self.switch_type == "pause" and self.manage and not self.armed and not self.busy and (s := lp.hass.states.get(self.status_entity) if self.status_entity and lp.hass is not None else None) is not None and s.state == "pause":
+            self.armed, self.armed_at, self.status = True, time.time(), EntryStatus.armed
 
         # plan this cycle in its cheapest window when armed; baseload has already seeded the phase loads
         self.data.data[12:] = 0.0
