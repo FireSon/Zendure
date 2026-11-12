@@ -119,7 +119,7 @@ class Distribution(EntityDevice):
         self.setpoint: int = 0
         self.capacity = 0.0
         self.optimize = False  # master switch: the mode select follows the plan each solve. Lives here because its switch entity hangs on this device
-        self.solver = False  # the planning on top of the fleet; off leaves the fleet on its own control
+        self.planning = False  # the planning on top of the fleet; off leaves the fleet on its own control
         self.plan_rank: dict[bool, dict[DistributionDevice, tuple[int, float]]] = {}  # per direction the plan's order, set by the solver after every solve
 
     def entity_create(self) -> None:
@@ -377,13 +377,12 @@ class Distribution(EntityDevice):
         """The fleet setpoint: manual is the knob, the other modes clamp, every mode is capped; idle and a pending reversal hold the fleet at 0."""
         if mode == DistributionMode.MANUAL:
             setpoint = int(self.manual_power)
-        else:
-            if mode == DistributionMode.SMART_DISCHARGING:
-                setpoint = max(setpoint, 0)
-            elif mode == DistributionMode.SMART_CHARGING:
-                setpoint = min(setpoint, 0)
-            elif mode == DistributionMode.STORE_SOLAR:
-                setpoint = min(setpoint, 0) if solar > 0 else 0
+        elif mode == DistributionMode.SMART_DISCHARGING:
+            setpoint = max(setpoint, 0)
+        elif mode == DistributionMode.SMART_CHARGING:
+            setpoint = min(setpoint, 0)
+        elif mode == DistributionMode.STORE_SOLAR:
+            setpoint = min(setpoint, 0) if solar > 0 else 0
 
         # the regulatory cap on what the fleet delivers to the house (Germany: 800 W); the app limit per device is not enough with several devices
         if self.max_output > 0:
@@ -530,7 +529,7 @@ class Distribution(EntityDevice):
 
         # start standing devices at RANGE_MIN until the excess is covered: in the plan's order while optimize follows it,
         # otherwise the emptiest first when charging and the fullest first when discharging
-        follow = self.solver and self.optimize and self.plan_rank.get(charging)
+        follow = self.planning and self.optimize and self.plan_rank.get(charging)
         for d in standing if follow else sorted(standing, key=lambda d: d.soc, reverse=not charging):
             if excess <= 0:
                 break
@@ -545,13 +544,13 @@ class Distribution(EntityDevice):
         active = [d.wear for d in self.devices if d.kwh and d.state > DeviceState.OFFLINE]  # only the packs that can run: an offline one or one without a pack would pull the mean down
         wear_mean = sum(active) / len(active) if active else 0.0
         demand = max(RANGE_MIN, self.setpoint_avg)
+        # a device without a battery works as a plain inverter: without this power command it delivers nothing
+        for d in self.devices:
+            if not d.kwh and d.state > DeviceState.OFFLINE:
+                d.power(d.power_profile[False].power, self.mode)
         for charging in (False, True):
             scores: dict[DistributionDevice, float] = {}
             for d in self.devices:
-                # a device without a battery works as a plain inverter: without this power command it delivers nothing
-                if not d.kwh and d.state > DeviceState.OFFLINE:
-                    d.power(d.power_profile[False].power, self.mode)
-                    continue
                 # the device's own verdict overrules the percentage
                 if d.soc_limit == (1 if charging else 2):
                     continue
@@ -568,7 +567,7 @@ class Distribution(EntityDevice):
                 scores[d] = head * head * fit / (1.0 + WEAR_BIAS * (d.wear / wear_mean if wear_mean else 0.0))
             order = sorted(scores, key=scores.get, reverse=True)
             # optimize on: the plan's order, the devices it leaves out behind it in score order (the sort is stable)
-            if self.solver and self.optimize and (rank := self.plan_rank.get(charging)):
+            if self.planning and self.optimize and (rank := self.plan_rank.get(charging)):
                 order.sort(key=lambda d: rank.get(d, (2, 0.0)))
             # on an equal band the current head stays in front: a swap costs a stop and a cold start for a fit or wear difference
             elif (head_now := self.profile[charging].order[0] if self.profile[charging].order else None) in scores and int(head_now.soc / 10) == int(order[0].soc / 10):
@@ -625,7 +624,6 @@ class Distribution(EntityDevice):
             persistent_notification.async_create(self.hass, "\n".join(lines), f"{PANEL_TITLE} phases", f"{DOMAIN}_phases")
             if self.on_save is not None:
                 await self.on_save()
-
 
     def match_phases(self, sources: dict) -> tuple[dict, dict]:
         # sources: per device or consumer its power entities with their sign and its set phase.

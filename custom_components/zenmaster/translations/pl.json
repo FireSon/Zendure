@@ -1002,6 +1002,7 @@
       "manage": {
         "title": "Dodaj",
         "add": "Dodaj",
+        "open": "Zarządzaj",
         "consumer": "Odbiorniki",
         "device": "Urządzenia",
         "solar": "Panele PV"
@@ -1010,7 +1011,8 @@
         "device_exists": "To urządzenie jest już dodane",
         "unknown_product": "Nieznany model",
         "cannot_connect": "Brak odpowiedzi pod tym adresem",
-        "invalid_auth": "Nieprawidłowa nazwa użytkownika lub hasło"
+        "invalid_auth": "Nieprawidłowa nazwa użytkownika lub hasło",
+        "invalid_serial": "Numer seryjny rejestratora składa się tylko z cyfr"
       }
     }
   }

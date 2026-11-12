@@ -33,17 +33,17 @@ _AUTH_ERRORS = ("user-error:auth-not-authorised", "user-error:auth-required")
 
 
 class FrankProvider(Provider):
-    async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
-        buy, sell = await super().fetch(dynamicPrice, now)  # raw wholesale forecast in working copies
+    async def fetch(self, dynamic_price: DynamicPrice, now: datetime):
+        buy, sell = await super().fetch(dynamic_price, now)  # raw wholesale forecast in working copies
 
         # the new API serves one day per call at 15-minute resolution; fetch today and the next two days
         rows = []
         # logged in the customer's own site, else the public prices
-        site = dynamicPrice.token.get("site")
+        site = dynamic_price.token.get("site")
         query, key = (_CUSTOMER_QUERY, "customerMarketPrices") if site else (_QUERY, "marketPrices")
         for days in range(3):
             date = (now.date() + timedelta(days=days)).isoformat()
-            payload = await self._post(dynamicPrice, query, {"date": date, "siteReference": site} if site else {"date": date, "resolution": "PT15M"})
+            payload = await self._post(dynamic_price, query, {"date": date, "siteReference": site} if site else {"date": date, "resolution": "PT15M"})
             if prices := ((payload.get("data") or {}).get(key) or {}).get("electricityPrices"):
                 rows.extend(prices)
         if not rows:
@@ -88,43 +88,43 @@ class FrankProvider(Provider):
         self.extend_buy(buy, sell, tail, base)
         return buy, sell
 
-    async def _post(self, dynamicPrice, query: str, variables: dict, retry: bool = True) -> dict:
+    async def _post(self, dynamic_price, query: str, variables: dict, retry: bool = True) -> dict:
         # one GraphQL call; logged in it carries the token, an expired token is renewed once
-        headers = {"Authorization": f"Bearer {auth}"} if (auth := dynamicPrice.token.get("authToken")) else {}
+        headers = {"Authorization": f"Bearer {auth}"} if (auth := dynamic_price.token.get("authToken")) else {}
         try:
-            session = async_get_clientsession(dynamicPrice.hass)  # HA's shared session, never closed here
+            session = async_get_clientsession(dynamic_price.hass)  # HA's shared session, never closed here
             async with session.post(_FE_URL, json={"query": query, "variables": variables}, headers=headers, timeout=_HTTP_TIMEOUT) as resp:
                 resp.raise_for_status()
                 payload = await resp.json() or {}
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise ProviderError(f"Frank Energie fetch failed: {err}") from err
         if any(e.get("message") in _AUTH_ERRORS for e in payload.get("errors") or []):
-            if retry and auth and await self.refresh(dynamicPrice):
-                await dynamicPrice._store(dynamicPrice.hass)
-                return await self._post(dynamicPrice, query, variables, retry=False)
+            if retry and auth and await self.refresh(dynamic_price):
+                await dynamic_price._store(dynamic_price.hass)
+                return await self._post(dynamic_price, query, variables, retry=False)
             raise ProviderError("Frank Energie: login expired, enter the password on the price card again")
         return payload
 
-    async def submit_otp(self, dynamicPrice, password: str) -> bool:
+    async def submit_otp(self, dynamic_price, password: str) -> bool:
         # the password from the price card logs in once and is never stored; kept are the token and the delivery site
-        if not dynamicPrice.email:
+        if not dynamic_price.email:
             raise ProviderError("Frank Energie: missing 'email' in config")
-        dynamicPrice.token = {}
-        payload = await self._post(dynamicPrice, _LOGIN, {"email": dynamicPrice.email, "password": password}, retry=False)
+        dynamic_price.token = {}
+        payload = await self._post(dynamic_price, _LOGIN, {"email": dynamic_price.email, "password": password}, retry=False)
         if not (login := (payload.get("data") or {}).get("login")):
             raise ProviderError(f"Frank Energie login failed: {str(payload.get('errors'))[:200]}")
-        dynamicPrice.token = {"authToken": login["authToken"], "refreshToken": login["refreshToken"]}
+        dynamic_price.token = {"authToken": login["authToken"], "refreshToken": login["refreshToken"]}
         # the site in delivery, else the first one on the account
-        sites = ((await self._post(dynamicPrice, _SITES, {})).get("data") or {}).get("userSites") or []
+        sites = ((await self._post(dynamic_price, _SITES, {})).get("data") or {}).get("userSites") or []
         if not (site := next((s for s in sites if s.get("status") == "IN_DELIVERY"), sites[0] if sites else None)):
             raise ProviderError("Frank Energie: no delivery site on this account")
-        dynamicPrice.token["site"] = site["reference"]
+        dynamic_price.token["site"] = site["reference"]
         return True
 
-    async def refresh(self, dynamicPrice) -> bool:
+    async def refresh(self, dynamic_price) -> bool:
         # trade the refresh token for a new pair; the site stays
-        token = dynamicPrice.token
-        payload = await self._post(dynamicPrice, _RENEW, {"authToken": token.get("authToken"), "refreshToken": token.get("refreshToken")}, retry=False)
+        token = dynamic_price.token
+        payload = await self._post(dynamic_price, _RENEW, {"authToken": token.get("authToken"), "refreshToken": token.get("refreshToken")}, retry=False)
         if not (renewed := (payload.get("data") or {}).get("renewToken")):
             return False
         token.update(authToken=renewed["authToken"], refreshToken=renewed["refreshToken"])

@@ -4,23 +4,23 @@ import asyncio
 from dataclasses import asdict
 from datetime import date, timedelta
 from types import MappingProxyType
+from uuid import uuid4
 
 import aiohttp
 import voluptuous as vol
 from aiohttp import ClientTimeout
-
-from uuid import uuid4
-
 from homeassistant.components import websocket_api
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, SchemaAction, watt_factor
+from .const import DOMAIN, OPEN_METEO_URL, SchemaAction, stat_to_time, watt_factor
 from .coordinator import SUBENTRY_TYPES, title_taken
-from .solver.forecast import SolarPanel, _OPEN_METEO_URL
+from .solver.forecast import SolarPanel
 
 
 HISTORY_DAYS = 30  # calendar days in the trend view
@@ -141,8 +141,10 @@ async def ws_save_schema(hass, connection, msg):
     if (device := coord.config.deserialize_poly([*coord.devices, *coord.drivers.values(), coord.prices], msg["section"], msg.get("payload") or {})) is None:
         connection.send_error(msg["id"], "not_found", msg["section"])
         return
-    coord.config.serialize(device, msg["section"], coord.config.payload)
-    await coord.config.save()
+    # a device with a subentry is kept there; the Store only holds distribution, the drivers and prices
+    if not getattr(device, "subentry_id", None):
+        coord.config.serialize(device, msg["section"], coord.config.payload)
+        await coord.config.save()
     if getattr(device, "subentry_id", None) and coord.persist_device(device):
         # its connection is built with the device: a new address needs a new build, and only a reload replaces its entities with it
         hass.async_create_task(hass.config_entries.async_reload(coord.entry_id))
@@ -178,8 +180,12 @@ async def ws_subentry_add(hass, connection, msg):
             return
         data |= found
         data["sn"] = str(data.get(getattr(driver, "KEY", "sn"), ""))  # the field that identifies the device becomes its serial
-        if error := "device_exists" if any(s.data.get("sn") == data["sn"] for s in coord.entry.subentries.values()) else None if (family := driver.device_family(data)) else "unknown_product":
-            connection.send_result(msg["id"], {"ok": False, "errors": [error]})
+        # a device that is already there or of an unknown product is refused
+        if any(s.data.get("sn") == data["sn"] for s in coord.entry.subentries.values()):
+            connection.send_result(msg["id"], {"ok": False, "errors": ["device_exists"]})
+            return
+        if not (family := driver.device_family(data)):
+            connection.send_result(msg["id"], {"ok": False, "errors": ["unknown_product"]})
             return
         sid = coord.discovered({**data, "family": family}, kind=driver.id)
         await coord.resync(coord.sync_devices())
@@ -214,16 +220,17 @@ async def ws_subentry_add(hass, connection, msg):
 async def ws_subentry_update(hass, connection, msg):
     # the panel's "save" on a consumer or solar panel: "name" is the title, the other fields merge into the subentry data
     coord = _coordinator(hass)
-    if coord is not None:
-        rows = coord.manager_list("solar_panels")
-        if (row := next((r for r in rows if r["id"] == msg["subentry_id"]), None)) is not None:
-            patch = {k: v for k, v in msg["patch"].items() if k != "id"}
-            coord.manager_save("solar_panels", [{**r, **patch} if r is row else r for r in rows])
-            await coord.resync()
-            connection.send_result(msg["id"], {"ok": True})
-            return
-    sub = coord.entry.subentries.get(msg["subentry_id"]) if coord is not None and coord.entry is not None else None
-    if sub is None:
+    if coord is None or coord.entry is None:
+        connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
+        return
+    rows = coord.manager_list("solar_panels")
+    if (row := next((r for r in rows if r["id"] == msg["subentry_id"]), None)) is not None:
+        patch = {k: v for k, v in msg["patch"].items() if k != "id"}
+        coord.manager_save("solar_panels", [{**r, **patch} if r is row else r for r in rows])
+        await coord.resync()
+        connection.send_result(msg["id"], {"ok": True})
+        return
+    if (sub := coord.entry.subentries.get(msg["subentry_id"])) is None:
         connection.send_error(msg["id"], "not_found", msg["subentry_id"])
         return
     patch = dict(msg["patch"])
@@ -243,14 +250,16 @@ async def ws_subentry_update(hass, connection, msg):
 async def ws_subentry_delete(hass, connection, msg):
     # HA removes the subentry's device and entities along with it; the coordinator drops the consumer or panel
     coord = _coordinator(hass)
-    if coord is not None:
-        rows = coord.manager_list("solar_panels")
-        if any(r["id"] == msg["subentry_id"] for r in rows):
-            coord.manager_save("solar_panels", [r for r in rows if r["id"] != msg["subentry_id"]])
-            await coord.resync()
-            connection.send_result(msg["id"], {"ok": True})
-            return
-    if coord is None or coord.entry is None or msg["subentry_id"] not in coord.entry.subentries:
+    if coord is None or coord.entry is None:
+        connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
+        return
+    rows = coord.manager_list("solar_panels")
+    if any(r["id"] == msg["subentry_id"] for r in rows):
+        coord.manager_save("solar_panels", [r for r in rows if r["id"] != msg["subentry_id"]])
+        await coord.resync()
+        connection.send_result(msg["id"], {"ok": True})
+        return
+    if msg["subentry_id"] not in coord.entry.subentries:
         connection.send_error(msg["id"], "not_found", msg["subentry_id"])
         return
     hass.config_entries.async_remove_subentry(coord.entry, msg["subentry_id"])
@@ -311,9 +320,6 @@ async def ws_get_history(hass, connection, msg):
 
 async def _history_stats(hass, ids, wanted):
     # the day statistics of every wanted entity, and the hours of savings_today for its first and last value of a day
-    from homeassistant.components.recorder import get_instance
-    from homeassistant.components.recorder.statistics import statistics_during_period
-
     end = dt_util.now()
     start = (end - timedelta(days=HISTORY_DAYS)).replace(hour=0, minute=0, second=0, microsecond=0)
     daily = await get_instance(hass).async_add_executor_job(
@@ -328,9 +334,7 @@ async def _history_stats(hass, ids, wanted):
 def _history_days(daily, hourly, ids, panels):
     # per calendar day the solar, battery and grid energy, the autarky, the savings and how well the forecast held
     def day_of(row):
-        st = row.get("start")
-        stamp = dt_util.utc_from_timestamp(st) if isinstance(st, (int, float)) else st
-        return dt_util.as_local(stamp).date()
+        return dt_util.as_local(stat_to_time(row.get("start"))).date()
 
     def gains(entity, field):
         # a monotone counter: the gain of a day is the step to the next day
@@ -384,9 +388,6 @@ def _history_days(daily, hourly, ids, panels):
 @websocket_api.async_response
 async def ws_get_day(hass, connection, msg):
     # one past calendar day as it really went, in the shape of get_plan: the quarters of that day per series, from the recorder and the weather of that day
-    from homeassistant.components.recorder import get_instance
-    from homeassistant.components.recorder.statistics import statistics_during_period
-
     coord = _coordinator(hass)
     if coord is None:
         connection.send_error(msg["id"], "not_ready", "ZenMaster not ready yet")
@@ -420,8 +421,7 @@ async def ws_get_day(hass, connection, msg):
         for row in stats.get(eid, []):
             if (mean := row.get("mean")) is None:
                 continue
-            stamp = dt_util.utc_from_timestamp(row["start"]) if isinstance(row["start"], (int, float)) else row["start"]
-            for q in range(i := int((stamp - start).total_seconds() // 900), min(quarters, i + span)):
+            for q in range(i := int((stat_to_time(row["start"]) - start).total_seconds() // 900), min(quarters, i + span)):
                 sums[q], counts[q] = sums[q] + mean * factor, counts[q] + 1
         series[sid] = [s / n if n else 0.0 for s, n in zip(sums, counts)]
     # the plan's house load is the base without the consumers, as the baseload takes it
@@ -431,7 +431,7 @@ async def ws_get_day(hass, connection, msg):
     # the outside temperature per quarter of that day; the Open-Meteo forecast API also serves the recent past
     params = {"latitude": hass.config.latitude, "longitude": hass.config.longitude, "minutely_15": "temperature_2m", "timezone": hass.config.time_zone, "start_date": msg["day"], "end_date": msg["day"]}
     try:
-        async with async_get_clientsession(hass).get(_OPEN_METEO_URL, params=params, timeout=ClientTimeout(total=20)) as resp:
+        async with async_get_clientsession(hass).get(OPEN_METEO_URL,params=params, timeout=ClientTimeout(total=20)) as resp:
             series["temp"] = (await resp.json())["minutely_15"]["temperature_2m"][:quarters]
     except (aiohttp.ClientError, asyncio.TimeoutError, KeyError):
         pass

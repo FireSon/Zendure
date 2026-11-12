@@ -9,14 +9,15 @@ from zoneinfo import ZoneInfo
 import aiohttp
 import numpy as np
 from aiohttp import ClientTimeout
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .solver import LpSolver, SolverEntry
 from ..config import ConfigField
-from ..const import watt_factor
+from ..const import OPEN_METEO_URL, stat_to_time, watt_factor
 
 _LOGGER = logging.getLogger(__name__)
-_OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 _HTTP_TIMEOUT = ClientTimeout(total=15)
 _CAL_DAYS = 10  # calibration window: days of history used to learn the POA factor
 
@@ -95,7 +96,7 @@ class Forecast(SolverEntry):
         }
         try:
             session = async_get_clientsession(self.hass)  # HA's shared session, never closed here
-            async with session.get(_OPEN_METEO_URL, params=params, timeout=_HTTP_TIMEOUT) as resp:
+            async with session.get(OPEN_METEO_URL,params=params, timeout=_HTTP_TIMEOUT) as resp:
                 resp.raise_for_status()
                 m15 = (await resp.json())["minutely_15"]
         except (aiohttp.ClientError, asyncio.TimeoutError, KeyError) as err:
@@ -153,7 +154,7 @@ class Forecast(SolverEntry):
         }
         try:
             session = async_get_clientsession(self.hass)  # HA's shared session, never closed here
-            async with session.get(_OPEN_METEO_URL, params=params, timeout=ClientTimeout(total=40)) as resp:
+            async with session.get(OPEN_METEO_URL,params=params, timeout=ClientTimeout(total=40)) as resp:
                 resp.raise_for_status()
                 b = (await resp.json())["minutely_15"]
         except (aiohttp.ClientError, asyncio.TimeoutError, KeyError) as err:
@@ -171,8 +172,6 @@ class Forecast(SolverEntry):
         # Measured power (kW) per quarter from the recorder (5-min mean) over the last 10 days.
         if self.hass is None:
             return {}
-        from homeassistant.components.recorder import get_instance
-        from homeassistant.components.recorder.statistics import statistics_during_period
 
         stats = await get_instance(self.hass).async_add_executor_job(statistics_during_period, self.hass, now - timedelta(days=_CAL_DAYS), now, {meter}, "5minute", None, {"mean"})
         # Average the (up to 3) 5-min means per quarter, then convert to kW.
@@ -181,8 +180,7 @@ class Forecast(SolverEntry):
             mean = row.get("mean")
             if mean is None:
                 continue
-            st = row.get("start")
-            dt = datetime.fromtimestamp(st, timezone.utc) if isinstance(st, (int, float)) else st
+            dt = stat_to_time(row.get("start"))
             a = acc.setdefault((dt.date(), dt.hour * 4 + dt.minute // 15), [0.0, 0])
             a[0] += mean
             a[1] += 1

@@ -57,7 +57,7 @@ def _patch(monkeypatch, script):
     return session
 
 
-async def _stub_base(self, dynamicPrice, now):
+async def _stub_base(self, dynamic_price, now):
     # the wholesale base the provider overlays: flat, with the NL tariffs, as test_dynamicprice stubs it
     self.import_markup, self.energy_tax, self.vat, self.fixed_cost_per_day, self.zone = 0.0, 0.09, 21.0, 0.0, "NL"
     self.tou = np.zeros(7 * 96)

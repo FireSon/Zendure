@@ -76,6 +76,8 @@ export class ZmGroup extends LitElement {
     const d: Record<string, unknown> = {};
     for (const f of this.fields) d[f.id] = readValue(this.config, f.entry ?? this.entry, f);
     this._draft = this.newType ? { ...this.preset } : d;
+    // a new entry: a select shows its first option, so that option is its value from the start
+    if (this.newType) for (const f of this.fields) if (f.selector.select && this._draft[f.id] === undefined) this._draft[f.id] = this._options(f)[0]?.value;
     this._result = null;
     this._editing = true;
   }

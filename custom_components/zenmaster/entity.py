@@ -1,4 +1,4 @@
-"""Base entity and device classes for the Zendure integration."""
+"""Base entity and device classes for the ZenMaster integration."""
 
 from __future__ import annotations
 
@@ -111,6 +111,7 @@ class EntityDevice:
         self.device_info = DeviceInfo(identifiers={(DOMAIN, device_id)})
         self.entities: dict[str, HaEntity | None] = {}
         self._restore: list[HaEntity] = []
+        self.on_config_changed: Callable | None = None  # the coordinator: persist subentry_data() after the device learned something its subentry keeps
         self.entity_create()
         if (device := device_by_identifier(self.hass, self.device_id)) is not None:
             names = {snakecase(f"{self.name}_{name}"): key for key, (_, name, _) in self.SENSORS.items()}
@@ -125,6 +126,11 @@ class EntityDevice:
     def subentry_data(self) -> dict[str, Any]:
         """The fields a subentry-backed device keeps in its subentry; the coordinator persists them when they change."""
         return {}
+
+    def config_changed(self) -> None:
+        # an address, a pack name or a mode to hand back was learned; the coordinator persists it
+        if self.on_config_changed is not None:
+            self.on_config_changed(self)
 
     def add_entity(self, entity: HaEntity) -> None:
         # hand a new entity to its HA platform; on a subentry-backed device it is filed under that subentry

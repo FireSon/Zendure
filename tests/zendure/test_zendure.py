@@ -29,8 +29,17 @@ class FakeMqtt:
 class FakeResponse:
     status = 200
 
-    def __init__(self, body: str) -> None:
+    def __init__(self, body: str, delay: float = 0.0) -> None:
         self._body = body
+        self._delay = delay
+
+    # the session call is used as `async with`, the way aiohttp hands out a response
+    async def __aenter__(self):
+        await asyncio.sleep(self._delay)
+        return self
+
+    async def __aexit__(self, *exc) -> bool:
+        return False
 
     async def text(self) -> str:
         return self._body
@@ -41,13 +50,12 @@ class FakeSession:
         self.report = report
         self.posts: list[tuple[str, str]] = []
 
-    async def post(self, url: str, data=None, headers=None, timeout=None) -> FakeResponse:
+    def post(self, url: str, data=None, headers=None, timeout=None) -> FakeResponse:
         self.posts.append((url, data))
         return FakeResponse("{}")
 
-    async def get(self, url: str, headers=None, timeout=None) -> FakeResponse:
-        await asyncio.sleep(0.05)  # keep SENT observable between the post and the report
-        return FakeResponse(json.dumps(self.report))
+    def get(self, url: str, headers=None, timeout=None) -> FakeResponse:
+        return FakeResponse(json.dumps(self.report), delay=0.05)  # keep SENT observable between the post and the report
 
 
 def make_device(model: str = "SF2400 AC", cls: type = ZendureSolarFlow) -> ZendureSolarFlow:

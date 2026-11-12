@@ -27,6 +27,11 @@ class ConfigField:
     visible_when: dict | None = None  # {field_id: value or [values]} -> field shown only when it matches
     section_key: str | None = None  # display grouping in the UI card; a technical key, the UI translates it
 
+    @property
+    def persisted(self) -> bool:
+        # kept in a subentry: it has a cast, is no one-shot input and is not the key
+        return self.cast is not None and not self.transient and not self.is_key
+
 
 def read_field(obj: Any, field: ConfigField, value: Any) -> Any:
     # the value through the field's cast; one it cannot read is logged and the attribute keeps what it had
@@ -71,11 +76,11 @@ class Config:
 
     def deserialize(self, obj: Any, fields: list[ConfigField]) -> None:
         # get the key
-        if not (fid := next((f for f in fields if f.is_key), None)) or not (id := getattr(obj, fid.id, None)):
+        if not (fid := next((f for f in fields if f.is_key), None)) or not (key := getattr(obj, fid.id, None)):
             return
 
         # get the payload
-        if not (payload := self.payload.get(id)):
+        if not (payload := self.payload.get(key)):
             return
         self._apply(obj, fields, payload)
 

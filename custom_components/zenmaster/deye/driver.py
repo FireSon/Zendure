@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from ..config import ConfigField
 from ..driver import Driver
@@ -37,3 +37,8 @@ class DeyeDriver(Driver):
         ConfigField("ip", {"text": {}}, cast=str),
         ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False),
     ]
+
+    @classmethod
+    async def identify(cls, hass, data: dict[str, Any]) -> dict[str, Any] | str:
+        # the stick's serial goes into every V5 frame as a number: anything else is refused before the inverter is added
+        return {} if str(data.get("sn", "")).isdigit() else "invalid_serial"

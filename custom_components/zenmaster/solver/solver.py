@@ -141,10 +141,7 @@ class LinExpr:
         return r
 
     def __sub__(self, other: "LinExpr") -> "LinExpr":
-        r = LinExpr(self.terms)
-        for i, c in other.terms.items():
-            r.terms[i] = r.terms.get(i, 0.0) - c
-        return r
+        return self + -other
 
     def __mul__(self, scalar: float) -> "LinExpr":
         return LinExpr({i: c * scalar for i, c in self.terms.items()})
@@ -211,12 +208,12 @@ class LpSolver:
         for entry in self._entries:
             entry.entry_config(self)
 
-        self.rowQuarter({"supply": 1.0, "draw": -1.0}, lo=lambda t: self.l1[t] + self.l2[t] + self.l3[t], hi=lambda t: self.l1[t] + self.l2[t] + self.l3[t])
+        self.row_quarter({"supply": 1.0, "draw": -1.0}, lo=lambda t: self.l1[t] + self.l2[t] + self.l3[t], hi=lambda t: self.l1[t] + self.l2[t] + self.l3[t])
         self.limit = self.globals["phase_limit_kw"]
         # per phase the draws in the room the fixed load leaves; a phase already full leaves none, never an infeasible plan
         for ph, name in ((1, "l1"), (2, "l2"), (3, "l3")):
             factors = {c: (1.0 if p == ph else 1.0 / 3) for c, p in self._phase_columns if p in (0, ph)}
-            self.rowQuarter(factors, hi=lambda t, n=name: max(0.0, self.limit - getattr(self, n)[t]))
+            self.row_quarter(factors, hi=lambda t, n=name: max(0.0, self.limit - getattr(self, n)[t]))
 
     async def run(self, now):
         # shift the history window one slot per elapsed quarter (re-runs within the same quarter don't shift)
@@ -327,7 +324,6 @@ class LpSolver:
     def data(self, id, uom, day: int = 1, name="", source="lp_result") -> SolverData:
         # 12 history slots + at least the solve horizon (forecast asks for more via day)
         data = SolverData(id, uom, name, source, max(day * 96 + 12, self.horizon + 12))
-        data.index = len(self._data)
         self._data.append(data)
         return data
 
@@ -369,7 +365,7 @@ class LpSolver:
         # bound as a 0-arg thunk (deferred until solve) if it is f(t), otherwise the number/None itself
         return (lambda: b(t)) if callable(b) else b
 
-    def rowQuarter(self, factors: dict, lo: Bound | None = None, hi: Bound | None = None) -> None:
+    def row_quarter(self, factors: dict, lo: Bound | None = None, hi: Bound | None = None) -> None:
         # one row per quarter: sum factor*column. A str key expands to every column with that tag; an LpColumn key is used directly.
         cols = []
         for key, f in factors.items():
@@ -382,11 +378,12 @@ class LpSolver:
                 expr += f * c[t]
             self._rows.append((expr, self._bound(lo, t), self._bound(hi, t)))
 
-    def rowDelta(self, expr: Callable[[int, int], LinExpr], const: Bound = 0.0, lo: Bound | None = None, hi: Bound | None = None) -> Callable[[], None]:
+    def row_delta(self, expr: Callable[[int, int], LinExpr], const: Bound = 0.0, lo: Bound | None = None, hi: Bound | None = None) -> Callable[[], None]:
         # couple two quarters over the whole horizon: equality expr(t+1,t)==const, or inequality lo/hi
         # returns build() that re-evaluates expr in place; call it in prerun when coefficients change
         start = len(self._rows)
         n = self.horizon - 1
+
         def build() -> None:
             for t in range(n):
                 row = expr(t + 1, t)
@@ -402,13 +399,12 @@ class LpSolver:
     def place_block(self, phase: Phase, powerprofile: list[float], latest: int = 96) -> int | None:
         # place a fixed appliance cycle in its cheapest buy-price window, keeping every phase load under the limit, then commit it
         price = self.price_buy.data[12 : 12 + self.horizon]
-        limit = self.globals["phase_limit_kw"]
-        loads = [self.l1, self.l2, self.l3] if phase == Phase.all else [(None, self.l1, self.l2, self.l3)[phase]]
+        loads = self.loads[phase]
         per = [p / len(loads) for p in powerprofile]  # the power each phase carries: a third of it on all phases
         length = len(powerprofile)
         best_cost, best_start = float("inf"), None
         for start in range(latest - length + 1):
-            if any(load[start + step] + per[step] > limit for load in loads for step in range(length)):
+            if any(load[start + step] + per[step] > self.limit for load in loads for step in range(length)):
                 continue
             window_cost = sum(powerprofile[step] * price[start + step] for step in range(length))
             if window_cost < best_cost:

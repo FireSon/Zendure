@@ -3,11 +3,15 @@ from __future__ import annotations
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 import numpy as np
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import statistics_during_period
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .solver import LpSolver, LpColumn, SolverEntry
 from ..config import ConfigField
-from ..consumer import ConsumerDevice
+from ..consumer import HEAD, MANAGE, TAIL, ConsumerDevice
 from ..const import Phase, watt_factor
 
 _TANK_K = 3600.0 / 4.2  # litre-kelvin per kWh of water: 1 kWh lifts 200 l by 4.3 degC
@@ -38,13 +42,11 @@ def _cop(outdoor: float, indoor: float) -> float:
 
 # the fields every store shares; each class below adds the ones that only make sense for it
 _LINK = [
-    ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True, hidden=True),
-    ConfigField("name", {"text": {}}),  # the subentry title: HA names the device and its entities after it
+    *HEAD,
     ConfigField("temp_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "temperature"}]}}, cast=str, section_key="link"),
     ConfigField("power_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "power"}, {"domain": "sensor", "device_class": "current"}]}}, cast=str, section_key="link"),
 ]
 # settings have no cast: they are entities on the consumer's device, HA keeps their value (see ConsumerDevice)
-_MANAGE = ConfigField("manage", {"boolean": {}}, section_key="behaviour")
 _BAND = [
     ConfigField("t_min", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"),
     ConfigField("t_max", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"),
@@ -53,10 +55,6 @@ _AMBIENT = ConfigField("ambient", {"number": {"mode": "box", "step": 0.5}}, sect
 _AMBIENT_ENTITY = ConfigField("ambient_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "temperature"}]}}, cast=str, required=False, section_key="link")
 _MAX_POWER = ConfigField("max_power", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, required=False, section_key="plate")
 _VOLUME = ConfigField("volume", {"number": {"mode": "box", "step": 10, "unit_of_measurement": "l"}}, required=False, section_key="plate")
-_TAIL = [
-    ConfigField("phase", {"select": {"options": [{"value": "0", "label": "Alle fasen"}, {"value": "1", "label": "L1"}, {"value": "2", "label": "L2"}, {"value": "3", "label": "L3"}]}}, section_key="expert"),
-    ConfigField("state", {"entity": {}}, readonly=True),
-]
 
 
 class Heating(SolverEntry, ConsumerDevice):
@@ -119,11 +117,11 @@ class Heating(SolverEntry, ConsumerDevice):
         # The floor is a row, not a bound: a store that sits under it cannot always climb back inside the phase limit,
         # and a bound it cannot reach makes the whole LP infeasible. Falling short costs _COMFORT_PENALTY per degC.
         self.slack = lp.column(cost=_COMFORT_PENALTY, lo=0.0)
-        lp.rowQuarter({self.temp: 1.0, self.slack: 1.0}, lo=lambda t: self._tmin[t])
+        lp.row_quarter({self.temp: 1.0, self.slack: 1.0}, lo=lambda t: self._tmin[t])
         # the house has a soft ceiling too: above t_max costs the same penalty, so cheap power does not overheat it
         if soft:
             self.over = lp.column(cost=_COMFORT_PENALTY, lo=0.0)
-            lp.rowQuarter({self.temp: 1.0, self.over: -1.0}, hi=lambda t: self.t_max)
+            lp.row_quarter({self.temp: 1.0, self.over: -1.0}, hi=lambda t: self.t_max)
 
         self._cops = [3.0] * lp.horizon  # absolute COP per quarter for the heat balance, sized to the solve window
         self._mins = [_MIN_KW] * lp.horizon  # the minimum power per quarter, from the outdoor forecast; only _runs uses it
@@ -132,28 +130,28 @@ class Heating(SolverEntry, ConsumerDevice):
             self.mass = lp.column(dest=lp.data(f"{self.id}_mass", "C", name=self.name))
             # under t_min costs a little, so the plan only dips under it when that saves more
             below = lp.column(cost=_TARGET_COST, lo=0.0)
-            lp.rowQuarter({self.temp: 1.0, below: 1.0}, lo=lambda t: self.t_min)
+            lp.row_quarter({self.temp: 1.0, below: 1.0}, lo=lambda t: self.t_min)
             # power above the knee gives less heat per kW; the LP keeps knee at power - _KNEE when that is positive
             knee = lp.column(lo=0.0)
-            lp.rowQuarter({knee: 1.0, self.power: -1.0}, lo=lambda t: -_KNEE, hi=lambda t: 0.0)
+            lp.row_quarter({knee: 1.0, self.power: -1.0}, lo=lambda t: -_KNEE, hi=lambda t: 0.0)
             # the sun on the expected solar production when there are solar meters, else on the global irradiance
             sun = lambda t: (lp.solar if lp.globals.get("solar_entities") else lp.sun).data[12 + t]
             ua = lambda t: self.ua + self.ua_wind * lp.wind.data[12 + t]
             gain = lambda t: 0.25 / self.ci * (self.sun_gain * sun(t) + self.q_int + ua(t) * self._outdoor.data[12 + t])
-            air = lp.rowDelta(lambda t1, t2: self.temp[t1] - (1 - 0.25 * (ua(t2) + self.him) / self.ci) * self.temp[t2] - 0.25 * self.him / self.ci * self.mass[t2] - 0.25 * self._cops[t2] / self.ci * (self.power[t2] - (1 - _KNEE_COP) * knee[t2]), const=gain)
-            mass = lp.rowDelta(lambda t1, t2: self.mass[t1] - (1 - 0.25 * self.him / self.cm) * self.mass[t2] - 0.25 * self.him / self.cm * self.temp[t2], const=0.0)
+            air = lp.row_delta(lambda t1, t2: self.temp[t1] - (1 - 0.25 * (ua(t2) + self.him) / self.ci) * self.temp[t2] - 0.25 * self.him / self.ci * self.mass[t2] - 0.25 * self._cops[t2] / self.ci * (self.power[t2] - (1 - _KNEE_COP) * knee[t2]), const=gain)
+            mass = lp.row_delta(lambda t1, t2: self.mass[t1] - (1 - 0.25 * self.him / self.cm) * self.mass[t2] - 0.25 * self.him / self.cm * self.temp[t2], const=0.0)
             self._rebuild_model = lambda: (air(), mass())
         else:
             # discretized RC model -> temp[t+1] = (1-B)*temp[t] + A*power[t] + B*loss_temp + icept*A, with
             # A = 0.25/(tau*slope) degC per kW-quarter and B = 0.25/tau loss fraction per quarter.
             # The lambdas read the live parameters so a recalibration only needs the row rebuild below.
             loss = lambda t: 0.25 / self.tau * self.ambient + self.icept * 0.25 / (self.tau * self.slope)
-            self._rebuild_model = lp.rowDelta(lambda t1, t2: self.temp[t1] + (0.25 / self.tau - 1.0) * self.temp[t2] - 0.25 / (self.tau * self.slope) * self.power[t2], const=loss)
+            self._rebuild_model = lp.row_delta(lambda t1, t2: self.temp[t1] + (0.25 / self.tau - 1.0) * self.temp[t2] - 0.25 / (self.tau * self.slope) * self.power[t2], const=loss)
 
     async def entry_prerun(self, lp: LpSolver, now: datetime) -> None:
         # The house is used as a heat buffer, so the saving is the same heat bought at a better moment:
         # the energy since the last run, at the price of its quarter, against the average buy price over the coming day.
-        if self._pending_kwh and getattr(lp, "price_buy", None) is not None:
+        if self._pending_kwh and lp.price_buy is not None:
             window = lp.price_buy.data[12 : 12 + 96]
             reference = float(sum(window) / len(window)) if len(window) else 0.0
             price = float(lp.price_buy.data[lp.settle])
@@ -218,16 +216,15 @@ class Heating(SolverEntry, ConsumerDevice):
         await self.save_params(lp.hass, {"slope": self.slope, "icept": self.icept, "tau": self.tau})
 
 
-
 class HeatingHeatPump(Heating):
     # space heating by a heat pump: comfort floor with a night setback, loses heat to the outdoor forecast
     SOFT_FLOOR = True
     TILES = ["temp_entity", "control_entity"]
     CONFIG = [*_LINK, ConfigField("control_entity", {"entity": {"filter": [{"domain": "number"}, {"domain": "climate"}]}}, cast=str, required=False, section_key="link"),
               ConfigField("setpoint_entity", {"entity": {"filter": [{"domain": "climate"}, {"domain": "number"}, {"domain": "input_number"}, {"domain": "sensor"}]}}, cast=str, required=False, section_key="link"),
-              ConfigField("control", {"select": {"options": _CONTROLS}}, cast=str, section_key="behaviour"), _MANAGE, ConfigField("setpoint", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"),
+              ConfigField("control", {"select": {"options": _CONTROLS}}, cast=str, section_key="behaviour"), MANAGE, ConfigField("setpoint", {"number": {"mode": "box", "step": 0.5}}, section_key="behaviour"),
               ConfigField("day_drop", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), ConfigField("night_drop", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"),
-              ConfigField("headroom", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), _MAX_POWER, *_TAIL]
+              ConfigField("headroom", {"number": {"mode": "box", "step": 0.5, "unit_of_measurement": "K"}}, section_key="behaviour"), _MAX_POWER, *TAIL]
     # the house calls its comfort target the setpoint, like a thermostat; the shared code reads the target of this quarter as t_min
     t_min = property(lambda self: self._target, lambda self, v: setattr(self, "setpoint", v))
     _target = 19.5  # the setpoint of this quarter; the shared __init__ reads t_min before this class sets it
@@ -280,9 +277,9 @@ class HeatingHeatPump(Heating):
         p[12:12 + lp.horizon] = self._runs(p[12:12 + lp.horizon], np.array(self._mins))
         # this quarter's plan in the type the entity takes, on its step and inside its range; written every quarter, a device falls back to its own curve without it
         if self.control_entity and lp.hass is not None and (state := lp.hass.states.get(self.control_entity)) is not None:
-            a, p, floor = state.attributes, float(self.power.dest.data[12]), self._tmin[0]
-            delta = max(0.0, float(self.temp.dest.data[13]) - floor) if p else 0.0  # the room the plan heats to by the end of this quarter; none in a quarter _runs dropped
-            value = {"power": p * (1000.0 if a.get("unit_of_measurement") == "W" else 1.0), "capacity": 100.0 * p / self.max_power, "delta": delta, "temperature": floor + delta}[self.control]
+            a, kw, floor = state.attributes, float(self.power.dest.data[12]), self._tmin[0]
+            delta = max(0.0, float(self.temp.dest.data[13]) - floor) if kw else 0.0  # the room the plan heats to by the end of this quarter; none in a quarter _runs dropped
+            value = {"power": kw * (1000.0 if a.get("unit_of_measurement") == "W" else 1.0), "capacity": 100.0 * kw / self.max_power, "delta": delta, "temperature": floor + delta}[self.control]
             step = a.get("step") or a.get("target_temp_step") or 0.5
             value = round(round(value / step) * step, 3)
             value = min(max(value, a.get("min", a.get("min_temp", value))), a.get("max", a.get("max_temp", value)))
@@ -302,13 +299,14 @@ class HeatingHeatPump(Heating):
 
 class PoolHeatPump(Heating):
     # pool water from a heat pump: hard band, loses heat to the outside air around the pool
-    CONFIG = [*_LINK, _MANAGE, *_BAND, _AMBIENT, _MAX_POWER, *_TAIL]
+    CONFIG = [*_LINK, MANAGE, *_BAND, _AMBIENT, _MAX_POWER, *TAIL]
 
     def __init__(self) -> None:
         super().__init__()
         self.t_min, self.t_max = 26.0, 30.0
 
-_CAL_MIN_DAYS = 20   # minimum heating-active days before a refit is trusted (off-season gate)
+
+_CAL_MIN_DAYS = 20  # minimum heating-active days before a refit is trusted (off-season gate)
 
 
 def floor_hour(x) -> datetime:
@@ -322,9 +320,6 @@ async def fit_store(hass, elec_id: str, temp_id: str, ambient: float, days: int 
     # is too little heating signal in the window (off-season -> caller keeps its current params).
     #   slope = UA/COP (kW_elec/degC), icept = free-gain offset (kW_elec), tau = cooling time constant (h).
     # The loss is against the fixed temperature of the room the tank stands in.
-    from homeassistant.components.recorder import get_instance
-    from homeassistant.components.recorder.statistics import statistics_during_period
-
     if not elec_id or not temp_id:
         return None
     now = datetime.now(timezone.utc)
@@ -336,7 +331,7 @@ async def fit_store(hass, elec_id: str, temp_id: str, ambient: float, days: int 
     pwr = {floor_hour(r["start"]): abs(r["mean"]) * factor for r in stats.get(elec_id, []) if r.get("mean") is not None}  # abs: a reversed meter reports negative
     tmp = {floor_hour(r["start"]): r["mean"] for r in stats.get(temp_id, []) if r.get("mean") is not None}
 
-    ref = {k: float(ambient) for k in tmp}
+    ref = float(ambient)
 
     hrs = sorted(set(pwr) & set(tmp) & set(ref))
     if not hrs:
@@ -345,7 +340,7 @@ async def fit_store(hass, elec_id: str, temp_id: str, ambient: float, days: int 
     # energy signature: daily-mean P_elec vs daily-mean (T - T_ref), gated on heating-active days
     days_acc: dict = {}
     for k in hrs:
-        days_acc.setdefault(k.date(), []).append((pwr[k], tmp[k] - ref[k]))
+        days_acc.setdefault(k.date(), []).append((pwr[k], tmp[k] - ref))
     dp = np.array([np.mean([p for p, _ in v]) for v in days_acc.values()])
     dd = np.array([np.mean([x for _, x in v]) for v in days_acc.values()])
     active = (dp > 0.1) & (dd > 3.0)
@@ -369,7 +364,7 @@ async def fit_store(hass, elec_id: str, temp_id: str, ambient: float, days: int 
     if len(cur) >= 6:
         runs.append(cur)
     for run in runs:
-        xy = [(i, np.log(tmp[k] - ref[k])) for i, k in enumerate(run) if tmp[k] - ref[k] > 0.5 and ((k.hour >= 22) or (k.hour < 6))]
+        xy = [(i, np.log(tmp[k] - ref)) for i, k in enumerate(run) if tmp[k] - ref > 0.5 and ((k.hour >= 22) or (k.hour < 6))]
         if len(xy) >= 5:
             sl = float(np.polyfit([i for i, _ in xy], [y for _, y in xy], 1)[0])
             if sl < 0:
@@ -381,10 +376,6 @@ async def fit_store(hass, elec_id: str, temp_id: str, ambient: float, days: int 
 async def fit_house(hass, power_id: str, temp_id: str, solar_ids: list, lat: float, lon: float, phase: Phase = Phase.all):
     # The house from its daily heat balances over the last year: loss with wind, sun and free heat, and air plus mass from the room changes.
     # Returns (ci, cm, him, ua, ua_wind, sun_gain, q_int), or None with too few days.
-    import aiohttp
-    from homeassistant.components.recorder import get_instance
-    from homeassistant.components.recorder.statistics import statistics_during_period
-    from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
     # hourly means of the heat pump and the solar meters in kW and of the room; the standby of fans and control gives no heat
     now = datetime.now(timezone.utc)
@@ -397,7 +388,7 @@ async def fit_house(hass, power_id: str, temp_id: str, solar_ids: list, lat: flo
     # outdoor temperature, global irradiance and wind of the same hours from the weather archive; a failed fetch keeps the current fit
     params = {"latitude": lat, "longitude": lon, "start_date": begin.date().isoformat(), "end_date": now.date().isoformat(), "hourly": "temperature_2m,shortwave_radiation,wind_speed_10m", "wind_speed_unit": "ms", "timezone": "UTC"}
     try:
-        async with async_get_clientsession(hass).get("https://archive-api.open-meteo.com/v1/archive", params=params) as r:
+        async with async_get_clientsession(hass).get("https://archive-api.open-meteo.com/v1/archive", params=params, timeout=aiohttp.ClientTimeout(total=40)) as r:
             r.raise_for_status()
             h = (await r.json())["hourly"]
     except (aiohttp.ClientError, TimeoutError, ValueError, KeyError):

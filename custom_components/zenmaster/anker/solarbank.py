@@ -12,23 +12,18 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from ..config import FLEET, IDENTITY, ConfigField
-from ..const import DOMAIN, PhaseModi
+from ..const import DOMAIN
 from ..device import DeviceState, PolledDevice, ProfileCharge, ProfileDischarge
 from ..modbus import decode, encode
-from ..number import HaNumber
-from ..select import HaSelect
 from ..sensor import HaSensor
 
 if TYPE_CHECKING:
-    from ..distribution import DistributionMode
     from .driver import AnkerDriver, Product
 
 _LOGGER = logging.getLogger(__name__)
 
 PORT = 502
 SLOW_EVERY = 15  # temperature, capacity, limits and operating mode once per this many polls
-POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
-POWER_MAX_TIME = 10  # s: or this long after the command
 MIN_W = 100  # 1 to 99 W is refused by the device (anker-charging#103): such a request becomes 0
 PWR_MAX = 3500  # W both ways until the device reports its own limits (10036/10038); Omnibattery's envelope for the family
 
@@ -64,7 +59,6 @@ class AnkerSolarbank(PolledDevice):
         self.ip: str = data["ip"]
         self.port = int(data.get("port") or PORT)
         self.dc_pv = product.dc_pv
-        self.on_config_changed: Any = None  # the coordinator: persist subentry_data() after the ip was learned
         self.mode_mask: int | None = None  # the modes the firmware offers now; None until read
         self.home_input = self.home_output = self.battery_input = self.battery_output = 0
         self.mode: int | None = data.get("mode")  # the operating mode before we took control, put back when we hand it back; kept in the subentry so a crash does not lose it
@@ -99,18 +93,8 @@ class AnkerSolarbank(PolledDevice):
         HaSensor(self, "soc", uom="%", device_class="battery", state_class="measurement")
         HaSensor(self, "soc_min", uom="%", state_class="measurement")  # the device's own discharge limit
         HaSensor(self, "soc_max", uom="%", state_class="measurement")  # the device's own charge limit
-        HaNumber(self, "individual", uom="W", minimum=-10000, maximum=10000, on_changed=lambda _entity, _value: None)  # the setpoint of the individual mode, EM's own: nothing goes to the device
-
-        HaSensor(self, "home_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "home_output", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_output", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "temp", uom="°C", device_class="temperature", state_class="measurement", precision=1)
-        self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
-        HaSelect(self, "power_phase", PhaseModi, on_changed=self.update_phase, restore=True)
-
-        self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
-        HaSensor(self, "rte", uom="%", state_class="measurement", precision=1)
+        super().entity_create()
 
     async def read(self, address: int, kind: str, holding: bool = False) -> int:
         count = 2 if kind in ("int32", "uint32") else 1
@@ -187,17 +171,9 @@ class AnkerSolarbank(PolledDevice):
             self.config_changed()
 
         # the capacity, the soc limits and the power limits the device works with; a change reorders the fleet
-        changed = False
+        changed = self.update_limits(values)
         for key in ("soc_min", "soc_max"):
             if key in values and self.entity_update(key, int(values[key])):
-                changed = True
-        if values.get("kwh") and round(values["kwh"], 3) != self.kwh:
-            self.kwhsensor.update_value(round(values["kwh"], 3))
-            changed = True
-        for profile, key, sign in ((self.power_profile[0], "discharge_max", 1), (self.power_profile[1], "charge_max", -1)):
-            if (limit := int(values.get(key) or 0)) and sign * limit != profile.power:
-                profile.power = sign * limit
-                profile.__post_init__()  # floor and bands follow the new limit
                 changed = True
         if changed and self.on_invalidate is not None:
             self.on_invalidate()
@@ -210,5 +186,5 @@ class AnkerSolarbank(PolledDevice):
         self.entity_update("battery_output", max(0, battery))
         self.entity_update("battery_input", max(0, -battery))
         self.power_actual = p
-        if abs(self.power_actual - self.power_setpoint) < POWER_SET or (time.time() - self.state_since) > POWER_MAX_TIME:
+        if self.power_reached(time.time()):
             self.set_state(DeviceState.ACTIVE)

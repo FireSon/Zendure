@@ -4,11 +4,13 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import numpy as np
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import statistics_during_period
 
 from ..solver import Action, EntryStatus, LpSolver, SolverEntry
 from ...config import ConfigField
-from ...const import Phase, watt_factor
-from ...consumer import ConsumerDevice
+from ...const import Phase, time_to_slot, watt_factor
+from ...consumer import HEAD, MANAGE, TAIL, ConsumerDevice
 from ...switch import HaSwitch
 
 _ON_THRESHOLD_W = 10.0  # consumption above this = the appliance is running
@@ -23,22 +25,13 @@ _DEFAULTS = {"dishwasher": (0.9, 7), "washingmachine": (0.3, 7), "dryer": (1.6, 
 _DURATION_H = {"d": 24.0, "h": 1.0, "min": 1 / 60, "s": 1 / 3600}  # a duration sensor's unit in hours
 
 
-def _time_to_slot(time_str: str) -> int | None:
-    try:
-        h, m = time_str.split(":")[:2]  # "HH:MM", or "HH:MM:SS" the way HA's time entity keeps it
-        return int(h) * 4 + int(m) // 15
-    except (ValueError, AttributeError):
-        return None
-
-
 class Appliance(SolverEntry, ConsumerDevice):
     # A schedulable on/off appliance (dishwasher, dryer, washing machine, or any custom load). `kind` is a
     # label only; the behaviour is identical: the appliance places its cycle in its cheapest window,
     # arming via a witnessed power rise and acting on start/stop/skip commands.
     # Fields without a cast are settings: entities on the device, kept by HA (see ConsumerDevice).
     CONFIG = [
-        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True, hidden=True),
-        ConfigField("name", {"text": {}}),  # the subentry title: HA names the device and its entities after it
+        *HEAD,
         ConfigField("kind", {"select": {"options": [{"value": "dishwasher", "label": "Vaatwasser"}, {"value": "dryer", "label": "Droger"}, {"value": "washingmachine", "label": "Wasmachine"}, {"value": "custom", "label": "Overig"}]}}, cast=str, readonly=True),
         ConfigField("armed", {"boolean": {}}, cast=bool, hidden=True),
         ConfigField("armed_at", {"number": {}}, cast=float, required=False, hidden=True),
@@ -47,12 +40,11 @@ class Appliance(SolverEntry, ConsumerDevice):
         ConfigField("pause_entity", {"entity": {"domain": "button"}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
         ConfigField("power_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("duration_entity", {"entity": {"domain": "sensor", "device_class": "duration"}}, cast=str, required=False, section_key="link"),
-        ConfigField("manage", {"boolean": {}}, section_key="behaviour"),
+        MANAGE,
         ConfigField("latest_start_time", {"time": {}}, section_key="behaviour"),
         ConfigField("power_rating", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, section_key="expert"),
         ConfigField("cycle_duration_slots", {"number": {"mode": "box"}}, section_key="expert"),
-        ConfigField("phase", {"select": {"options": [{"value": "0", "label": "Alle fasen"}, {"value": "1", "label": "L1"}, {"value": "2", "label": "L2"}, {"value": "3", "label": "L3"}]}}, section_key="expert"),
-        ConfigField("state", {"entity": {}}, readonly=True),
+        *TAIL,
     ]
 
     # the override (manage) is a switch on the device; these are the moment-to-moment actions
@@ -77,7 +69,7 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.armed = False
         self.armed_at = 0.0  # when the arming happened; without a fixed time it sets the deadline, so it must survive a restart
         self.phase = Phase.all
-        self._profile = None          # learned per-slot kW cycle profile (None -> flat power_rating)
+        self._profile = None  # learned per-slot kW cycle profile (None -> flat power_rating)
         self._last_cal: datetime | None = None
         self._idle_since: float | None = None  # when the power dropped below the threshold while busy
         self._quiet_since: float | None = None  # when the power last dropped below the threshold, busy or not
@@ -139,8 +131,8 @@ class Appliance(SolverEntry, ConsumerDevice):
     def on_power(self, watts: float, now: float | None = None) -> None:
         now = now if now is not None else time.time()
         super().on_power(watts, now)  # the energy of this quarter
-        if watts <= _ON_THRESHOLD_W:            # idle: rest long enough and a later rise counts as a start
-            if self._quiet_since is None:       # found idle on the first reading: it has been resting all along
+        if watts <= _ON_THRESHOLD_W:  # idle: rest long enough and a later rise counts as a start
+            if self._quiet_since is None:  # found idle on the first reading: it has been resting all along
                 self._quiet_since = now - self._quiet_s if self._first else now
             if self.busy and self._idle_since is None:
                 self._idle_since = now
@@ -156,12 +148,12 @@ class Appliance(SolverEntry, ConsumerDevice):
             self.busy = True
             self.status = EntryStatus.running
             return
-        if rested >= self._quiet_s:             # below -> above after a real rest: witnessed start
+        if rested >= self._quiet_s:  # below -> above after a real rest: witnessed start
             self._running_since = now
         if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S or now < self._direct_until or not any(self.cycle()):
             if self.status is EntryStatus.none:
                 self.status = EntryStatus.running  # it draws while we plan nothing: say so instead of "off"
-            return                              # hands off / busy / a pause inside a cycle / past the 2-min window / a cycle of unknown size
+            return  # hands off / busy / a pause inside a cycle / past the 2-min window / a cycle of unknown size
         self.armed = True
         self.armed_at = now
         self.status = EntryStatus.armed
@@ -184,7 +176,7 @@ class Appliance(SolverEntry, ConsumerDevice):
 
         # book the measured energy at the price of the quarter it was used in, and remember the price
         # of the quarter the cycle was armed in: that is what it would have cost without shifting
-        price = float(lp.price_buy.data[lp.settle]) if getattr(lp, "price_buy", None) is not None else 0.0
+        price = float(lp.price_buy.data[lp.settle]) if lp.price_buy is not None else 0.0
         if self.armed and self._arm_price is None:
             self._arm_price = price
         if self._pending_kwh:
@@ -216,7 +208,7 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.data.data[12:] = 0.0
         if self.armed:
             profile = self.cycle()
-            slot = _time_to_slot(self.latest_start_time) if self.latest_start_time else None
+            slot = time_to_slot(self.latest_start_time) if self.latest_start_time else None
             if slot is not None:
                 # started by then, so finished a cycle later: place_block wants the slots it must be finished in
                 latest = ((slot - (now.hour * 60 + now.minute) // 15) % 96 or 96) + len(profile)  # wall-clock slot -> slots from now
@@ -275,8 +267,6 @@ class Appliance(SolverEntry, ConsumerDevice):
 
     async def calibrate(self, lp: LpSolver, now: datetime) -> None:
         # learn the typical per-quarter kW cycle profile: detect runs above the on-threshold, average their shapes
-        from homeassistant.components.recorder import get_instance
-        from homeassistant.components.recorder.statistics import statistics_during_period
         if not self.power_entity:
             return
         end = datetime.now(timezone.utc)
@@ -285,21 +275,22 @@ class Appliance(SolverEntry, ConsumerDevice):
         rows = [r["mean"] for r in stats.get(self.power_entity, []) if r.get("mean") is not None]
         state = lp.hass.states.get(self.power_entity)
         factor = watt_factor(state, self.phase) / 1000.0  # the reading in kW, whatever unit the sensor uses
-        series = [float(np.mean(rows[i:i + 3])) * factor for i in range(0, len(rows), 3)]   # 5-min means -> 15-min kW
+        series = [float(np.mean(rows[i:i + 3])) * factor for i in range(0, len(rows), 3)]  # 5-min means -> 15-min kW
         runs, cur = [], []
-        for kw in series:                       # split into runs above the on-threshold
+        for kw in series:  # split into runs above the on-threshold
             if kw > _ON_THRESHOLD_W / 1000.0:
                 cur.append(kw)
             elif cur:
-                runs.append(cur); cur = []
+                runs.append(cur)
+                cur = []
         if cur:
             runs.append(cur)
-        runs = [r for r in runs if len(r) >= 2]   # ignore blips
+        runs = [r for r in runs if len(r) >= 2]  # ignore blips
         if len(runs) < 3:
             return
         n = int(np.median([len(r) for r in runs]))
         self._profile = [float(np.mean([r[j] for r in runs if len(r) > j])) for j in range(n)]
-        self.cycle_duration_slots = n            # learned duration replaces the configured fallback
+        self.cycle_duration_slots = n  # learned duration replaces the configured fallback
 
         # longest silence that still sat inside one cycle (gaps up to 90 min join two runs); twice that
         # is the rest this appliance must show before a rise may count as a start

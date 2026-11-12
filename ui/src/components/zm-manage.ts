@@ -35,6 +35,7 @@ export class ZmManage extends LitElement {
   @property({ attribute: false }) add: any[] = [];  // the tile catalog from get_schema
   @property({ attribute: false }) hass: any = null;
   @property() tab: Kind = 'consumer';
+  @property() sel = '';  // a device to open on, from its pencil in the overview
   @state() private _sel: string | null = null;  // the entry being edited (a device by its key or, just added, by its subentry)
   @state() private _tile: any = null;  // the tile being added
   @state() private _right = false;  // the phone shows the right side
@@ -44,7 +45,7 @@ export class ZmManage extends LitElement {
   @state() private _narrow = NARROW.matches;
   private _onNarrow = () => { this._narrow = NARROW.matches; };
 
-  connectedCallback() { super.connectedCallback(); NARROW.addEventListener('change', this._onNarrow); }
+  connectedCallback() { super.connectedCallback(); NARROW.addEventListener('change', this._onNarrow); if (this.sel) this._open('device', this.sel); }
   disconnectedCallback() { super.disconnectedCallback(); NARROW.removeEventListener('change', this._onNarrow); }
 
   static styles = [

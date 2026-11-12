@@ -38,10 +38,10 @@ class BatteryUnit:
         self.dc_in = lp.column(hi=0.0, dest=lp.data(f"{key}_solar_in", "kW", name=name))
         self.dc_out = lp.column(hi=0.0, tags=("supply",), dest=lp.data(f"{key}_solar_out", "kW", name=name))
         self.soc = lp.column(lo=0.0, hi=1.0, dest=lp.data(f"{key}_soc", "0-1", name=name))
-        self.rebuild = lp.rowDelta(lambda t1, t2: self.soc[t1] - self.soc[t2] - self.gain * (AC_IN * self.charge[t2] + DC_IN * self.dc_in[t2]) + self.gain * self.discharge[t2], const=0.0)
+        self.rebuild = lp.row_delta(lambda t1, t2: self.soc[t1] - self.soc[t2] - self.gain * (AC_IN * self.charge[t2] + DC_IN * self.dc_in[t2]) + self.gain * self.discharge[t2], const=0.0)
         # its own panels either fill the pack or leave through its inverter, which also carries the discharge
-        lp.rowQuarter({self.dc_in: 1.0, self.dc_out: 1.0}, hi=lambda t: self.solar[t])
-        lp.rowQuarter({self.discharge: 1.0, self.dc_out: 1.0}, hi=lambda t: self.out_max)
+        lp.row_quarter({self.dc_in: 1.0, self.dc_out: 1.0}, hi=lambda t: self.solar[t])
+        lp.row_quarter({self.discharge: 1.0, self.dc_out: 1.0}, hi=lambda t: self.out_max)
 
     def prerun(self, h: int, meters: dict[str, np.ndarray], wear_mean: float, terminal: float) -> None:
         x = self.device
@@ -126,12 +126,12 @@ class DistributionEntry(SolverEntry):
         self._bat_charge = lp.column(dest=lp.data("bat_charge", "kW"))
         self._bat_discharge = lp.column(dest=lp.data("bat_discharge", "kW"))
         self._bat_soc = lp.data("bat_soc", "0-1")
-        lp.rowQuarter({self._bat_charge: 1.0, **{u.charge: -1.0 for u in self._units}, **{u.dc_in: -1.0 for u in self._units}}, lo=0.0, hi=0.0)
-        lp.rowQuarter({self._bat_discharge: 1.0, **{u.discharge: -1.0 for u in self._units}}, lo=0.0, hi=0.0)
+        lp.row_quarter({self._bat_charge: 1.0, **{u.charge: -1.0 for u in self._units}, **{u.dc_in: -1.0 for u in self._units}}, lo=0.0, hi=0.0)
+        lp.row_quarter({self._bat_discharge: 1.0, **{u.discharge: -1.0 for u in self._units}}, lo=0.0, hi=0.0)
 
         # the regulatory cap on what the fleet delivers to the house (Germany: 800 W), in the plan as in the live setpoint
         if d.max_output > 0:
-            lp.rowQuarter({**{u.discharge: 1.0 for u in self._units}, **{u.dc_out: 1.0 for u in self._units}}, hi=d.max_output / 1000)
+            lp.row_quarter({**{u.discharge: 1.0 for u in self._units}, **{u.dc_out: 1.0 for u in self._units}}, hi=d.max_output / 1000)
 
     @staticmethod
     def _walk(stock: float, basis: float, charge: float, discharge: float, charge_grid: float, discharge_grid: float, buy: float, sell: float) -> tuple[float, float, float]:
@@ -152,8 +152,8 @@ class DistributionEntry(SolverEntry):
         # Prices are flat within a quarter, so the money is exact; only the grid/solar split of the
         # charge is taken at quarter level instead of per tick.
         d = self.distribution
-        buy = float(lp.price_buy.data[12]) if getattr(lp, "price_buy", None) is not None else 0.0
-        sell = float(lp.price_sell.data[12]) if getattr(lp, "price_sell", None) is not None else 0.0
+        buy = float(lp.price_buy.data[12]) if lp.price_buy is not None else 0.0
+        sell = float(lp.price_sell.data[12]) if lp.price_sell is not None else 0.0
         if lp.globals.get("price_valid"):
             d.entity_update("price_buy", buy)
             d.entity_update("price_sell", sell)
@@ -182,12 +182,11 @@ class DistributionEntry(SolverEntry):
             pending.clear()
         d.entity_update("savings", self.savings)
 
+        # the grid per quarter: the price of a kWh in and out, and the connection as its limit both ways
         h = lp.horizon
-        for t in range(h):
-            self.grid_buy.costs[t] = lp.price_buy.data[12 + t] * 0.25
-            self.grid_sell.costs[t] = -lp.price_sell.data[12 + t] * 0.25
-            self.grid_buy.upper[t] = d.max_kw
-            self.grid_sell.upper[t] = d.max_kw
+        self.grid_buy.costs[:] = lp.price_buy.data[12:12 + h] * 0.25
+        self.grid_sell.costs[:] = -lp.price_sell.data[12:12 + h] * 0.25
+        self.grid_buy.upper[:] = self.grid_sell.upper[:] = d.max_kw
 
         # every battery on its own: the loss of the round trip sits in its SoC (AC_IN, DC_IN), its wear in what discharging costs
         meters = lp.globals.get("solar_meters", {})
@@ -265,7 +264,7 @@ class DistributionEntry(SolverEntry):
         now = self._now
         left = 0 if now is None else max(0, ((23 - now.hour) * 60 + (60 - now.minute)) // 15)
         expected = 0.0
-        if left and getattr(lp, "price_buy", None) is not None:
+        if left and lp.price_buy is not None:
             buy, sell = lp.price_buy.data, lp.price_sell.data
             gb, gs = self.grid_buy.dest.data, self.grid_sell.dest.data
             bc, bd = self._bat_charge.dest.data, self._bat_discharge.dest.data

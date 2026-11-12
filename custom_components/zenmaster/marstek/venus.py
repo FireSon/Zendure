@@ -13,23 +13,19 @@ from pymodbus.client import AsyncModbusTcpClient
 from pymodbus.exceptions import ModbusException
 
 from ..config import FLEET, IDENTITY, ConfigField
-from ..const import DOMAIN, PhaseModi
+from ..const import DOMAIN
 from ..device import DeviceState, PolledDevice, ProfileCharge, ProfileDischarge
 from ..modbus import decode
 from ..number import HaNumber
-from ..select import HaSelect
 from ..sensor import HaSensor
 
 if TYPE_CHECKING:
-    from ..distribution import DistributionMode
     from .driver import MarstekDriver, Product
 
 _LOGGER = logging.getLogger(__name__)
 
 PORT = 502
 SLOW_EVERY = 15  # temperature, capacity, limits and work mode once per this many polls
-POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
-POWER_MAX_TIME = 10  # s: or this long after the command
 DOD_DEFAULT = 88  # % the device discharges by default; soc_min starts at 100 - this
 
 # the control registers, the same for every generation (ViperRNMC/marstek_venus_modbus registers/*.yaml)
@@ -66,7 +62,6 @@ class MarstekVenus(PolledDevice):
         self.ip: str = data.get("ip") or self.sn
         self.port = int(data.get("port") or PORT)
         self.allow_control: bool = bool(data.get("allow_control"))  # off by default: the control is not confirmed on a device
-        self.on_config_changed: Any = None  # the coordinator: persist subentry_data(); nothing is learned over Modbus
         self.home_input = self.home_output = self.battery_input = self.battery_output = 0
         self.work_mode: int | None = None  # user_work_mode before we took control, put back when we hand it back
 
@@ -91,24 +86,8 @@ class MarstekVenus(PolledDevice):
         HaSensor(self, "soc", uom="%", device_class="battery", state_class="measurement")
         HaNumber(self, "soc_min", uom="%", minimum=0, maximum=100, restore=True, on_changed=self.soc_changed)
         HaNumber(self, "soc_max", uom="%", minimum=0, maximum=100, restore=True, on_changed=self.soc_changed)
-        HaNumber(self, "individual", uom="W", minimum=-10000, maximum=10000, on_changed=lambda _entity, _value: None)  # the setpoint of the individual mode, EM's own: nothing goes to the device
-
-        HaSensor(self, "home_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "home_output", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_output", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "temp", uom="°C", device_class="temperature", state_class="measurement", precision=1)
-        self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
-        HaSelect(self, "power_phase", PhaseModi, on_changed=self.update_phase, restore=True)
-
-        self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
-        HaSensor(self, "rte", uom="%", state_class="measurement", precision=1)
-
-    def soc_changed(self, entity: Any, value: Any) -> None:
-        # soc_min and soc_max are ZenMaster's own limits, nothing goes to the device; the fleet order follows them
-        setattr(self, entity.attr, value)
-        if self.on_invalidate is not None:
-            self.on_invalidate()
+        super().entity_create()
 
     async def read(self, key: str) -> float:
         address, kind, scale = self.registers[key]
@@ -172,16 +151,7 @@ class MarstekVenus(PolledDevice):
             self.work_mode = int(values["work_mode"])
 
         # the capacity and the limits the device works with; a change reorders the fleet
-        changed = False
-        if "kwh" in values and values["kwh"] and round(values["kwh"], 3) != self.kwh:
-            self.kwhsensor.update_value(round(values["kwh"], 3))
-            changed = True
-        for profile, key, sign in ((self.power_profile[0], "discharge_max", 1), (self.power_profile[1], "charge_max", -1)):
-            if (limit := int(values.get(key) or 0)) and sign * limit != profile.power:
-                profile.power = sign * limit
-                profile.__post_init__()  # floor and bands follow the new limit
-                changed = True
-        if changed and self.on_invalidate is not None:
+        if self.update_limits(values) and self.on_invalidate is not None:
             self.on_invalidate()
 
         # the power at the AC side and in the pack; the direction from battery_power, positive for charge (marstek_venus_modbus sensor.py)
@@ -192,5 +162,5 @@ class MarstekVenus(PolledDevice):
         self.entity_update("battery_output", max(0, -battery))
         self.entity_update("battery_input", max(0, battery))
         self.power_actual = p
-        if abs(self.power_actual - self.power_setpoint) < POWER_SET or (time.time() - self.state_since) > POWER_MAX_TIME:
+        if self.power_reached(time.time()):
             self.set_state(DeviceState.ACTIVE)

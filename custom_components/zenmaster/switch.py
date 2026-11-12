@@ -1,4 +1,4 @@
-"""Switch platform for the Zendure integration."""
+"""Switch platform for the ZenMaster integration."""
 
 from __future__ import annotations
 
@@ -13,11 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .entity import EntityDevice, HaEntity
 
 
-async def async_setup_entry(
-    _hass: HomeAssistant,
-    _config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the switches."""
     HaSwitch.add = async_add_entities
 
@@ -27,10 +23,10 @@ class HaSwitch(SwitchEntity, HaEntity):
 
     add: AddEntitiesCallback
 
-    def __init__(self, device: EntityDevice, key: str, vendor_id: str | None = None, on_changed: Callable | None = None, restore: bool = False, default: bool = False, disabled: bool = False) -> None:
-
+    def __init__(self, device: EntityDevice, key: str, vendor_id: str | None = None, on_changed: Callable | None = None, restore: bool = False, default: bool | None = None, disabled: bool = False) -> None:
         super().__init__(device, key, vendor_id, disabled)
         self._on_changed = on_changed
+        self._attr_is_on = default  # the position before a stored one is restored; None stays unknown
         self.entity_description = SwitchEntityDescription(key=key, name=key)
         if restore:
             device._restore.append(self)

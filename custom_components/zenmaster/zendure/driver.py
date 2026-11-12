@@ -63,6 +63,7 @@ E2dkgSuggik3oa0427KvctFf8uhOV94RvEDyqvT5+pgNYZ2Yfga9pD/jjpoHEUlo
 IWxNsPrUP+XsZpBJy/mvOhE5QXo6Y35zDqqj8tI7AGmAWu22jg==
 -----END CERTIFICATE-----""")
 
+
 class Product(NamedTuple):
     cls: type
     family: str  # names the device (family_<serial tail>)
@@ -99,7 +100,7 @@ PRODUCTS: dict[str, Product] = {
 PRODKEYS: dict[str, str] = {key: product for product, row in PRODUCTS.items() for key in row.prodkeys}
 
 
-def product_row(product: str) -> Product | None:
+def find_product(product: str) -> Product | None:
     # the product string is written differently per route ("SolarFlow 800 Pro" from the cloud, "solarFlow800Pro" locally)
     return PRODUCTS.get(product.lower().replace(" ", ""))
 
@@ -213,37 +214,23 @@ class ZendureDriver(Driver):
         if self.on_discovered is None or not sn or sn in self.devices:
             return
         product = product or PRODKEYS.get(prodkey.lower(), "")  # the cloud hands over a product key, never a product
-        if not (row := product_row(product)):
+        if not (row := find_product(product)):
             _LOGGER.warning("Zendure: skipping %s: unknown product %s", sn, product)
             return
         _LOGGER.info("Found Zendure device: %s (%s)", sn, product)
         ip = ip or self._ips.pop(sn, "") or self._ips.pop(device_id, "")  # an address mDNS saw before the cloud or the broker named the device
         self.on_discovered({"sn": sn, "product": product, "device_id": device_id, "prodkey": prodkey, "ip": ip, "blemac": blemac, "family": row.family})
 
-    def init_device(self, subentry_id: str, name: str, data: dict[str, Any]) -> EntityDevice | None:
-        """create a Zendure Device based on the product."""
-        if not (row := product_row(str(data.get("product", "")))):
-            return None
+    @classmethod
+    def product_row(cls, data: dict[str, Any]) -> Product | None:
+        return find_product(str(data.get("product", "")))  # the product string differs per route
 
-        if (old := self.devices.get(data["sn"])) is not None:
-            self.remove_device(old)
-
+    def build_device(self, subentry_id: str, name: str, data: dict[str, Any], row: Product) -> EntityDevice:
         # an address mDNS saw before the device was built; the coordinator writes it to the subentry right after the build
         if not data.get("ip") and (ip := self._ips.pop(data["sn"], None) or self._ips.pop(data.get("device_id", ""), None)):
             data = {**data, "ip": ip}
         powers = (row.pwr_max, row.pwr_min) if issubclass(row.cls, DistributionDevice) else ()
-        device = row.cls(self.hass, self, subentry_id, name, data, data["product"], *powers)
-        if isinstance(device, DistributionDevice):
-            self.distribution.devices.append(device)
-            device.on_invalidate = self.distribution.on_invalidate
-        self.devices[device.sn] = device
-        self._all_devices.append(device)
-        return device
-
-    @classmethod
-    def device_family(cls, data: dict[str, Any]) -> str | None:
-        row = product_row(str(data.get("product", "")))
-        return row.family if row else None
+        return row.cls(self.hass, self, subentry_id, name, data, data["product"], *powers)
 
     @classmethod
     def match_zeroconf(cls, info: Any) -> dict[str, Any] | None:
@@ -380,7 +367,7 @@ class ZendureDriver(Driver):
         _LOGGER.info("MQTT [%s] connected, rc=%s", userdata, rc)
         if userdata == ConnectionType.LOCAL:
             client.subscribe("/#")  # local broker: everything, discovery needs it
-        for d in self.devices.values():
+        for d in list(self.devices.values()):
             # without an MQTT address there is no topic to talk to; that device is steered over zenSDK
             if not d.device_key:
                 continue

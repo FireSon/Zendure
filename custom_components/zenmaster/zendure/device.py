@@ -6,7 +6,6 @@ import asyncio
 import json
 import logging
 import time
-from collections.abc import Callable
 from contextlib import suppress
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any
@@ -75,7 +74,6 @@ class ZendureDevice:
         self.model = model
         self.ip: str | None = data.get("ip") or None
         self.blemac: str = data.get("blemac") or ""
-        self.on_config_changed: Callable[[Any], None] | None = None  # the coordinator: persist subentry_data() after ip or blemac were learned
         sn = self.sn
         if (model.lower().startswith("solarflow") or "smart" in model.lower()) and len(sn) >= 4:
             self.ble_name: str | None = f"Zen{sn[0]}{sn[2]}{sn[3]}_{sn[-1]}"  # SolarFlow and smart meters
@@ -93,11 +91,6 @@ class ZendureDevice:
 
     def subentry_data(self) -> dict[str, Any]:
         return {"product": self.model, "sn": self.sn, "device_id": self.device_key, "prodkey": self.prodkey, "ip": self.ip or "", "blemac": self.blemac}
-
-    def config_changed(self) -> None:
-        # ip, blemac or a pack name were learned; the coordinator persists them
-        if self.on_config_changed is not None:
-            self.on_config_changed(self)
 
     def _ble_close(self) -> None:
         # the BLE link closed and forgotten, so the device's connection slot is free for the next attempt or another client

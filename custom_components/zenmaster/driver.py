@@ -40,16 +40,25 @@ class Driver:
     async def unload(self) -> None:
         """Every device closes its own connection in its unload."""
 
+    @classmethod
+    def product_row(cls, data: dict[str, Any]) -> Any:
+        # the brand's Product row for the product in the subentry data; None for an unknown product
+        return cls.PRODUCTS.get(str(data.get("product", "")))
+
+    def build_device(self, subentry_id: str, name: str, data: dict[str, Any], row: Any) -> EntityDevice:
+        # the brand's device class, called with the product row
+        return self.DEVICE(self.hass, self, subentry_id, name, data, row)
+
     def init_device(self, subentry_id: str, name: str, data: dict[str, Any]) -> EntityDevice | None:
         # an unknown product is skipped; a device built again replaces the old one
-        if not (row := self.PRODUCTS.get(str(data.get("product", "")))):
+        if not (row := self.product_row(data)):
             _LOGGER.warning("%s: skipping %s: unknown product %s", self.manufacturer, data.get("sn"), data.get("product"))
             return None
         if (old := self.devices.get(data["sn"])) is not None:
             self.remove_device(old)
 
         # a power device joins the fleet when it may be steered; every device is in the coordinator's list
-        device = self.DEVICE(self.hass, self, subentry_id, name, data, row)
+        device = self.build_device(subentry_id, name, data, row)
         if isinstance(device, DistributionDevice) and device.allow_control:
             self.distribution.devices.append(device)
             device.on_invalidate = self.distribution.on_invalidate
@@ -69,5 +78,5 @@ class Driver:
 
     @classmethod
     def device_family(cls, data: dict[str, Any]) -> str | None:
-        row = cls.PRODUCTS.get(str(data.get("product", "")))
+        row = cls.product_row(data)
         return row.family if row else None
