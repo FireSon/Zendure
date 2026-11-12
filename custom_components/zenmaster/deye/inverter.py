@@ -84,7 +84,7 @@ class DeyeInverter(DistributionDevice):
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, f"{self.sn}_meter")}, name=f"{name}_meter", manufacturer=driver.manufacturer, model="Meter")
         self.meter = DeyeMeter(hass, f"{self.sn}_meter", f"{name}_meter", subentry_id)
 
-        self.logger = Logger(self.ip, int(data.get("serial", self.sn)), self.port)  # the number in every V5 frame: what the stick reported when it was added, else the serial itself
+        self.logger = Logger(self.ip, int(self.sn) if self.sn.isdigit() else 0, self.port)  # a printed serial with letters is no V5 number: 0 lets the stick tell its own in its first answer
         self._silent = 0
         self._polls = 0
 

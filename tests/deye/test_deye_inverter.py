@@ -192,27 +192,19 @@ def test_individual_goes_through_every_tou_program(monkeypatch) -> None:
     asyncio.run(scenario())
 
 
-def test_identify_asks_the_stick_for_its_number(monkeypatch) -> None:
-    # a stick with letters in its printed serial: the number for the V5 frames comes from its own answer to the search text
-    import custom_components.zenmaster.deye.driver as driver_module
-
+def test_a_serial_with_letters_learns_the_number_from_the_stick(monkeypatch) -> None:
+    # the printed serial has letters: the first request goes out without a number, the answer carries the stick's own, and the next requests use it
     async def scenario() -> None:
-        class Stick(asyncio.DatagramProtocol):
-            def connection_made(self, transport) -> None:
-                self.transport = transport
-
-            def datagram_received(self, payload: bytes, address) -> None:
-                if payload == b"WIFIKIT-214028-READ":
-                    self.transport.sendto(f"127.0.0.1,D263299220D0,{SERIAL}".encode(), address)
-
-        transport, _ = await asyncio.get_running_loop().create_datagram_endpoint(Stick, local_addr=("127.0.0.1", 0))
-        monkeypatch.setattr(driver_module, "DISCOVERY_PORT", transport.get_extra_info("sockname")[1])
-        assert await DeyeDriver.identify(None, {"sn": "D263299220D0", "ip": "127.0.0.1"}) == {"serial": SERIAL}
-        transport.close()
-
-        # nothing listens any more: no answer is the error key the panel shows
-        monkeypatch.setattr(driver_module, "DISCOVERY_S", 0.3)
-        assert await DeyeDriver.identify(None, {"sn": "D263299220D0", "ip": "127.0.0.1"}) == "cannot_connect"
+        monkeypatch.setattr(inverter_module, "POLL_S", 0.01)
+        stick = FakeStick(dict(HV))
+        port = await stick.start()
+        hass = fake_hass()
+        hass.async_create_task = asyncio.get_running_loop().create_task  # unload hands back on a task of its own
+        driver = DeyeDriver(hass, "entry", [], types.SimpleNamespace(devices=[], on_invalidate=lambda: None))
+        d = driver.init_device("sub1", "Deye_D0", {"sn": "D263299220D0", "product": "HV", "ip": "127.0.0.1", "port": port, "kwh": 10.24})
+        assert await wait_for(lambda: len(stick.requests) >= 3)
+        assert stick.requests[0][1] == 0 and stick.requests[-1][1] == SERIAL and d.logger.serial == SERIAL and d.sn == "D263299220D0"
+        d.unload()
 
     asyncio.run(scenario())
 
