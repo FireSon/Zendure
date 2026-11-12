@@ -1011,8 +1011,7 @@
         "device_exists": "This device is already added",
         "unknown_product": "Unknown model",
         "cannot_connect": "No answer at this address",
-        "invalid_auth": "Wrong username or password",
-        "invalid_serial": "The serial number of the logger stick has digits only"
+        "invalid_auth": "Wrong username or password"
       }
     }
   }

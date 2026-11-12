@@ -1011,8 +1011,7 @@
         "device_exists": "Dit apparaat is al toegevoegd",
         "unknown_product": "Onbekend model",
         "cannot_connect": "Geen antwoord op dit adres",
-        "invalid_auth": "Gebruikersnaam of wachtwoord klopt niet",
-        "invalid_serial": "Het serienummer van de logger-stick bestaat alleen uit cijfers"
+        "invalid_auth": "Gebruikersnaam of wachtwoord klopt niet"
       }
     }
   }

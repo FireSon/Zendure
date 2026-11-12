@@ -68,7 +68,7 @@ class DeyeInverter(DistributionDevice):
 
     def __init__(self, hass: HomeAssistant, driver: DeyeDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
         self.driver = driver
-        self.sn: str = str(data["sn"])  # the identity: the serial of the logger stick, also in every V5 frame
+        self.sn: str = str(data["sn"])  # the identity: the serial printed on the logger stick, letters allowed
         self.model: str = data["product"]  # the battery type: LV or HV
         self.product = product
         self.ip: str = data["ip"]
@@ -84,7 +84,7 @@ class DeyeInverter(DistributionDevice):
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, f"{self.sn}_meter")}, name=f"{name}_meter", manufacturer=driver.manufacturer, model="Meter")
         self.meter = DeyeMeter(hass, f"{self.sn}_meter", f"{name}_meter", subentry_id)
 
-        self.logger = Logger(self.ip, int(self.sn), self.port)
+        self.logger = Logger(self.ip, int(data.get("serial", self.sn)), self.port)  # the number in every V5 frame: what the stick reported when it was added, else the serial itself
         self._silent = 0
         self._polls = 0
 

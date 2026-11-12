@@ -1011,8 +1011,7 @@
         "device_exists": "Dieses Gerät ist bereits hinzugefügt",
         "unknown_product": "Unbekanntes Modell",
         "cannot_connect": "Keine Antwort unter dieser Adresse",
-        "invalid_auth": "Benutzername oder Passwort falsch",
-        "invalid_serial": "Die Seriennummer des Logger-Sticks besteht nur aus Ziffern"
+        "invalid_auth": "Benutzername oder Passwort falsch"
       }
     }
   }
