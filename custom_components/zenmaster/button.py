@@ -1,4 +1,4 @@
-"""Button platform for the Zendure integration."""
+"""Button platform for the ZenMaster integration."""
 
 from __future__ import annotations
 
@@ -12,11 +12,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .entity import EntityDevice, HaEntity
 
 
-async def async_setup_entry(
-    _hass: HomeAssistant,
-    _config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the buttons."""
     HaButton.add = async_add_entities
 

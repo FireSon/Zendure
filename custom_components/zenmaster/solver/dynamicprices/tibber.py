@@ -28,12 +28,12 @@ query {
 
 
 class TibberProvider(Provider):
-    async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
-        buy, sell = await super().fetch(dynamicPrice, now)  # raw wholesale forecast in working copies
+    async def fetch(self, dynamic_price: DynamicPrice, now: datetime):
+        buy, sell = await super().fetch(dynamic_price, now)  # raw wholesale forecast in working copies
 
-        headers = {"Authorization": f"Bearer {dynamicPrice.access_token}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {dynamic_price.access_token}", "Content-Type": "application/json"}
         try:
-            session = async_get_clientsession(dynamicPrice.hass)  # HA's shared session, never closed here
+            session = async_get_clientsession(dynamic_price.hass)  # HA's shared session, never closed here
             async with session.post(_TIBBER_URL, json={"query": _QUERY}, headers=headers, timeout=_HTTP_TIMEOUT) as resp:
                 resp.raise_for_status()
                 payload = await resp.json()

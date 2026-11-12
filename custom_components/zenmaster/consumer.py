@@ -9,12 +9,24 @@ from functools import partial
 from homeassistant.const import EntityCategory
 
 from .button import HaButton
+from .config import ConfigField
 from .entity import EntityDevice
 from .number import HaNumber
 from .select import HaSelect
 from .sensor import HaSensor
 from .switch import HaSwitch
 from .time import HaTime
+
+# the fields every consumer shares: its identity in front, the manage switch, its phase and status at the end
+HEAD = [
+    ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True, hidden=True),
+    ConfigField("name", {"text": {}}),  # the subentry title: HA names the device and its entities after it
+]
+MANAGE = ConfigField("manage", {"boolean": {}}, section_key="behaviour")
+TAIL = [
+    ConfigField("phase", {"select": {"options": [{"value": "0", "label": "Alle fasen"}, {"value": "1", "label": "L1"}, {"value": "2", "label": "L2"}, {"value": "3", "label": "L3"}]}}, section_key="expert"),
+    ConfigField("state", {"entity": {}}, readonly=True),
+]
 
 
 class ConsumerDevice(EntityDevice):

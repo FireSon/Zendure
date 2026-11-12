@@ -85,7 +85,7 @@ def field_values(obj, fields) -> dict:
     # the object's persisted fields in the shape the forms store them: a select as its option string, no Nones
     out = {}
     for field in fields:
-        if field.cast is None or field.transient or field.is_key or (value := getattr(obj, field.id, None)) is None:
+        if not field.persisted or (value := getattr(obj, field.id, None)) is None:
             continue
         out[field.id] = str(int(value)) if "select" in field.selector and isinstance(value, int) else value
     return out
@@ -183,7 +183,13 @@ class Coordinator:
         for sid, sub in self.entry.subentries.items():
             if sid in built or (driver := self.drivers.get(sub.subentry_type)) is None:
                 continue
-            if (device := driver.init_device(sid, self.stable_name(sub), dict(sub.data))) is None:
+            # a device that cannot be built is skipped: one bad subentry must not keep the rest from starting
+            try:
+                device = driver.init_device(sid, self.stable_name(sub), dict(sub.data))
+            except Exception:
+                _LOGGER.exception("%s: %s not built", driver.manufacturer, sub.title)
+                continue
+            if device is None:
                 continue
             changed = True
             if isinstance(device, DistributionDevice):
@@ -205,7 +211,7 @@ class Coordinator:
         family = data.pop("family")
         taken = {s.title for s in self.entry.subentries.values()} | {d.name for d in self.devices}
         name = unique_name(family, sn, taken)
-        sub =ConfigSubentry(data=MappingProxyType(data), subentry_type=kind, title=name, unique_id=f"{kind}_{sn}")
+        sub = ConfigSubentry(data=MappingProxyType(data), subentry_type=kind, title=name, unique_id=f"{kind}_{sn}")
         self.hass.config_entries.async_add_subentry(self.entry, sub)
         return sub.subentry_id
 
@@ -306,17 +312,10 @@ class Coordinator:
                 consumer.id, consumer.name, consumer.hass, consumer.entry = sid, name, self.hass, self.entry
                 consumer.on_setting, consumer.on_action = self.setting_changed, self.consumer_command
                 for field in cls.CONFIG:
-                    if field.cast is not None and not field.transient and not field.is_key and field.id in sub.data:
+                    if field.persisted and field.id in sub.data:
                         setattr(consumer, field.id, read_field(consumer, field, sub.data[field.id]))
-                dr.async_get(self.hass).async_get_or_create(
-                    config_entry_id=self.entry_id,
-                    config_subentry_id=sid,
-                    identifiers={(DOMAIN, sid)},
-                    name=sub.title,
-                    manufacturer=PANEL_TITLE,
-                    model=cls.__name__,
-                    via_device_id=(zen.id if (zen := device_by_identifier(self.hass, PANEL_TITLE)) else None),  # the ZenMaster device
-                )
+                via = zen.id if (zen := device_by_identifier(self.hass, PANEL_TITLE)) else None  # the ZenMaster device
+                dr.async_get(self.hass).async_get_or_create(config_entry_id=self.entry_id, config_subentry_id=sid, identifiers={(DOMAIN, sid)}, name=sub.title, manufacturer=PANEL_TITLE, model=cls.__name__, via_device_id=via)
                 EntityDevice.__init__(consumer, self.hass, sid, name, subentry_id=sid)  # its own device: status, buttons and settings
                 consumer.device_load(self.config.section("devices", consumer.device_id))  # the settings as they stood before the restart
                 await consumer.restore(self.hass)
@@ -326,7 +325,7 @@ class Coordinator:
                 continue
             # hidden fields are state the consumer owns (armed, legionella_at): only the links follow the subentry
             for field in cls.CONFIG:
-                if field.cast is None or field.transient or field.is_key or field.hidden or field.id not in sub.data:
+                if not field.persisted or field.hidden or field.id not in sub.data:
                     continue
                 if getattr(consumer, field.id, None) != (value := read_field(consumer, field, sub.data[field.id])):
                     setattr(consumer, field.id, value)
@@ -379,7 +378,7 @@ class Coordinator:
         # Columns and rows are built once from the config, so a changed setting only lands after this runs.
         # init() clears the blackboard, so everything that lives there goes back right after. The entries register
         # their entity tracking in entry_config, so the registrations of the previous structure go first.
-        self.distribution.solver = self.prices.provider != "none"  # a dynamic price provider is what the solver needs
+        self.distribution.planning = self.prices.provider != "none"  # a dynamic price provider is what the solver needs
         for unsub in self._track_unsubs:
             unsub()
         self._track_unsubs.clear()
@@ -409,7 +408,7 @@ class Coordinator:
         async with self._solve_lock:
             if rebuild:
                 self.rebuild_solver()
-            if not self.distribution.solver:  # the solver is off: no plan, the fleet runs on its own control
+            if not self.distribution.planning:  # the solver is off: no plan, the fleet runs on its own control
                 return
             x = await self.solver.run(now or dt_util.now())
         if x is not None:

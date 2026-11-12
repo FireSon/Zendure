@@ -18,7 +18,9 @@ def _placement_lp(phase_limit: float = 17 / 3) -> LpSolver:
     lp.l1 = np.zeros(96)
     lp.l2 = np.zeros(96)
     lp.l3 = np.zeros(96)
+    lp.loads = [[lp.l1, lp.l2, lp.l3], [lp.l1], [lp.l2], [lp.l3]]
     lp.globals["phase_limit_kw"] = phase_limit
+    lp.limit = phase_limit
     lp.price_buy = SolverData("price_buy", "euro", data_size=108)
     return lp
 

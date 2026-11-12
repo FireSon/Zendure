@@ -51,6 +51,7 @@ export class ZmOverview extends LitElement {
   @state() private _pendingMode: string | null = null;  // the option just picked, until the entity confirms it
   @state() private _activeOnly = localStorage.getItem('zm-active-only') === '1';  // the device rows: all, or only the ones that are not offline; kept per browser like the tab
   @state() private _manage = false;  // the add and edit dialog is open
+  @state() private _manageSel = '';  // the device its pencil opened the dialog on
   @state() private _onboardName: string | null = null;
   @state() private _narrow = NARROW.matches;
   @state() private _day: string | null = null;  // the past day shown, null for the live plan
@@ -143,6 +144,10 @@ export class ZmOverview extends LitElement {
       .nm .n { display: flex; align-items: center; gap: 3px; min-width: 0; font-family: var(--zm-font-body); font-size: var(--zm-fs-m); font-weight: 800; color: var(--zm-text); }
       .nm .n a, .nm .n span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; text-underline-offset: 3px; }
       .nm .n a:hover { text-decoration: underline; color: #13967d; }
+      .edit { flex: none; width: 20px; height: 20px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 6px; background: transparent; color: var(--zm-text-faint); cursor: pointer; opacity: 0; }
+      .row:hover .edit, .edit:focus-visible { opacity: 1; }
+      .lbl:hover .edit, .edit:hover, .edit:focus-visible { color: #13967d; background: var(--zm-teal-soft); }
+      .narrow .edit { opacity: 1; }
       .nm .m .ph { flex: none; font-weight: 700; color: var(--zm-text-dim); }
       .nm .m { display: flex; align-items: center; gap: 5px; font-family: var(--zm-font-body); font-size: var(--zm-fs-s); font-weight: 700; color: var(--zm-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .nm .m i { flex: none; width: 7px; height: 7px; border-radius: 50%; }
@@ -242,18 +247,19 @@ export class ZmOverview extends LitElement {
     window.dispatchEvent(new CustomEvent('location-changed'));
   };
 
-  // the name links to the HA device; adding and editing go through the Toevoegen dialog
-  private _haName(name: string, eid: string) {
+  // the name links to the HA device; adding and editing go through the manage dialog, a device's pencil opens it on that device
+  private _haName(name: string, eid: string, id = '') {
     const href = this._haHref(eid);
     return html`
-      ${href ? html`<a href=${href} title=${t('ui.devices.open_ha', 'Open in Home Assistant')} @click=${this._go}>${name}</a>` : html`<span>${name}</span>`}`;
+      ${href ? html`<a href=${href} title=${t('ui.devices.open_ha', 'Open in Home Assistant')} @click=${this._go}>${name}</a>` : html`<span>${name}</span>`}
+      ${id ? html`<button class="edit" title=${t('ui.common.edit', 'Bewerken')} @click=${() => { this._manageSel = id; this._manage = true; }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"></path><path d="M13.5 6.5l4 4"></path></svg></button>` : nothing}`;
   }
 
   private _devRow(d: DevRow) {
     return html`
       <div class="row ${d.dim ? 'dim' : ''}">
         <div class="lbl">
-          <div class="nm"><div class="n">${this._haName(d.name, d.eid)}</div><div class="m"><i style="background:${d.dot}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
+          <div class="nm"><div class="n">${this._haName(d.name, d.eid, d.id)}</div><div class="m"><i style="background:${d.dot}"></i>${d.phase ? html`<span class="ph">${d.phase}</span>` : nothing}${d.model}</div></div>
           <div class="w" style="color:${d.wattColor}">${d.net > 0 ? '+' : ''}${d.net}<span class="u"> W</span></div>
           <div class="bat">${d.hasPack ? html`<i style="width:${d.socPct}%"></i>` : nothing}</div>
           ${this.view === 'plan' ? html`<div class="dpop">${this._devTiles(d)}</div>` : nothing}
@@ -372,11 +378,11 @@ export class ZmOverview extends LitElement {
           </div>`}
       </div></div>
       <div class="foot">
-        <button class="addbtn" @click=${() => (this._manage = true)}>+ ${t('ui.manage.add', 'Toevoegen')}</button>
+        <button class="addbtn" @click=${() => (this._manage = true)}>${t('ui.manage.open', 'Beheren')}</button>
         ${devs.length ? html`<button class="addbtn" @click=${() => { this._activeOnly = !this._activeOnly; localStorage.setItem('zm-active-only', this._activeOnly ? '1' : '0'); }}>${this._activeOnly ? t('ui.devices.show_all', 'Alle apparaten') : t('ui.devices.show_active', 'Actieve apparaten')}</button>` : nothing}
         ${ZendureBle.available() ? html`<button class="addbtn" title=${t('ui.ble.title', 'Apparaat koppelen via Bluetooth')} @click=${() => (this._onboardName = '')}>${t('ui.devices.pair', 'Koppelen')}</button>` : nothing}
       </div>
-      ${this._manage ? html`<zm-manage .config=${this.config} .schema=${this.schema} .add=${this.add} .hass=${this.hass} @close=${() => (this._manage = false)}></zm-manage>` : nothing}
+      ${this._manage ? html`<zm-manage .config=${this.config} .schema=${this.schema} .add=${this.add} .hass=${this.hass} .sel=${this._manageSel} @close=${() => { this._manage = false; this._manageSel = ''; }}></zm-manage>` : nothing}
       ${this._onboardName !== null
         ? html`<zm-ble-onboard .config=${this.config} .driverId=${Object.keys(byKind(this.config, 'ZendureDriver'))[0] ?? ''} .bleName=${this._onboardName} @close=${() => (this._onboardName = null)}></zm-ble-onboard>`
         : nothing}

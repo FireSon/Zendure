@@ -1,4 +1,4 @@
-"""Select platform for the Zendure integration."""
+"""Select platform for the ZenMaster integration."""
 
 from __future__ import annotations
 
@@ -13,11 +13,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .entity import EntityDevice, HaEntity
 
 
-async def async_setup_entry(
-    _hass: HomeAssistant,
-    _config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the selects."""
     HaSelect.add = async_add_entities
 
@@ -27,16 +23,7 @@ class HaSelect(SelectEntity, HaEntity):
 
     add: AddEntitiesCallback
 
-    def __init__(
-        self,
-        device: EntityDevice,
-        key: str,
-        options: dict[Any, str],
-        vendor_id: str | None = None,
-        on_changed: Callable | None = None,
-        restore: bool = False,
-        disabled: bool = False,
-    ) -> None:
+    def __init__(self, device: EntityDevice, key: str, options: dict[Any, str], vendor_id: str | None = None, on_changed: Callable | None = None, restore: bool = False, disabled: bool = False) -> None:
         super().__init__(device, key, vendor_id, disabled)
         self._options = options
         self._attr_options = list(options.values())

@@ -1002,6 +1002,7 @@
       "manage": {
         "title": "Add",
         "add": "Add",
+        "open": "Manage",
         "consumer": "Consumers",
         "device": "Devices",
         "solar": "Solar panels"
@@ -1010,7 +1011,8 @@
         "device_exists": "This device is already added",
         "unknown_product": "Unknown model",
         "cannot_connect": "No answer at this address",
-        "invalid_auth": "Wrong username or password"
+        "invalid_auth": "Wrong username or password",
+        "invalid_serial": "The serial number of the logger stick has digits only"
       }
     }
   }

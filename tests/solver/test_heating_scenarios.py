@@ -323,10 +323,10 @@ def test_a_setpoint_someone_else_changed_goes_back() -> None:
     # parked at 20, then someone sets 50: the next write puts 20 back; a setpoint that already holds is left alone
     h = _boiler()
     h.setpoint_entity, h.hass = "number.pw_setpoint_hot_water", _Hass("50")
-    h.setpoint(None)
+    h.write_setpoint(None)
     assert h.hass.calls == [("number", "set_value", 20.0)], "50 is not what EM wants, so 20 goes back"
     h.hass.value, h.hass.calls = "20.0", []
-    h.setpoint(None)
+    h.write_setpoint(None)
     assert h.hass.calls == [], "20 already holds, nothing is written"
 
 
@@ -413,8 +413,7 @@ def test_a_completed_disinfection_restarts_the_interval() -> None:
 
 def test_the_house_fit_finds_a_known_house_back(monkeypatch) -> None:
     # 200 days of a known house on a setpoint between 19 and 20.5 C that changes per day, off for two hours every night, with sensor noise
-    from homeassistant.components import recorder as rec
-    from homeassistant.helpers import aiohttp_client
+    from custom_components.zenmaster.solver import heating as mod
     ci, cm, him, ua, w, g, qi = 8.0, 12.5, 2.4, 0.18, 0.009, 0.006, 0.4
     rng, hours = np.random.default_rng(1), 200 * 24
     te = 6.0 + 6.0 * np.sin(np.arange(hours) / 24 / 30) + 3.0 * np.sin(np.arange(hours) * 2 * np.pi / 24)
@@ -443,8 +442,8 @@ def test_the_house_fit_finds_a_known_house_back(monkeypatch) -> None:
         async def __aexit__(self, *a):
             return False
 
-    monkeypatch.setattr(rec, "get_instance", lambda hass: _Rec())
-    monkeypatch.setattr(aiohttp_client, "async_get_clientsession", lambda hass: SimpleNamespace(get=lambda *a, **k: _Get()))
+    monkeypatch.setattr(mod, "get_instance", lambda hass: _Rec())
+    monkeypatch.setattr(mod, "async_get_clientsession", lambda hass: SimpleNamespace(get=lambda *a, **k: _Get()))
     hass = SimpleNamespace(states=SimpleNamespace(get=lambda eid: SimpleNamespace(state="0", attributes={"unit_of_measurement": "W"})))
     fit = asyncio.run(fit_house(hass, "power", "room", [], 52.0, 5.0))
     assert fit is not None

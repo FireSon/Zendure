@@ -11,8 +11,11 @@ from typing import TYPE_CHECKING, Any, Callable
 
 from homeassistant.core import HomeAssistant
 
-from .const import Phase
+from .const import Phase, PhaseModi
 from .entity import EntityDevice
+from .number import HaNumber
+from .select import HaSelect
+from .sensor import HaSensor
 
 if TYPE_CHECKING:
     from .distribution import DistributionMode
@@ -20,12 +23,10 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-DEADBAND_W = 20  # smallest power change worth a new command
 FLOOR_PCT = 0.10  # device floor as a fraction of rated power
 BAND_LOW_PCT = 0.30  # inverter band lower edge (the last/only active device may run below it)
 BAND_HIGH_PCT = 0.95  # inverter band upper edge
 REPORT_WAIT_S = 10.0  # a device awaiting the echo of its last command is left alone this long at most; one that stops reporting must not freeze the fleet
-HOLD_S = 2.0  # over the broker there is no echo of the limits: a device is left alone this long after a command (measured 2026-09-22: the setpoint is in after 1.1 to 2.4 s, nothing dropped at 2 s)
 
 
 class DeviceState(IntEnum):
@@ -92,6 +93,10 @@ class DistributionDevice(EntityDevice):
     """Generic contract only; the vendor implements the behavior and keeps every field and state truthful."""
 
     allow_control = True  # the fleet steers it; a brand whose control is not confirmed on a device leaves that to the user
+    POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
+    POWER_MAX_TIME = 10  # s: or this long after the command
+    HOLD_S = 2.0  # s a device is left alone after a command
+    DEADBAND_W = 10  # W: no new command while the measured power and the last setpoint are both this close to the new target
 
     def __init__(self, hass: HomeAssistant, device_id: str, profiles: list[PowerProfile], name: str | None = None, subentry_id: str | None = None) -> None:
         super().__init__(hass, device_id, name, subentry_id)
@@ -145,12 +150,24 @@ class DistributionDevice(EntityDevice):
             self.state = state
             self.state_since = time.time()
 
+    def new_setpoint(self, watts: int) -> bool:
+        # False inside the dead band; else the setpoint is published, so the recorder holds the command side too, and the caller sends it
+        if abs(self.power_actual - watts) < self.DEADBAND_W and abs(self.power_setpoint - watts) < self.DEADBAND_W:
+            return False
+        if self.power_setpoint != watts:
+            self.power_since = time.time()
+        self.setpoint.update_value(watts)
+        return True
+
+    def power_reached(self, now: float) -> bool:
+        # the command is in: the measured power is close to the setpoint, or it has had its time
+        return abs(self.power_actual - self.power_setpoint) < self.POWER_SET or now - self.state_since > self.POWER_MAX_TIME
+
 
 class PolledDevice(DistributionDevice):
     """A battery on a connection of its own: one loop sends a pending command first, else polls, and wakes at once on a new command."""
 
     POLL_S = 2.0  # s between two polls without a command
-    HOLD_S = 2.0  # s a device is left alone after a command
     RESEND_S = 30  # s before an accepted setpoint goes again, in case the device lost it
     OFFLINE_POLLS = 3  # failed polls before the device counts as offline
 
@@ -177,9 +194,38 @@ class PolledDevice(DistributionDevice):
         finally:
             await self.disconnect()
 
-    def config_changed(self) -> None:
-        if self.on_config_changed is not None:
-            self.on_config_changed(self)
+    def entity_create(self) -> None:
+        # the entities every polled battery has; a brand creates its own and then calls this
+        HaNumber(self, "individual", uom="W", minimum=-10000, maximum=10000, on_changed=lambda _entity, _value: None)  # the setpoint of the individual mode, EM's own: nothing goes to the device
+
+        HaSensor(self, "home_input", uom="W", device_class="power", state_class="measurement", aggr=True)
+        HaSensor(self, "home_output", uom="W", device_class="power", state_class="measurement", aggr=True)
+        HaSensor(self, "battery_input", uom="W", device_class="power", state_class="measurement", aggr=True)
+        HaSensor(self, "battery_output", uom="W", device_class="power", state_class="measurement", aggr=True)
+        self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
+        HaSelect(self, "power_phase", PhaseModi, on_changed=self.update_phase, restore=True)
+
+        self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
+        HaSensor(self, "rte", uom="%", state_class="measurement", precision=1)
+
+    def soc_changed(self, entity: Any, value: Any) -> None:
+        # soc_min and soc_max are ZenMaster's own limits, nothing goes to the device; the fleet order follows them
+        setattr(self, entity.attr, value)
+        if self.on_invalidate is not None:
+            self.on_invalidate()
+
+    def update_limits(self, values: dict[str, Any]) -> bool:
+        # the capacity and the power limits the device reports; True when one changed, so the caller reorders the fleet
+        changed = False
+        if values.get("kwh") and round(values["kwh"], 3) != self.kwh:
+            self.kwhsensor.update_value(round(values["kwh"], 3))
+            changed = True
+        for profile, key, sign in ((self.power_profile[0], "discharge_max", 1), (self.power_profile[1], "charge_max", -1)):
+            if (limit := int(values.get(key) or 0)) and sign * limit != profile.power:
+                profile.power = sign * limit
+                profile.__post_init__()  # floor and bands follow the new limit
+                changed = True
+        return changed
 
     def power(self, watts: int, mode: DistributionMode) -> int:
         watts = self.clamp(watts)
@@ -192,12 +238,8 @@ class PolledDevice(DistributionDevice):
         if watts == self.power_setpoint and self.state >= DeviceState.CONFIRM and time.time() - self.state_since < self.RESEND_S:
             return self.power_actual
 
-        # no new command while both the measured power and the last setpoint sit within 10 W of the new target
-        if abs(self.power_actual - watts) < 10 and abs(self.power_setpoint - watts) < 10:
+        if not self.new_setpoint(watts):
             return self.power_actual
-        if self.power_setpoint != watts:
-            self.power_since = time.time()
-        self.setpoint.update_value(watts)  # publish the setpoint we are about to send, so the recorder holds the command side too
         self._pending = ("power", watts)
         self._wake.set()
         self.set_state(DeviceState.SENT)  # SENT, CONFIRM once the device accepts it, ACTIVE once the power follows

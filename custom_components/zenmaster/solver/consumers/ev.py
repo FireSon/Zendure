@@ -6,32 +6,31 @@ from enum import IntEnum
 
 from ..solver import EntryStatus, LpSolver, SolverEntry
 from ...config import ConfigField
-from ...consumer import ConsumerDevice
-from ...const import Phase, watt_factor
+from ...consumer import HEAD, MANAGE, TAIL, ConsumerDevice
+from ...const import Phase, time_to_slot, watt_factor
 
-_CHARGER_MIN_KW = 4.2          # the wallbox cannot charge below this power
+_CHARGER_MIN_KW = 4.2  # the wallbox cannot charge below this power
 _STEP_S = 30  # Solar follows the surplus at most once per this many seconds
 
 
 class ChargeMode(IntEnum):
-    maximum = 1   # straight to max, ignores price and solar
+    maximum = 1  # straight to max, ignores price and solar
     ready_by = 2  # reach soc_target before departure, whatever the price
-    price = 3     # opportunistic up to ev_max while it pays, no deadline
-    solar = 4     # the solar surplus into the car, at least 4.2 kW
-    v2h = 5       # the car as house battery; not built yet, plans like price
+    price = 3  # opportunistic up to ev_max while it pays, no deadline
+    solar = 4  # the solar surplus into the car, at least 4.2 kW
+    v2h = 5  # the car as house battery; not built yet, plans like price
 
 
 class ElectricVehicle(SolverEntry, ConsumerDevice):
     # charge-only EV, planned deterministically while the cable is connected.
     # Fields without a cast are settings: entities on the device, kept by HA (see ConsumerDevice).
     CONFIG = [
-        ConfigField("id", {"text": {}}, cast=str, is_key=True, readonly=True, hidden=True),
-        ConfigField("name", {"text": {}}),  # the subentry title: HA names the device and its entities after it
+        *HEAD,
         ConfigField("charge_power_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("soc_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("connected_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("power_entity", {"entity": {}}, cast=str, required=False, section_key="link"),
-        ConfigField("manage", {"boolean": {}}, section_key="behaviour"),
+        MANAGE,
         ConfigField("departure_time", {"time": {}}, section_key="behaviour"),
         ConfigField("ev_charge_mode", {"select": {"options": [{"value": "1", "label": "Maximum"}, {"value": "2", "label": "Ready by"}, {"value": "3", "label": "Price"}, {"value": "4", "label": "Solar"}, {"value": "5", "label": "V2H"}]}}, section_key="behaviour"),
         ConfigField("ev_max_soc", {"number": {"mode": "box", "step": 0.1}}, section_key="behaviour"),
@@ -39,8 +38,7 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         ConfigField("charge_compensation_eur_kwh", {"number": {"mode": "box", "step": 0.01}}, section_key="behaviour"),
         ConfigField("capacity_kwh", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kWh"}}, section_key="expert"),
         ConfigField("max_power_kw", {"number": {"mode": "box", "step": 0.1, "unit_of_measurement": "kW"}}, section_key="expert"),
-        ConfigField("phase", {"select": {"options": [{"value": "0", "label": "Alle fasen"}, {"value": "1", "label": "L1"}, {"value": "2", "label": "L2"}, {"value": "3", "label": "L3"}]}}, section_key="expert"),
-        ConfigField("state", {"entity": {}}, readonly=True),
+        *TAIL,
     ]
 
     def __init__(self):
@@ -126,11 +124,8 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
             return
 
         now_slot = (now.hour * 60 + now.minute) // 15
-        try:
-            h, m = self.departure_time.split(":")[:2]  # "HH:MM", or "HH:MM:SS" the way HA's time entity keeps it
-            slots_until_departure = (int(h) * 4 + int(m) // 15 - now_slot) % 96 or 96
-        except (ValueError, AttributeError):
-            slots_until_departure = 96
+        # the quarters until departure; a full day when the time is not readable
+        slots_until_departure = 96 if (slot := time_to_slot(self.departure_time)) is None else (slot - now_slot) % 96 or 96
 
         # the solar left after the planned house load per quarter (kW), index 0 = slot 12
         surplus = [max(0.0, lp.solar.data[c] - sum(load[c - 12] for load in lp.loads[Phase.all])) for c in range(12, 12 + slots_until_departure)]
@@ -155,7 +150,7 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
                 kwh = lp.phase_room(self.phase, i - 12, max_kw if buy <= limit else min(max_kw, solar * (buy - sell) / (buy - limit)))
 
                 # wallbox cannot modulate below 4.2 kW
-                if kwh < _CHARGER_MIN_KW * 0.25:        
+                if kwh < _CHARGER_MIN_KW * 0.25:
                     return 0.0, buy
                 grid = max(0.0, kwh - solar)
                 price = ((kwh - grid) * sell + grid * buy) / kwh if kwh > 0 else buy

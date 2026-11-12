@@ -129,8 +129,6 @@ def test_the_button_hands_the_appliance_back() -> None:
 
 def test_the_rest_is_learned_from_history(monkeypatch) -> None:
     # four cycles, one with a 30-minute silence halfway: the rest becomes twice that silence
-    import homeassistant.components.recorder as rec
-    import homeassistant.components.recorder.statistics as recstats
     from custom_components.zenmaster.solver.consumers import appliance as mod
 
     quarters = []
@@ -145,8 +143,8 @@ def test_the_rest_is_learned_from_history(monkeypatch) -> None:
         async def async_add_executor_job(self, fn, *args):
             return {"sensor.dw_power": rows}
 
-    monkeypatch.setattr(rec, "get_instance", lambda hass: _Rec())
-    monkeypatch.setattr(recstats, "statistics_during_period", lambda *a, **k: None)
+    monkeypatch.setattr(mod, "get_instance", lambda hass: _Rec())
+    monkeypatch.setattr(mod, "statistics_during_period", lambda *a, **k: None)
 
     saved = {}
     d, h = _dw()

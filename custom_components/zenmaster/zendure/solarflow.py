@@ -18,7 +18,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from ..binary_sensor import HaBinarySensor
 from ..config import FLEET, IDENTITY, ConfigField
 from ..const import DOMAIN, PANEL_TITLE, PhaseModi
-from ..device import HOLD_S, REPORT_WAIT_S, DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
+from ..device import REPORT_WAIT_S,DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
 from ..entity import HaEntity
 from ..number import HaNumber
 from ..select import HaSelect
@@ -38,9 +38,6 @@ HTTP_HEADER = {"content-type": "application/json; charset=UTF-8"}
 HTTP_TIMEOUT = ClientTimeout(total=1)
 OFFLINE_TIMEOUT = 2400.0  # some devices report in bursts with more than a minute of silence in between
 STREAM_TIMEOUT = 60.0  # zenSDK is polled every 2 s and BLE pushes continuously: this long without a report is a lost device, not a burst
-POWER_SET = 40
-POWER_MAX_TIME = 10
-
 
 
 def _limits(watts: int) -> dict:
@@ -54,6 +51,8 @@ def _limits(watts: int) -> dict:
 
 class ZendureSolarFlow(ZendureDevice, DistributionDevice):
     """Zendure battery device with MQTT/HTTP/BLE communication."""
+
+    HOLD_S = 2.0  # over the broker there is no echo of the limits: a device is left alone this long after a command (measured 2026-09-22: the setpoint is in after 1.1 to 2.4 s, nothing dropped at 2 s)
 
     CONFIG = [
         *IDENTITY,
@@ -218,17 +217,14 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         # the device is busy with its last command: over ZenSDK until the report echoes the limits (REPORT_WAIT_S at most), over the broker HOLD_S
         since = time.time() - self.power_since
         if self.connection == ConnectionType.ZENSDK:
-            if (self.input_limit, self.output_limit) != ((expected := _limits(self.power_setpoint)["properties"])["inputLimit"], expected["outputLimit"]) and since < REPORT_WAIT_S:
+            expected = _limits(self.power_setpoint)["properties"]
+            if (self.input_limit, self.output_limit) != (expected["inputLimit"], expected["outputLimit"]) and since < REPORT_WAIT_S:
                 return self.power_actual
-        elif since < HOLD_S:
+        elif since < self.HOLD_S:
             return self.power_actual
 
-        # no new command while both the measured power and the last setpoint sit within 10 W of the new target
-        if abs(self.power_actual - watts) < 10 and abs(self.power_setpoint - watts) < 10:
+        if not self.new_setpoint(watts):
             return self.power_actual
-        if self.power_setpoint != watts:
-            self.power_since = time.time()
-        self.setpoint.update_value(watts)  # publish the setpoint we are about to send, so the recorder holds the command side too
         if self.connection in [ConnectionType.CLOUD, ConnectionType.LOCAL]:
             self.mqtt_power(watts)
         elif self.connection != ConnectionType.OFFLINE:
@@ -257,10 +253,10 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         self._msg_update = now
 
         # update the batteries
-        if batprops := payload.get("packData", None):
+        if batprops := payload.get("packData"):
             for bp in batprops:
                 if (sn := bp.pop("sn", None)) is not None:
-                    if (bat := self.batteries.get(sn, None)) is None:
+                    if (bat := self.batteries.get(sn)) is None:
                         bat = ZendureBattery._registry.get(sn) or ZendureBattery(self.hass, sn, self, bp.get("packType"))
                         self.batteries[sn] = bat
                         if (kwh := sum(b.kWh for b in self.batteries.values())) != self.kwh:
@@ -276,7 +272,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
 
             if k in ["outputHomePower", "gridInputPower"]:
                 self.power_actual = self.home_output - self.home_input
-                if self.grid_state != 0 and (abs(self.power_actual - self.power_setpoint) < POWER_SET or (now - self.state_since) > POWER_MAX_TIME):
+                if self.grid_state != 0 and self.power_reached(now):
                     self.set_state(DeviceState.ACTIVE)
             elif k == "inverseMaxPower":
                 self.power_profile[0].power = v  # the discharge limit as configured in the Zendure app
@@ -361,13 +357,13 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             if payload:
                 self._msg_id += 1
                 body = json.dumps({**payload, "sn": self.sn, "id": self._msg_id})
-                response = await session.post(f"http://{self.ip}/properties/write", data=body, headers=HTTP_HEADER, timeout=HTTP_TIMEOUT)
-                if response.status >= 400:
-                    _LOGGER.warning("ZENSDK write rejected for %s: HTTP %s %s", self.device_id, response.status, (await response.text())[:200])
+                async with session.post(f"http://{self.ip}/properties/write", data=body, headers=HTTP_HEADER, timeout=HTTP_TIMEOUT) as response:
+                    if response.status >= 400:
+                        _LOGGER.warning("ZENSDK write rejected for %s: HTTP %s %s", self.device_id, response.status, (await response.text())[:200])
 
             # get the properties; an answer puts the device on zenSDK, also one that came in over the broker
-            response = await session.get(f"http://{self.ip}/properties/report", headers=HTTP_HEADER, timeout=HTTP_TIMEOUT)
-            payload = json.loads(await response.text())
+            async with session.get(f"http://{self.ip}/properties/report", headers=HTTP_HEADER, timeout=HTTP_TIMEOUT) as response:
+                payload = json.loads(await response.text())
             self.update_properties(payload, time.time())
             self.connection = ConnectionType.ZENSDK
 

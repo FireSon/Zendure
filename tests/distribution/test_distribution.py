@@ -692,7 +692,7 @@ def _ranked(optimize: bool) -> tuple[list[FakeDevice], list[FakeDevice]]:
     # c planned now, a planned later, b not planned: discharging, with the score putting the fullest (b) first
     a, b, c = FakeDevice("a", 50.0), FakeDevice("b", 80.0), FakeDevice("c", 40.0)
     dist = make_distribution([a, b, c])
-    dist.solver, dist.optimize = True, optimize
+    dist.planning, dist.optimize = True, optimize
     dist.plan_rank = {False: {c: (0, -2.0), a: (1, 5.0)}, True: {}}
     dist.update_order()
     return [a, b, c], dist.profile[False].order
@@ -712,7 +712,7 @@ def test_a_standing_battery_starts_in_the_plan_order() -> None:
     # nothing runs yet and 600 W is asked: one battery starts, the planned one, not the fullest
     x, y = FakeDevice("x", 40.0), FakeDevice("y", 80.0)
     dist = make_distribution([x, y])
-    dist.solver = dist.optimize = True
+    dist.planning = dist.optimize = True
     dist.plan_rank = {False: {x: (0, -1.0)}, True: {}}
     dist.distribute_power(600, [x, y])
     assert x.power_setpoint == distribution_module.RANGE_MIN and y.power_setpoint == 0

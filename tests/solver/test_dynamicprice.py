@@ -89,13 +89,13 @@ def fake_session(payload, status=200):
     return lambda *a, **k: _Session(payload, status)
 
 
-async def _stub_base(self, dynamicPrice, now):
+async def _stub_base(self, dynamic_price, now):
     self.import_markup = 0.0
     self.energy_tax = 0.09
     self.vat = 21.0
     self.fixed_cost_per_day = 0.0
     self.zone = "NL"
-    self.tou = np.zeros(dynamicPrice.price_buy.data.size)  # no time-of-use grid fee in NL
+    self.tou = np.zeros(dynamic_price.price_buy.data.size)  # no time-of-use grid fee in NL
     self.last_fetch = now
     return np.full(SIZE, RAW), np.full(SIZE, RAW)
 
@@ -201,7 +201,7 @@ def test_zonneplan(monkeypatch):
              "price_tax_included": {"amount": (h + 1) / 100.0 * 1e7},  # the app sends whole numbers of 1e-7 euro
              "price_tax_excluded": {"amount": 0.05 * 1e7}} for h in range(24)]
 
-    async def fake_chart(self, dynamicPrice, chart):
+    async def fake_chart(self, dynamic_price, chart):
         return rows if chart == "electricity-quarter-hourly" else []
 
     monkeypatch.setattr(zonneplan.ZonneplanProvider, "_chart", fake_chart)

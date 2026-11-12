@@ -204,7 +204,7 @@ def test_unload_hands_back_a_device_under_control(monkeypatch) -> None:
 
 def test_silent_device_goes_offline_and_comes_back(monkeypatch) -> None:
     async def scenario() -> None:
-        monkeypatch.setattr(venus_module, "POWER_MAX_TIME", 0.3)
+        monkeypatch.setattr(venus_module.MarstekVenus, "POWER_MAX_TIME", 0.3)
         driver, d, fake = start(monkeypatch)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
         fake.down = True

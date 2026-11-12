@@ -12,21 +12,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from ..config import FLEET, IDENTITY, ConfigField
-from ..const import DOMAIN, PhaseModi
+from ..const import DOMAIN
 from ..device import DeviceState, PolledDevice, ProfileCharge, ProfileDischarge
 from ..number import HaNumber
-from ..select import HaSelect
 from ..sensor import HaSensor
 
 if TYPE_CHECKING:
-    from ..distribution import DistributionMode
     from .driver import Product, SessyDriver
 
 _LOGGER = logging.getLogger(__name__)
 
 SLOW_EVERY = 12  # the active strategy once per this many polls
-POWER_SET = 40  # W: the measured power is this close to the setpoint, the command is in
-POWER_MAX_TIME = 65  # s: or this long after the command; from standby a Sessy takes up to 60 s to start (Omnibattery discussion 129)
 TIMEOUT = aiohttp.ClientTimeout(total=10)
 API = "POWER_STRATEGY_API"  # the strategy in which the setpoint applies; on a lost network connection Sessy sets the setpoint to 0 itself (Sessy API docs)
 SOC_LIMIT = {"SYSTEM_STATE_BATTERY_FULL": 1, "SYSTEM_STATE_BATTERY_EMPTY": 2}  # system_state to the device's own verdict, like Zendure's socLimit
@@ -44,6 +40,7 @@ class SessyBattery(PolledDevice):
 
     POLL_S = 5.0  # power status every 5 s, like ha-sessy; the dongle's HTTP server seems fragile
     RESEND_S = 90  # s: an accepted setpoint goes again only after this long, past the start from standby; on a lost network the dongle resets it to 0 (Sessy API docs)
+    POWER_MAX_TIME = 65  # s: from standby a Sessy takes up to 60 s to start (Omnibattery discussion 129)
 
     CONFIG = [*IDENTITY, ConfigField("ip", {"text": {}}, cast=str), ConfigField("username", {"text": {}}, cast=str), ConfigField("password", {"text": {"type": "password"}}, cast=str), *FLEET, *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("system_state", "strategy_overridden"))]
 
@@ -54,7 +51,6 @@ class SessyBattery(PolledDevice):
         self.ip: str = data["ip"]
         self.username: str = data.get("username", "")
         self.password: str = data.get("password", "")
-        self.on_config_changed: Any = None
         self.home_input = self.home_output = self.battery_input = self.battery_output = 0
         self.strategy: str | None = data.get("strategy")  # the strategy before we took control, put back when we hand it back; kept in the subentry, the API offers no way to read it back after a crash
 
@@ -77,25 +73,9 @@ class SessyBattery(PolledDevice):
         HaNumber(self, "soc_min", uom="%", minimum=0, maximum=100, restore=True, on_changed=self.soc_changed)
         HaNumber(self, "soc_max", uom="%", minimum=0, maximum=100, restore=True, on_changed=self.soc_changed)
         HaSensor(self, "soc_limit", state_class="measurement")
-        HaNumber(self, "individual", uom="W", minimum=-10000, maximum=10000, on_changed=lambda _entity, _value: None)  # the setpoint of the individual mode, EM's own: nothing goes to the device
-
-        HaSensor(self, "home_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "home_output", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_output", uom="W", device_class="power", state_class="measurement", aggr=True)
-        self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
-        HaSelect(self, "power_phase", PhaseModi, on_changed=self.update_phase, restore=True)
         HaSensor(self, "system_state")
         HaSensor(self, "strategy_overridden")  # shown only: what sets it is not documented, a tester tells us before we steer on it
-
-        self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
-        HaSensor(self, "rte", uom="%", state_class="measurement", precision=1)
-
-    def soc_changed(self, entity: Any, value: Any) -> None:
-        # soc_min and soc_max are ZenMaster's own limits, nothing goes to the device; the fleet order follows them
-        setattr(self, entity.attr, value)
-        if self.on_invalidate is not None:
-            self.on_invalidate()
+        super().entity_create()
 
     async def get(self, path: str) -> dict[str, Any]:
         async with self.session.get(f"http://{self.ip}/api/v1/{path}") as response:
@@ -173,5 +153,5 @@ class SessyBattery(PolledDevice):
         # a battery that cannot follow is left out of the fleet until it can again
         if self.blocked:
             self.set_state(DeviceState.EXTERNAL)
-        elif abs(self.power_actual - self.power_setpoint) < POWER_SET or (time.time() - self.state_since) > POWER_MAX_TIME:
+        elif self.power_reached(time.time()):
             self.set_state(DeviceState.ACTIVE)

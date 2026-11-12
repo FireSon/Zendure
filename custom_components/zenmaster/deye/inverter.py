@@ -74,7 +74,6 @@ class DeyeInverter(DistributionDevice):
         self.ip: str = data["ip"]
         self.port = int(data.get("port") or PORT)
         self.allow_control: bool = bool(data.get("allow_control"))  # off by default: the control is not confirmed on a device
-        self.on_config_changed: Any = None  # the coordinator: persist subentry_data(); nothing is learned over the stick
 
         # the registry entry first: the entities find their device there; the power profile follows from its own maximum currents at the first poll
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, self.sn)}, name=name, manufacturer=driver.manufacturer, model=f"Hybrid ({self.model})")
@@ -111,10 +110,6 @@ class DeyeInverter(DistributionDevice):
 
     def subentry_data(self) -> dict[str, Any]:
         return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "kwh": self.kwh, "saved": self.saved, "allow_control": self.allow_control}
-
-    def config_changed(self) -> None:
-        if self.on_config_changed is not None:
-            self.on_config_changed(self)
 
     def power(self, watts: int, mode: DistributionMode) -> int:
         watts = self.clamp(watts)

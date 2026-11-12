@@ -12,14 +12,15 @@ from homeassistant.components import persistent_notification
 
 import numpy as np
 from aiohttp import ClientError, ClientTimeout
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.statistics import statistics_during_period
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .solver import LpSolver, SolverEntry
 from ..config import ConfigField
-from ..const import DOMAIN
+from ..const import DOMAIN, OPEN_METEO_URL, PANEL_TITLE, stat_to_time
 
 _LOGGER = logging.getLogger(__name__)
-_OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 _EPEX_URL = "https://epexpredictor.batzill.com/prices_short"  # EpexPredictor (b3nn0): indicative 7-day curve
 _HTTP_TIMEOUT = ClientTimeout(total=15)
 _FIT_WINDOWS = (10, 14, 21)  # candidate rolling fit windows in days; the best recent scorer wins
@@ -40,6 +41,11 @@ def _offpeak_spans(text: str) -> list[tuple[int, int]] | None:
     # off-peak ranges as a French bill writes them ("22h00-6h00", "23h30 à 7h30", "2h-7h ; 14h-17h"): every two times are one range, in minutes
     times = [int(h) * 60 + int(m or 0) for h, m in re.findall(r"(\d{1,2})(?:\s*[:hH]\s*(\d{2})?)?", text)]
     return list(zip(times[::2], times[1::2])) if times and len(times) % 2 == 0 and max(times) < 1440 else None
+
+
+def _optional_float(v) -> float | None:
+    # an empty card field is no override
+    return float(v) if v not in (None, "") else None
 
 
 # the providers whose price is wholesale spot plus a tariff offset; the manual offset overrides only apply to these
@@ -70,14 +76,14 @@ class DynamicPrice(SolverEntry):
             {"value": "smartenergy", "label": "smartENERGY (AT)"},
         ]}}, cast=str),
         ConfigField("saldering", {"boolean": {}}, cast=bool),
-        ConfigField("import_markup", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"provider": _SPOT_PROVIDERS}),
-        ConfigField("fixed_cost_per_day", {"number": {"step": 0.01, "unit_of_measurement": "EUR/dag"}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"provider": _SPOT_PROVIDERS}),
+        ConfigField("import_markup", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=_optional_float, required=False, visible_when={"provider": _SPOT_PROVIDERS}),
+        ConfigField("fixed_cost_per_day", {"number": {"step": 0.01, "unit_of_measurement": "EUR/dag"}}, cast=_optional_float, required=False, visible_when={"provider": _SPOT_PROVIDERS}),
         ConfigField("country", {"text": {}}, cast=str, required=False, readonly=True, hidden=True),
-        ConfigField("grid_fee", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"country": ["BE", "DE", "AT"]}),
+        ConfigField("grid_fee", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=_optional_float, required=False, visible_when={"country": ["BE", "DE", "AT"]}),
         ConfigField("offpeak_hours", {"text": {}}, cast=str, required=False, visible_when={"country": ["FR"]}),
         ConfigField("offpeak_hours_summer", {"text": {}}, cast=str, required=False, visible_when={"country": ["FR"]}),
-        ConfigField("export_factor", {"number": {"step": 0.001}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"country": ["DE", "FR", "AT"]}),
-        ConfigField("export_markup", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=lambda v: float(v) if v not in (None, "") else None, required=False, visible_when={"country": ["DE", "FR", "AT"]}),
+        ConfigField("export_factor", {"number": {"step": 0.001}}, cast=_optional_float, required=False, visible_when={"country": ["DE", "FR", "AT"]}),
+        ConfigField("export_markup", {"number": {"step": 0.001, "unit_of_measurement": "EUR/kWh"}}, cast=_optional_float, required=False, visible_when={"country": ["DE", "FR", "AT"]}),
         ConfigField("email", {"text": {}}, cast=str, required=False, visible_when={"provider": ["ZonneplanProvider", "FrankProvider"]}),
         ConfigField("password", {"text": {"type": "password"}}, cast=str, required=False, transient=True, visible_when={"provider": ["FrankProvider"]}),
         ConfigField("access_token", {"text": {"type": "password"}}, cast=str, required=False, visible_when={"provider": ["TibberProvider"]}),
@@ -151,12 +157,12 @@ class DynamicPrice(SolverEntry):
             await provider.submit_otp(self, otp.strip())
         except ProviderError as err:
             _LOGGER.warning("price authorisation: %s", err)
-            persistent_notification.async_create(hass, f"Koppelen mislukt: {err}", "ZenMaster", f"{DOMAIN}_auth")
+            persistent_notification.async_create(hass, f"Linking failed: {err}", PANEL_TITLE, f"{DOMAIN}_auth")
             return
         self.needcode = False
         await self._store(hass)
         _LOGGER.info("price authorisation: token received")
-        persistent_notification.async_create(hass, f"{type(provider).__name__.removesuffix('Provider')} is gekoppeld.", "ZenMaster", f"{DOMAIN}_auth")
+        persistent_notification.async_create(hass, f"{type(provider).__name__.removesuffix('Provider')} is linked.", PANEL_TITLE, f"{DOMAIN}_auth")
         await self._refresh(datetime.now().astimezone())  # pull the prices now, not at the next tick
 
     async def request_code(self, hass) -> bool:
@@ -171,11 +177,11 @@ class DynamicPrice(SolverEntry):
         except ProviderError as err:
             _LOGGER.warning("price authorisation: %s", err)
             await self._store(hass)
-            persistent_notification.async_create(hass, f"Code aanvragen mislukt: {err}", "ZenMaster", f"{DOMAIN}_auth")
+            persistent_notification.async_create(hass, f"Requesting a code failed: {err}", PANEL_TITLE, f"{DOMAIN}_auth")
             return False
         self.needcode = True
         await self._store(hass)
-        persistent_notification.async_create(hass, "Zonneplan heeft een code gemaild. Vul die in en sla op.", "ZenMaster", f"{DOMAIN}_auth")
+        persistent_notification.async_create(hass, f"{type(provider).__name__.removesuffix('Provider')} mailed a code. Enter it and save.", PANEL_TITLE, f"{DOMAIN}_auth")
         return True
 
     async def _store(self, hass) -> None:
@@ -203,6 +209,7 @@ class DynamicPrice(SolverEntry):
         self.price_buy.known = self.price_sell.known = self._provider.known_until  # the outlook dashes the prices past this point
         self._provider.last_fetch = now
 
+
 class Provider:
     def __init__(self):
         # buy = (spot * import_factor + import_markup + energy_tax + tou) * (1 + vat/100), energy_tax incl. the grid fee
@@ -222,7 +229,7 @@ class Provider:
         self._weather = {}  # hour timestamp -> (irradiance, wind), covers history and the tail
         self._tz = None  # local zone of the fit, so the tail uses the same hour-of-day
 
-    def init(self, dynamicPrice: DynamicPrice):
+    def init(self, dynamic_price: DynamicPrice):
         pass
 
     def extend_tail(self, wholesale: np.ndarray, tail: int, base_ts: int, key: str = "sell") -> None:
@@ -288,29 +295,29 @@ class Provider:
             w = (i + 1) / (_JUNCTION_SLOTS + 1)
             wholesale[tail + i] = last * (1 - w) + float(wholesale[tail + i]) * w
 
-    async def fit_shape_model(self, dynamicPrice: DynamicPrice, now: datetime) -> None:
+    async def fit_shape_model(self, dynamic_price: DynamicPrice, now: datetime) -> None:
         # Fit every published price series on its own recorded history: price ~ hour-of-day + weekend +
         # solar + wind. Of the candidate windows the one with the lowest error on the most recent days
         # wins, so the length follows the season. Net metering, a market-linked export tariff and a
         # fixed one all follow from the recorded data, so there is no branch per provider here.
         self._coef, self._weather, self._tz = {}, {}, now.tzinfo
-        if dynamicPrice.hass is None or now.tzinfo is None:
+        if dynamic_price.hass is None or now.tzinfo is None:
             return
-        ids = dynamicPrice.price_entities
+        ids = dynamic_price.price_entities
         if not ids:
             return
         # the hourly price history of every series, long enough for the longest window plus the score days
         span = max(_FIT_WINDOWS) + _FIT_SCORE_DAYS
-        if not (history := await self.price_history(dynamicPrice, now, span, ids)):
+        if not (history := await self.price_history(dynamic_price, now, span, ids)):
             _LOGGER.info("price shape model: not enough history yet, keeping the day-shape method")
             return
 
-        params = {"latitude": dynamicPrice.lat, "longitude": dynamicPrice.lon, "timezone": "UTC",
+        params = {"latitude": dynamic_price.lat, "longitude": dynamic_price.lon, "timezone": "UTC",
                   "hourly": "direct_normal_irradiance,diffuse_radiation,wind_speed_10m",
                   "past_days": span + 1, "forecast_days": 8}
         try:
-            session = async_get_clientsession(dynamicPrice.hass)  # HA's shared session, never closed here
-            async with session.get(_OPEN_METEO_URL, params=params, timeout=ClientTimeout(total=40)) as resp:
+            session = async_get_clientsession(dynamic_price.hass)  # HA's shared session, never closed here
+            async with session.get(OPEN_METEO_URL,params=params, timeout=ClientTimeout(total=40)) as resp:
                 resp.raise_for_status()
                 hourly = (await resp.json())["hourly"]
         except (ClientError, asyncio.TimeoutError, KeyError) as err:
@@ -323,13 +330,10 @@ class Provider:
             self._weather[ts] = (dni + dhi, hourly["wind_speed_10m"][i] or 0.0)
         self.fit_windows(history, now)
 
-    async def price_history(self, dynamicPrice: DynamicPrice, now: datetime, span: int, ids: dict) -> dict:
+    async def price_history(self, dynamic_price: DynamicPrice, now: datetime, span: int, ids: dict) -> dict:
         # per series its hourly means over the span, keyed on the hour; a series with too few hours is left out
-        from homeassistant.components.recorder import get_instance
-        from homeassistant.components.recorder.statistics import statistics_during_period
-
-        stats = await get_instance(dynamicPrice.hass).async_add_executor_job(
-            statistics_during_period, dynamicPrice.hass, now - timedelta(days=span), now, set(ids.values()), "hour", None, {"mean"}
+        stats = await get_instance(dynamic_price.hass).async_add_executor_job(
+            statistics_during_period, dynamic_price.hass, now - timedelta(days=span), now, set(ids.values()), "hour", None, {"mean"}
         )
         history = {}
         for key, entity in ids.items():
@@ -338,7 +342,7 @@ class Provider:
                 mean, st = row.get("mean"), row.get("start")
                 if mean is None or st is None:
                     continue
-                ts = int(st if isinstance(st, (int, float)) else st.timestamp())
+                ts = int(stat_to_time(st).timestamp())
                 hours[ts // 3600 * 3600] = float(mean)
             if len(hours) >= _FIT_MIN_HOURS:
                 history[key] = hours
@@ -389,18 +393,18 @@ class Provider:
         # the buy tail already carries the level the provider derived; give it its own fitted shape
         self.extend_tail(buy, tail, base_ts, "buy")
 
-    async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
+    async def fetch(self, dynamic_price: DynamicPrice, now: datetime):
         # read the tariff information for this provider
-        _TARIFFS_PATH = os.path.join(os.path.dirname(__file__), "dynamicprices", "tariffs.json")
-        _TARIFFS = json.loads(await asyncio.get_running_loop().run_in_executor(None, Path(_TARIFFS_PATH).read_text, "utf-8"))
+        tariffs_path = os.path.join(os.path.dirname(__file__), "dynamicprices", "tariffs.json")
+        tariffs = json.loads(await asyncio.get_running_loop().run_in_executor(None, Path(tariffs_path).read_text, "utf-8"))
 
         # look up settings by HA country code + provider name (strip "Provider"), case-insensitive; fall back to wholesale
-        country = dynamicPrice.country
-        land = next((v for k, v in _TARIFFS.items() if k.casefold() == country.casefold()), None) or _TARIFFS["NL"]
-        name = dynamicPrice.provider.removesuffix("Provider").casefold()
+        country = dynamic_price.country
+        land = next((v for k, v in tariffs.items() if k.casefold() == country.casefold()), None) or tariffs["NL"]
+        name = dynamic_price.provider.removesuffix("Provider").casefold()
         entry = next((v for k, v in land["providers"].items() if k.casefold() == name), None) or land["providers"]["wholesale"]
         # a value on the card wins over the supplier's, the supplier's over the country's
-        pick = lambda key, default=0.0: v if (v := getattr(dynamicPrice, key, None)) is not None else entry.get(key, land.get(key, default))
+        pick = lambda key, default=0.0: v if (v := getattr(dynamic_price, key, None)) is not None else entry.get(key, land.get(key, default))
         self.energy_tax = land["energy_tax"] + pick("grid_fee")
         self.vat = land["vat"]
         self.zone = land["wholesale_zone"]
@@ -411,21 +415,21 @@ class Provider:
         self.export_markup = pick("export_markup")
         self.publish = time.fromisoformat(land.get("publish", "13:00"))
 
-        await self.fit_shape_model(dynamicPrice, now)
+        await self.fit_shape_model(dynamic_price, now)
 
         # fetch EpexPredictor's indicative 7-day wholesale curve, from now
-        size = dynamicPrice.price_buy.data.size
+        size = dynamic_price.price_buy.data.size
         params = {"country": country, "surcharge": 0, "taxPercent": 0, "evaluation": "false",
                   "unit": "EUR_PER_KWH", "hourly": "false", "hours": size // 4, "timezone": "UTC"}
         try:
-            session = async_get_clientsession(dynamicPrice.hass)  # HA's shared session, never closed here
+            session = async_get_clientsession(dynamic_price.hass)  # HA's shared session, never closed here
             async with session.get(_EPEX_URL, params=params, timeout=_HTTP_TIMEOUT) as resp:
                 resp.raise_for_status()
                 d = await resp.json(content_type=None)
         except (ClientError, asyncio.TimeoutError, KeyError) as err:
             raise ProviderError(f"EpexPredictor fetch failed: {err}") from err
         # the raw EpexPredictor wholesale price in working copies of buy and sell; the provider turns buy into an all-in price
-        buy, sell = dynamicPrice.price_buy.data.copy(), dynamicPrice.price_sell.data.copy()
+        buy, sell = dynamic_price.price_buy.data.copy(), dynamic_price.price_sell.data.copy()
         base = int(now.timestamp()) // 900 * 900 - 12 * 900  # slot 12 = current quarter (12 history slots before now)
         for ts, val in zip(d.get("s") or [], d.get("t") or []):
             idx = (int(ts) - base) // 900
@@ -437,7 +441,7 @@ class Provider:
         if tou := land.get("grid_tou"):
             # the address's off-peak hours for winter and summer; unreadable input falls back to the country default with a warning
             spans = []
-            for text in (dynamicPrice.offpeak_hours, dynamicPrice.offpeak_hours_summer or dynamicPrice.offpeak_hours):
+            for text in (dynamic_price.offpeak_hours, dynamic_price.offpeak_hours_summer or dynamic_price.offpeak_hours):
                 if (found := _offpeak_spans(text or tou["offpeak"])) is None:
                     _LOGGER.warning("Off-peak hours %r are not readable, using %s", text, tou["offpeak"])
                 spans.append(found or _offpeak_spans(tou["offpeak"]))

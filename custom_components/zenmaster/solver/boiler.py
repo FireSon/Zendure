@@ -5,10 +5,13 @@ import time
 from datetime import date, datetime, timedelta
 
 import numpy as np
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder.history import state_changes_during_period
 
-from .heating import Heating, _AMBIENT, _AMBIENT_ENTITY, _BAND, _LINK, _MANAGE, _MAX_POWER, _TANK_K, _TAIL, _VOLUME
+from .heating import Heating, _AMBIENT, _AMBIENT_ENTITY, _BAND, _LINK, _MAX_POWER, _TANK_K, _VOLUME
 from .solver import Action, EntryStatus, LpSolver
 from ..config import ConfigField
+from ..consumer import MANAGE, TAIL
 from ..const import Phase, watt_factor
 
 # the tank as ten layers, the coil heating the bottom one; the sensor height as a fraction of the tank
@@ -39,7 +42,7 @@ class BoilerHeatPump(Heating):
     CONFIG = [*_LINK, ConfigField("setpoint_entity", {"entity": {"filter": [{"domain": "number", "device_class": "temperature"}]}}, cast=str, required=False, section_key="link"),
               ConfigField("bottom_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "temperature"}]}}, cast=str, required=False, section_key="link"),
               ConfigField("top_entity", {"entity": {"filter": [{"domain": "sensor", "device_class": "temperature"}]}}, cast=str, required=False, section_key="link"),
-              _MANAGE, *_BAND, _AMBIENT, _AMBIENT_ENTITY,
+              MANAGE, *_BAND, _AMBIENT, _AMBIENT_ENTITY,
               ConfigField("legionella", {"boolean": {}}, section_key="behaviour"),
               ConfigField("legionella_days", {"number": {"mode": "box", "step": 1}}, section_key="behaviour"),
               ConfigField("legionella_band", {"number": {"mode": "box", "step": 1}}, section_key="behaviour"),
@@ -48,7 +51,7 @@ class BoilerHeatPump(Heating):
               ConfigField("nights_from", {"number": {}}, cast=float, required=False, hidden=True),
               ConfigField("layers", {"text": {}}, cast=list, required=False, hidden=True),
               ConfigField("sensor_height", {"select": {"options": [{"value": "onder", "label": "Onder"}, {"value": "midden", "label": "Midden"}, {"value": "boven", "label": "Boven"}]}}, section_key="plate"),
-              _MAX_POWER, _VOLUME, *_TAIL]
+              _MAX_POWER, _VOLUME, *TAIL]
 
     def __init__(self) -> None:
         super().__init__()
@@ -95,7 +98,7 @@ class BoilerHeatPump(Heating):
     def release(self) -> None:
         # hands the tank back to its own thermostat: no run in progress, setpoint parked
         self._target, self._fill = 0.0, 0.0
-        self.setpoint(None)
+        self.write_setpoint(None)
 
     def entry_config(self, lp: LpSolver) -> None:
         # the phase from the config, the power column, and the sensors the tank and the model follow
@@ -114,7 +117,7 @@ class BoilerHeatPump(Heating):
     def on_top(self, degrees: float) -> None:
         self._top = degrees
 
-    def setpoint(self, degrees: float | None) -> None:
+    def write_setpoint(self, degrees: float | None) -> None:
         # write the setpoint: a temperature to run for, None to park it at the entity minimum and stop
         if not self.setpoint_entity or self.hass is None:
             return
@@ -159,7 +162,7 @@ class BoilerHeatPump(Heating):
             self._target = 0.0
             self.data.data[13:] = 0.0  # done: the rest of the block leaves the plan, so a restart or the next quarter does not take it up again
             self.status = EntryStatus.none
-            self.setpoint(None)
+            self.write_setpoint(None)
 
     def cop_at(self, degrees: float, outside):
         # what the unit makes of one kWh: the standard curve at the level measured on this unit
@@ -302,7 +305,7 @@ class BoilerHeatPump(Heating):
         self.on_temp(self._temp0)
 
         # the target itself goes to the unit, so the unit stops there too; what it actually draws back onto its phase
-        self.setpoint(self._target if self._target else None)
+        self.write_setpoint(self._target if self._target else None)
         self.status = EntryStatus.running if self._target else EntryStatus.none
         self.data.data[12] = self._meter[0] / 1000.0
 
@@ -336,7 +339,7 @@ class BoilerHeatPump(Heating):
 
 class BoilerElectric(Heating):
     # domestic hot water from a resistive element: every kWh in is a kWh of heat
-    CONFIG = [*_LINK, _MANAGE, *_BAND, _AMBIENT, _MAX_POWER, _VOLUME, *_TAIL]
+    CONFIG = [*_LINK, MANAGE, *_BAND, _AMBIENT, _MAX_POWER, _VOLUME, *TAIL]
 
     def __init__(self) -> None:
         super().__init__()
@@ -369,9 +372,6 @@ def curve(outside, water):
 
 async def fit_nights(hass, elec_id: str, temp_ids: list, amb_id: str, ambient: float, now: datetime, since: float = 0.0, phase: Phase = Phase.all) -> list:
     # tau per sensor from the nights of the last ten days since the boiler came: the drop from 1 to 6 with the unit off, against the room, the median over the nights
-    from homeassistant.components.recorder import get_instance
-    from homeassistant.components.recorder.history import state_changes_during_period
-
     if not hass or not elec_id:
         return [None] * len(temp_ids)
     start = now - timedelta(days=_NIGHTS + 1)

@@ -1,4 +1,4 @@
-"""Sensor platform for the Zendure integration."""
+"""Sensor platform for the ZenMaster integration."""
 
 from __future__ import annotations
 
@@ -17,11 +17,7 @@ AGGREGATE_MAX_GAP_S = 300.0  # longer telemetry gaps are not integrated: the dev
 AGGREGATE_PUSH_S = 60.0  # the counter integrates every telemetry tick but pushes to HA at most this often
 
 
-async def async_setup_entry(
-    _hass: HomeAssistant,
-    _config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
+async def async_setup_entry(_hass: HomeAssistant, _config_entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Set up the sensors."""
     HaSensor.add = async_add_entities
 
@@ -31,22 +27,7 @@ class HaSensor(SensorEntity, HaEntity):
 
     add: AddEntitiesCallback
 
-    def __init__(
-        self,
-        device: EntityDevice,
-        key: str,
-        vendor_id: str | None = None,
-        *,
-        uom: str | None = None,
-        device_class: str | None = None,
-        state_class: str | None = None,
-        precision: int | None = None,
-        icon: str | None = None,
-        aggr: bool = False,
-        convert: Callable[[Any], Any] | None = None,
-        disabled: bool = False,
-        restore: bool = False,
-    ) -> None:
+    def __init__(self, device: EntityDevice, key: str, vendor_id: str | None = None, *, uom: str | None = None, device_class: str | None = None, state_class: str | None = None, precision: int | None = None, icon: str | None = None, aggr: bool = False, convert: Callable[[Any], Any] | None = None, disabled: bool = False, restore: bool = False) -> None:
         super().__init__(device, key, vendor_id, disabled)
         self._attr_suggested_display_precision = precision
         self._convert = convert

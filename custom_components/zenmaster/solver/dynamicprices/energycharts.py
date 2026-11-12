@@ -14,12 +14,12 @@ _HTTP_TIMEOUT = ClientTimeout(total=5)
 
 
 class EnergyChartsProvider(Provider):
-    async def fetch(self, dynamicPrice: DynamicPrice, now: datetime):
-        buy, sell = await super().fetch(dynamicPrice, now)  # raw wholesale forecast in working copies
+    async def fetch(self, dynamic_price: DynamicPrice, now: datetime):
+        buy, sell = await super().fetch(dynamic_price, now)  # raw wholesale forecast in working copies
 
         params = {"bzn": self.zone, "start": now.date().isoformat(), "end": (now.date() + timedelta(days=1)).isoformat()}
         try:
-            session = async_get_clientsession(dynamicPrice.hass)  # HA's shared session, never closed here
+            session = async_get_clientsession(dynamic_price.hass)  # HA's shared session, never closed here
             async with session.get(_URL, params=params, timeout=_HTTP_TIMEOUT) as resp:
                 resp.raise_for_status()
                 data = await resp.json(content_type=None)
@@ -30,13 +30,13 @@ class EnergyChartsProvider(Provider):
         markup, vat = self.import_markup + self.energy_tax, 1 + self.vat / 100.0
         us = data.get("unix_seconds") or []
         pr = data.get("price") or []
-        step = (us[1] - us[0]) // 900 if len(us) > 1 else 4   # quarters per point (4 = hourly, 1 = quarter-hourly)
+        step = (us[1] - us[0]) // 900 if len(us) > 1 else 4  # quarters per point (4 = hourly, 1 = quarter-hourly)
         base = int(now.timestamp()) // 900 * 900 - 12 * 900  # slot 12 = the quarter containing now
         tail = 12
         for ts, p in zip(us, pr):
             if p is None:
                 continue
-            w = float(p) / 1000.0   # EUR/MWh -> EUR/kWh
+            w = float(p) / 1000.0  # EUR/MWh -> EUR/kWh
             idx = (int(ts) - base) // 900
             for q in range(step):
                 slot = idx + q
