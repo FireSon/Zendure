@@ -72,6 +72,10 @@ class Logger:
             self.close()
             raise OSError(f"logger {self.ip}: {err!r}") from err
 
+        # a stick asked without a number tells its own in the answer; every next request carries it (the way ha-solarman learns it)
+        if not self.serial:
+            self.serial = struct.unpack("<I", reply[7:11])[0]
+
         # the RTU frame sits after the 25-byte header of an answer; slave and CRC come off, function code and data stay
         modbus = reply[25:-2]
         if len(modbus) < 5 or crc16(modbus[:-2]) != struct.unpack("<H", modbus[-2:])[0]:
