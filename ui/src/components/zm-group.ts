@@ -42,6 +42,8 @@ export class ZmGroup extends LitElement {
 
   private _isEnum(f: Field) { return !!f.selector?.select; }
   private _isSecret(f: Field) { return f.selector?.text?.type === 'password'; }
+  // a select's options as {value, label}: HA also allows plain strings, as the device add forms send them
+  private _options(f: Field) { return (f.selector.select?.options ?? []).map((o: any) => (typeof o === 'string' ? { value: o, label: o } : o)); }
 
   private _fieldValue(fid: string): unknown {
     return this._editing ? this._draft[fid] : readValue(this.config, this.fields.find((f) => f.id === fid)?.entry ?? this.entry, { id: fid } as Field);
@@ -220,7 +222,7 @@ export class ZmGroup extends LitElement {
       return html`<span class="ro">${v == null || v === '' ? '-' : '••••••••'}</span>`;
     }
     if (this._isEnum(f)) {
-      const opt = (f.selector.select?.options ?? []).find((o) => o.value === String(v));
+      const opt = this._options(f).find((o) => o.value === String(v));
       return html`<span class="ro" style="text-align:left">${opt ? t(`option.${f.id}.${opt.value}`, opt.label) : (v == null ? '-' : String(v))}</span>`;
     }
     if (f.selector?.device) {
@@ -248,7 +250,7 @@ export class ZmGroup extends LitElement {
       return html`<label class="sw"><input type="checkbox" .checked=${v === true} @change=${(e: Event) => this._set(f.id, (e.target as HTMLInputElement).checked)} /><span class="track"></span><span class="knob"></span></label>`;
     }
     if (this._isEnum(f)) {
-      return html`<select class="zin" @change=${(e: Event) => this._set(f.id, (e.target as HTMLSelectElement).value)}>${(f.selector.select?.options ?? []).map((o) => html`<option value=${o.value} ?selected=${String(v) === o.value}>${t(`option.${f.id}.${o.value}`, o.label)}</option>`)}</select>`;
+      return html`<select class="zin" @change=${(e: Event) => this._set(f.id, (e.target as HTMLSelectElement).value)}>${this._options(f).map((o) => html`<option value=${o.value} ?selected=${String(v) === o.value}>${t(`option.${f.id}.${o.value}`, o.label)}</option>`)}</select>`;
     }
     const num = f.selector?.number;
     if (num) {

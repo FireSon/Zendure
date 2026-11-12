@@ -240,6 +240,18 @@ class HeatingHeatPump(Heating):
         self.ci, self.cm, self.him, self.ua, self.q_int = 8.0, 12.5, 2.4, 0.2, 0.4  # a typical house until the calibration has fitted this one
         self.control_entity = ""  # the number or climate the plan of each quarter is written to
         self.control = "temperature"
+        self._written = None  # the plan's last value on control_entity
+
+    def entry_config(self, lp: LpSolver) -> None:
+        super().entry_config(lp)
+        # the device back after a restart gets the plan of this quarter at once, not at the next quarter
+        lp.track(self.control_entity, lambda _state: self._send(lp.hass, self._written) if self._written is not None else None, back=True)
+
+    def _send(self, hass, value: float) -> None:
+        # the value to the number or climate: a climate takes it as its target temperature
+        domain = self.control_entity.split(".")[0]
+        service, key = ("set_temperature", "temperature") if domain == "climate" else ("set_value", "value")
+        hass.async_create_task(hass.services.async_call(domain, service, {"entity_id": self.control_entity, key: value}, blocking=False))
 
     async def entry_prerun(self, lp: LpSolver, now: datetime) -> None:
         # the setpoint from its entity when one is linked (a climate's target, otherwise its state), else the number on the device
@@ -274,9 +286,8 @@ class HeatingHeatPump(Heating):
             step = a.get("step") or a.get("target_temp_step") or 0.5
             value = round(round(value / step) * step, 3)
             value = min(max(value, a.get("min", a.get("min_temp", value))), a.get("max", a.get("max_temp", value)))
-            domain = self.control_entity.split(".")[0]
-            service, key = ("set_temperature", "temperature") if domain == "climate" else ("set_value", "value")
-            lp.hass.async_create_task(lp.hass.services.async_call(domain, service, {"entity_id": self.control_entity, key: value}, blocking=False))
+            self._written = value
+            self._send(lp.hass, value)
         super().entry_postrun(lp)
 
     async def calibrate(self, lp: LpSolver, now: datetime) -> None:

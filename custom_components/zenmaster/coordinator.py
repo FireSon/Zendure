@@ -456,7 +456,7 @@ class Coordinator:
             self.persist_consumer(c)
         await self.config.save()
 
-    def track(self, entity_id: str, callback: Callable[[float], None], factor: float | None = None, phase: Phase = Phase.all, keep: bool = False) -> None:
+    def track(self, entity_id: str, callback: Callable[[float], None], factor: float | None = None, phase: Phase = Phase.all, keep: bool = False, back: bool = False) -> None:
         # the coordinator owns every entity-event registration; parses the state to float (x factor) so the caller only implements the value handler.
         # Without a factor the unit decides: kW becomes watts, and a current is converted with the voltage that follows from the phase.
         # keep: for the life of the coordinator (the P1 meter); otherwise until the next rebuild, like the entries that ask for it.
@@ -467,6 +467,11 @@ class Coordinator:
         def handler(event: Event) -> None:
             new = event.data.get("new_state")
             if new is None:
+                return
+            # back: only the first state after unavailable, the moment a device returns from a restart
+            if back:
+                if (old := event.data.get("old_state")) is not None and old.state == "unavailable" and new.state != "unavailable":
+                    callback(new.state)
                 return
             try:
                 value = float(new.state) * factor

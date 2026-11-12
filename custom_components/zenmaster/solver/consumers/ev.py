@@ -60,6 +60,7 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         self.ev_charge_mode = ChargeMode.price
         self._stepped = 0.0  # when on_surplus last wrote the charger
         self._written_kw = 0.0  # the last power written: the car's draw, since the cloud power lags
+        self._surplus_sum, self._surplus_count = 0.0, 0  # the surplus readings since the last step
 
     @property
     def charge_target(self) -> float:
@@ -84,13 +85,19 @@ class ElectricVehicle(SolverEntry, ConsumerDevice):
         # Solar follows the live surplus of the distribution within the quarter
         if (distribution := lp.globals.get("price_device")) is not None:
             lp.track(distribution.entities["surplus"].entity_id, self.on_surplus)
+        # the charger back after its restart gets the plan of this quarter at once
+        lp.track(self.charge_power_entity, lambda _state: self.hass.async_create_task(self._write(self.ev_power.data[12])), back=True)
 
     def on_surplus(self, watts: float) -> None:
-        # Solar in a planned quarter: the car takes its draw plus the surplus, at least 4.2 kW, at most once per 30 s
-        if self.ev_charge_mode is not ChargeMode.solar or self.ev_power.data[12] <= 0 or not self.charge_power_entity or time.time() - self._stepped < _STEP_S:
+        # Solar in a planned quarter: every 30 s the car takes its draw plus the mean surplus of those 30 s, at least 4.2 kW
+        if self.ev_charge_mode is not ChargeMode.solar or self.ev_power.data[12] <= 0 or not self.charge_power_entity:
             return
-        self._stepped = time.time()
-        self.hass.async_create_task(self._write(max(_CHARGER_MIN_KW, min(self.max_power_kw, self._written_kw + watts / 1000))))
+        self._surplus_sum, self._surplus_count = self._surplus_sum + watts, self._surplus_count + 1
+        if time.time() - self._stepped < _STEP_S:
+            return
+        mean = self._surplus_sum / self._surplus_count
+        self._stepped, self._surplus_sum, self._surplus_count = time.time(), 0.0, 0
+        self.hass.async_create_task(self._write(max(_CHARGER_MIN_KW, min(self.max_power_kw, self._written_kw + mean / 1000))))
 
     async def apply_power(self) -> None:
         # the planned charge power for this quarter
