@@ -717,6 +717,10 @@
         "name": "Pause button",
         "description": "The appliance's own pause button; Release is then its resume button."
       },
+      "status_entity": {
+        "name": "Operation state",
+        "description": "Optional: the appliance's own status. When it reads pause, the program is armed and resumed in the cheapest window."
+      },
       "duration_entity": {
         "name": "Program duration",
         "description": "Optional: the appliance's own estimate of the selected program's length. The learned cycle is stretched or shortened to it; without a value the learned cycle is used."

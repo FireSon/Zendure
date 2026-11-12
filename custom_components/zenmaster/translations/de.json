@@ -717,6 +717,10 @@
         "name": "Pausetaste",
         "description": "Die eigene Pausetaste des Geräts; Freigabe ist dann die Fortsetzen-Taste."
       },
+      "status_entity": {
+        "name": "Betriebszustand",
+        "description": "Optional: der eigene Status des Geräts. Steht er auf pause, wird das Programm bereitgestellt und im günstigsten Zeitfenster fortgesetzt."
+      },
       "duration_entity": {
         "name": "Programmdauer",
         "description": "Optional: die eigene Schätzung des Geräts für die Dauer des gewählten Programms. Der gelernte Zyklus wird darauf gestreckt oder gekürzt; ohne Wert gilt der gelernte Zyklus."
