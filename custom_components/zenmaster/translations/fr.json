@@ -1011,8 +1011,7 @@
         "device_exists": "Cet appareil est déjà ajouté",
         "unknown_product": "Modèle inconnu",
         "cannot_connect": "Aucune réponse à cette adresse",
-        "invalid_auth": "Nom d'utilisateur ou mot de passe incorrect",
-        "invalid_serial": "Le numéro de série du stick logger ne contient que des chiffres"
+        "invalid_auth": "Nom d'utilisateur ou mot de passe incorrect"
       }
     }
   }
