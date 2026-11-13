@@ -135,12 +135,12 @@ def test_lv_packs_become_devices_and_give_the_kwh(monkeypatch) -> None:
         packs = {0x2712: 2}
         for n, sn in enumerate(("PACK0001", "PACK0002")):
             base = 0x2730 + n * 0x26
-            packs |= {base + i: ord(sn[2 * i]) << 8 | ord(sn[2 * i + 1]) for i in range(4)} | {base + 0x08: 530, base + 0x09: -58 & 0xFFFF, base + 0x0F: 978, base + 0x12: 1000, base + 0x16: 3315, base + 0x18: 504}
+            packs |= {base + i: ord(sn[2 * i]) << 8 | ord(sn[2 * i + 1]) for i in range(4)} | {base + 0x08: 530, base + 0x09: -58 & 0xFFFF, base + 0x0A: 1135, base + 0x0F: 978, base + 0x12: 1000, base + 0x16: 3315, base + 0x18: 504}
         energy = {0x0208: 355, 0x0209: 58, 0x020A: 12377, 0x020C: 3985, 0x0211: 54, 0x0216: 4270, 0x0256: 2301, 0x0261: 5002}
         d, stick, _driver, _distribution = await start(monkeypatch, {0x0000: 0x0005, 0x024B: 5230} | packs | energy, product="")
         assert await wait_for(lambda: len(d.packs) == 2 and d.kwh == 10.24)
         pack = d.packs["PACK0001"]
-        assert (value(pack, "voltage"), value(pack, "current"), value(pack, "soc"), value(pack, "capacity"), value(pack, "cell_max"), value(pack, "cycles")) == (53.0, -5.8, 97.8, 100.0, 3.315, 504)
+        assert (value(pack, "voltage"), value(pack, "current"), value(pack, "temp"), value(pack, "soc"), value(pack, "capacity"), value(pack, "cell_max"), value(pack, "cycles")) == (53.0, -5.8, 13.5, 97.8, 100.0, 3.315, 504)
         assert [value(d.meter, k) for k in ("import_today", "export_today", "import_total", "export_total", "voltage_l1", "frequency")] == [35.5, 5.8, 1237.7, 398.5, 230.1, 50.02]
         assert (value(d, "pv_today"), value(d, "pv_total"), d.model) == (5.4, 427.0, "LV")
         d.unload()

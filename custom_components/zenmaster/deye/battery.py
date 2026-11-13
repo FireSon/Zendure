@@ -33,11 +33,11 @@ class DeyeBattery(EntityDevice):
         HaSensor(self, "cell_min", uom="V", device_class="voltage", state_class="measurement", precision=3)
 
     def update(self, r: list[int]) -> None:
-        # one pack block, offsets from its serial: tenths, a signed current, millivolt cells
+        # one pack block, offsets from its serial: tenths, a signed current, the temperature 1000 up like the inverter's, millivolt cells
         self.ah = r[0x12] / 10
         self.entity_update("voltage", r[0x08] / 10)
         self.entity_update("current", decode([r[0x09]], "int16") / 10)
-        self.entity_update("temp", r[0x0A] / 10)
+        self.entity_update("temp", (r[0x0A] - 1000) / 10)
         self.entity_update("soc", r[0x0F] / 10)
         self.entity_update("soh", r[0x10] / 10)
         self.entity_update("capacity", self.ah)
