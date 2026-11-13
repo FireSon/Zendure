@@ -241,16 +241,16 @@ def test_individual_steers_the_battery_currents(monkeypatch) -> None:
         # its power profile: 120 A and 100 A at 401.2 V would give 48100 and 40100 W, its rated 12 kW caps both
         assert (d.power_profile[0].power, d.power_profile[1].power) == (12000, -12000)
 
-        # discharge 1500 W: on its own CT, the discharge current 1500 W over 401.2 V is 4 A, the program powers and max sell power its own, the SOC floor, the Sell bit kept
+        # discharge 1500 W: Export First, the discharge current 1500 W over 401.2 V is 4 A, max sell power up to the setpoint (150 at the HV scale), the program powers its own, the SOC floor, the Sell bit kept
         d.power(1500, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (2, 4, 100, 0, 100)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (0, 4, 100, 0, 150)
         assert [stick.registers[a] for a in POWERS] == [30] * 6 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
 
-        # charge 2000 W from the grid: 2000 W over 401.2 V is 5 A, no discharge, the SOC target, the grid bit next to the Sell bit
+        # charge 2000 W from the grid: on its own CT, 2000 W over 401.2 V is 5 A, no discharge, the SOC target, the grid bit next to the Sell bit
         d.power(-2000, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.sent == (-2000, DistributionMode.INDIVIDUAL)) and stick.registers[GRID_CHARGE_A] == 5
-        assert (stick.registers[GRID_CHARGE], stick.registers[DISCHARGE_A]) == (1, 0) and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
+        assert (stick.registers[WORK_MODE], stick.registers[GRID_CHARGE], stick.registers[DISCHARGE_A]) == (2, 1, 0) and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
         d.power_off()
         d.unload()
         stick.server.close()
@@ -265,13 +265,13 @@ def test_a_hand_back_the_inverter_does_not_take_keeps_its_saved_settings(monkeyp
         stick.refused = set(POWERS[3:])
         assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
         d.power(1500, DistributionMode.INDIVIDUAL)
-        assert await wait_for(lambda: d.sent == (1500, DistributionMode.INDIVIDUAL)) and stick.registers[WORK_MODE] == 2
+        assert await wait_for(lambda: d.sent == (1500, DistributionMode.INDIVIDUAL)) and stick.registers[WORK_MODE] == 0
 
         # the hand back is acknowledged but the work mode does not take it: what we saved stays, so a next control cannot save our own values
         stick.ignored = {WORK_MODE}
         d.power_off()
         await asyncio.sleep(0.3)
-        assert d.saved[WORK_MODE] == 1 and stick.registers[WORK_MODE] == 2
+        assert d.saved[WORK_MODE] == 1 and stick.registers[WORK_MODE] == 0
 
         # once it takes it, the hand back is done and the saved settings go
         stick.ignored = set()
