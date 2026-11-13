@@ -267,7 +267,8 @@ export class ZmGroup extends LitElement {
   // entity id. It is shown live and written straight through the entity's service, in read and edit mode alike.
   private _live(f: Field): { eid: string; st: any } | null {
     const v = readValue(this.config, this.entry, f);
-    if (typeof v !== 'string' || !/^(switch|number|select|time)\./.test(v)) return null;
+    // a link field (entity selector) holds an entity id to pick, never a live setting of the device
+    if (f.selector?.entity || typeof v !== 'string' || !/^(switch|number|select|time)\./.test(v)) return null;
     return { eid: v, st: this.hass?.states?.[v] };
   }
 
