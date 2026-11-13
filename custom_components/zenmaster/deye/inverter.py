@@ -43,7 +43,7 @@ WRITES = (CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, WORK_MODE, SELL_POW
 CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (WORK_MODE, 5), (POWERS[0], 24))  # the blocks that hold them
 ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
 RATED = 0x0014  # the inverter's rated AC power, 0.1 W in two words, low word first
-ENERGY = (0x0208, 0x0218 - 0x0208)  # the grid import and export and the production, today and in total
+ENERGY = (0x0202, 0x0218 - 0x0202)  # the battery charge and discharge, the grid import and export and the production, today and in total
 SLOW = ((TEMP, 1), (WORK_MODE, 1), (CHARGE_A, 2), (RATED, 2), ENERGY)  # temperature, work mode, its own maximum charge and discharge current, its rated power, the energy counters
 
 # the device type, as ha-solarman tells the families apart: only the three-phase hybrids of the deye_p3 profile are read and steered
@@ -159,6 +159,8 @@ class DeyeInverter(DistributionDevice):
         self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
         HaSensor(self, "pv_today", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
         HaSensor(self, "pv_total", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
+        HaSensor(self, "battery_charge_total", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
+        HaSensor(self, "battery_discharge_total", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
 
     async def device_loop(self) -> None:
         while True:
@@ -302,6 +304,8 @@ class DeyeInverter(DistributionDevice):
             self.meter.entity_update("export_total", total(0x020C))
             self.entity_update("pv_today", r[0x0211] / 10)
             self.entity_update("pv_total", total(0x0216))
+            self.entity_update("battery_charge_total", total(0x0204))
+            self.entity_update("battery_discharge_total", total(0x0206))
 
     def update_status(self, r: dict[int, int]) -> None:
         # the battery; its power positive for discharge, as ha-solarman's battery state reads it
