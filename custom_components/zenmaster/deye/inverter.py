@@ -82,7 +82,7 @@ class DeyeInverter(DistributionDevice):
         ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False),
         ConfigField("allow_control", {"boolean": {}}, cast=bool),
         ConfigField("kwh", {"number": {"step": 0.1, "unit_of_measurement": "kWh"}}, cast=float, readonly=True),
-        *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("soc", "battery_voltage", "battery_input", "battery_output", "pv_power", "temp", "work_mode")),
+        *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("soc", "battery_voltage", "battery_input", "battery_output", "pv_power", "temp", "work_mode", "home_input", "home_output", "home_input_aggr", "home_output_aggr", "solar")),
     ]
 
     def __init__(self, hass: HomeAssistant, driver: DeyeDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
@@ -151,9 +151,11 @@ class DeyeInverter(DistributionDevice):
     def entity_create(self) -> None:
         HaSensor(self, "soc", uom="%", device_class="battery", state_class="measurement")
         HaSensor(self, "battery_voltage", uom="V", device_class="voltage", state_class="measurement", precision=1)
-        HaSensor(self, "battery_input", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "battery_output", uom="W", device_class="power", state_class="measurement", aggr=True)
-        HaSensor(self, "pv_power", uom="W", device_class="power", state_class="measurement")
+        # the panel reads every battery on the same keys: the battery power is this inverter's home side, its PV its solar
+        HaSensor(self, "battery_input", "home_input", uom="W", device_class="power", state_class="measurement", aggr=True)
+        HaSensor(self, "battery_output", "home_output", uom="W", device_class="power", state_class="measurement", aggr=True)
+        HaSensor(self, "pv_power", "solar", uom="W", device_class="power", state_class="measurement")
+        self.entities["home_input_aggr"], self.entities["home_output_aggr"] = self.entities["battery_input_aggr"], self.entities["battery_output_aggr"]
         HaSensor(self, "temp", uom="°C", device_class="temperature", state_class="measurement", precision=1)
         HaSensor(self, "work_mode")
         self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)

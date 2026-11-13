@@ -106,6 +106,8 @@ def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
         # the HV scales: 0.1 V and 10 W per raw unit; each phase from its signed low word, the total their sum
         assert (d.soc, d.kwh, d.temp, d.power_actual) == (63, 10.24, 25.3, -1500)
         assert (value(d, "battery_voltage"), value(d, "battery_input"), value(d, "battery_output"), value(d, "pv_power")) == (401.2, 1500, 0, 2000)
+        # the same entities on the keys the panel reads for every battery
+        assert (value(d, "home_input"), value(d, "home_output"), value(d, "solar")) == (1500, 0, 2000) and d.entities["home_input_aggr"] is d.entities["battery_input_aggr"]
         assert [value(d.meter, key) for key in ("phase1_power", "phase2_power", "phase3_power", "grid_power")] == [-300, 500, 2000, 2200]
         assert value(d, "work_mode") == 2
 
