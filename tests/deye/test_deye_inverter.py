@@ -34,6 +34,7 @@ class FakeStick:
         self.registers = registers
         self.requests: list[tuple[int, int]] = []
         self.refused: set[int] = set()  # registers it answers with a Modbus exception
+        self.ignored: set[int] = set()  # registers whose write it acknowledges but does not take, like an inverter that does not apply it (yet)
 
     async def start(self) -> int:
         self.server = await asyncio.start_server(self.serve, "127.0.0.1", 0)
@@ -52,7 +53,8 @@ class FakeStick:
                 if address in self.refused:
                     answer = bytes([1, func | 0x80, 2])
                 elif func == 0x10:
-                    self.registers[address] = struct.unpack(">H", rtu[7:9])[0]
+                    if address not in self.ignored:
+                        self.registers[address] = struct.unpack(">H", rtu[7:9])[0]
                     answer = bytes([1, 0x10]) + struct.pack(">HH", address, count)
                 else:
                     answer = bytes([1, 0x03, 2 * count]) + struct.pack(f">{count}H", *(self.registers.get(address + i, 0) for i in range(count)))
@@ -250,6 +252,31 @@ def test_individual_steers_the_battery_currents(monkeypatch) -> None:
         assert await wait_for(lambda: d.sent == (-2000, DistributionMode.INDIVIDUAL)) and stick.registers[GRID_CHARGE_A] == 5
         assert (stick.registers[GRID_CHARGE], stick.registers[DISCHARGE_A]) == (1, 0) and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
         d.power_off()
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_a_hand_back_the_inverter_does_not_take_keeps_its_saved_settings(monkeypatch) -> None:
+    async def scenario() -> None:
+        # its own settings: Zero Export To Load, 120 A discharge; programs 4-6 refuse a write over Modbus, so they never hold a hand back up
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, WORK_MODE: 1})
+        stick.refused = set(POWERS[3:])
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
+        d.power(1500, DistributionMode.INDIVIDUAL)
+        assert await wait_for(lambda: d.sent == (1500, DistributionMode.INDIVIDUAL)) and stick.registers[WORK_MODE] == 2
+
+        # the hand back is acknowledged but the work mode does not take it: what we saved stays, so a next control cannot save our own values
+        stick.ignored = {WORK_MODE}
+        d.power_off()
+        await asyncio.sleep(0.3)
+        assert d.saved[WORK_MODE] == 1 and stick.registers[WORK_MODE] == 2
+
+        # once it takes it, the hand back is done and the saved settings go
+        stick.ignored = set()
+        assert await wait_for(lambda: not d.saved)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A]) == (1, 120)
         d.unload()
         stick.server.close()
 

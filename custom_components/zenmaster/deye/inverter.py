@@ -114,6 +114,7 @@ class DeyeInverter(DistributionDevice):
         self.battery_voltage = 0.0  # V, the entity writes it: a grid charge current is W over this
         self.saved: dict[int, int] = {int(address): value for address, value in data.get("saved", {}).items()}
         self.written: dict[int, int] = {}
+        self.refused: set[int] = set()  # registers this inverter refuses to write: they keep its own value, a hand back does not wait for them
         self.request: tuple[int, DistributionMode] | None = None
         self.sent: tuple[int, DistributionMode] | None = None
         self.device_task = asyncio.get_running_loop().create_task(self.device_loop())
@@ -182,10 +183,7 @@ class DeyeInverter(DistributionDevice):
         try:
             # the inverter's own settings, read once before the first write
             if not self.saved:
-                saved: dict[int, int] = {}
-                for start, count in CONTROL:
-                    saved.update(zip(range(start, start + count), await self.logger.read(start, count)))
-                self.saved = saved
+                self.saved = await self.read_control()
                 self.config_changed()
 
             # per mode what it wants: a setpoint through the battery currents on its own CT (the TOU power is no hard limit), at rest both currents closed, SMART_* on its own CT with one current closed
@@ -216,6 +214,10 @@ class DeyeInverter(DistributionDevice):
                 if self.written.get(address) != value:
                     await self.write(address, value)
                     self.written[address] = value
+
+            # what the inverter holds now next to what we asked, so a test compares both with what it does
+            held = await self.read_control()
+            _LOGGER.info("Deye %s: %s %d W, asked %s, holds %s", self.name, mode.name, watts, wanted, {a: held[a] for a in wanted})
         except OSError as err:
             _LOGGER.warning("Deye %s: settings not written (%s)", self.name, err)
             return
@@ -225,21 +227,34 @@ class DeyeInverter(DistributionDevice):
         self.set_state(DeviceState.ACTIVE if setpoint or mode == DistributionMode.OFF else DeviceState.EXTERNAL)
 
     async def restore(self) -> None:
-        # hand back: every register we may have changed gets the inverter's own value again; a failure tries again next round
+        # hand back: every register we may have changed gets the inverter's own value again; only a read back that shows them all clears what we saved,
+        # else the next round tries again, so a new control can never take our own values for the inverter's
         try:
             for address in WRITES:
                 await self.write(address, self.saved[address])
+            back = await self.read_control()
         except OSError as err:
             _LOGGER.warning("Deye %s: hand back failed (%s)", self.name, err)
             return
+        if differ := [a for a in WRITES if a not in self.refused and back[a] != self.saved[a]]:
+            _LOGGER.warning("Deye %s: hand back not taken yet for %s, again next round", self.name, ", ".join(f"0x{a:04X}" for a in differ))
+            return
         self.saved, self.written, self.sent = {}, {}, None
         self.config_changed()
+
+    async def read_control(self) -> dict[int, int]:
+        # the blocks that hold every register we may change
+        values: dict[int, int] = {}
+        for start, count in CONTROL:
+            values.update(zip(range(start, start + count), await self.logger.read(start, count)))
+        return values
 
     async def write(self, address: int, value: int) -> None:
         # one setting; a register the inverter refuses is logged and left, the rest still goes
         try:
             await self.logger.write(address, value)
         except Refused as err:
+            self.refused.add(address)
             _LOGGER.warning("Deye %s: register 0x%04X refused (%s)", self.name, address, err)
 
     async def poll(self) -> None:
