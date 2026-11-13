@@ -210,6 +210,10 @@ class Appliance(SolverEntry, ConsumerDevice):
         if self.switch_type == "pause" and self.manage and not self.armed and not self.busy and (s := lp.hass.states.get(self.status_entity) if self.status_entity and lp.hass is not None else None) is not None and s.state == "pause":
             self.armed, self.armed_at, self.status = True, time.time(), EntryStatus.armed
 
+        # armed without its status, as after a restart where the status starts at none: show it as armed again
+        if self.armed and not self.busy and self.status is EntryStatus.none:
+            self.status = EntryStatus.armed
+
         # plan this cycle in its cheapest window when armed; baseload has already seeded the phase loads
         self.data.data[12:] = 0.0
         if self.armed:
