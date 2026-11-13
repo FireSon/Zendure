@@ -5,10 +5,12 @@ import struct
 import time
 import types
 
+import pytest
+
 import custom_components.zenmaster.deye.inverter as inverter_module
 from custom_components.zenmaster.deye.driver import DeyeDriver
 from custom_components.zenmaster.deye.inverter import CHARGE_A, DISCHARGE_A, GRID_CHARGE, GRID_CHARGE_A, POWERS, RATED, SELL_POWER, SOCS, SOURCES, TOU, WORK_MODE
-from custom_components.zenmaster.deye.logger import crc16
+from custom_components.zenmaster.deye.logger import ModbusTcp, crc16
 from custom_components.zenmaster.device import DeviceState
 from custom_components.zenmaster.distribution import DistributionMode
 from custom_components.zenmaster.sensor import HaSensor
@@ -275,5 +277,24 @@ def test_coordinator_builds_a_deye_in_the_fleet() -> None:
         coord.hass.async_create_task = asyncio.get_running_loop().create_task  # unload hands back on a task of its own
         entry.subentries = {sid: s for sid, s in entry.subentries.items() if sid != sub.subentry_id}
         assert coord.sync_devices() is True and not coord.drivers["deye"].devices and d not in coord.devices
+
+    asyncio.run(scenario())
+
+
+def test_modbus_tcp_reads_and_an_unreachable_stick_is_an_oserror() -> None:
+    # a stick with plain Modbus TCP: an MBAP header, unit 1, function 3; nobody on the port gives an OSError like the V5 path
+    async def scenario() -> None:
+        async def handle(reader, writer):
+            tid, _pid, _length, unit, _fc, address, count = struct.unpack(">HHHBBHH", await reader.readexactly(12))
+            data = struct.pack(f">{count}H", *(0x0005 + address + i for i in range(count)))
+            writer.write(struct.pack(">HHHBBB", tid, 0, 3 + len(data), unit, 3, len(data)) + data)
+            await writer.drain()
+
+        server = await asyncio.start_server(handle, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        assert await ModbusTcp("127.0.0.1", port).read(0x0000, 2) == [0x0005, 0x0006]
+        server.close()
+        with pytest.raises(OSError):
+            await ModbusTcp("127.0.0.1", 1).read(0x0000, 1)
 
     asyncio.run(scenario())

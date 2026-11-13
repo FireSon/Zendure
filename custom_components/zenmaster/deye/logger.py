@@ -110,18 +110,18 @@ class ModbusTcp:
 
     async def read(self, start: int, count: int) -> list[int]:
         # function 3, holding registers, unit 1 like the V5 path
-        return (await self.call(self.client.read_holding_registers(start, count=count))).registers
+        return (await self.call(lambda: self.client.read_holding_registers(start, count=count))).registers
 
     async def write(self, address: int, value: int) -> None:
         # function 16 with one register: a Deye takes its settings only this way
-        await self.call(self.client.write_registers(address, [value & 0xFFFF]))
+        await self.call(lambda: self.client.write_registers(address, [value & 0xFFFF]))
 
     async def call(self, request):
-        # connected on first use; a refused register is Refused, anything else an OSError, as on the V5 path
+        # connected on first use, the request made only then (pymodbus refuses it unconnected); a refused register is Refused, anything else an OSError, as on the V5 path
         try:
             if not self.client.connected:
                 await self.client.connect()
-            result = await request
+            result = await request()
         except ModbusException as err:
             raise OSError(f"modbus {err!r}") from err
         if result.isError():
