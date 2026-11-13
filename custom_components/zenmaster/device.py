@@ -66,7 +66,7 @@ class ProfileDischarge(PowerProfile):
     """Discharge direction profile."""
 
     def available_power(self, device: DistributionDevice) -> int:
-        if device.soc_limit == 2 or (device.kwh and device.soc <= device.soc_min):  # empty: the device's own verdict or ours
+        if device.kwh and (device.soc_limit == 2 or device.soc <= device.soc_min):  # empty: the device's own verdict or ours, only with a pack (one without works as a plain inverter)
             return 0
         # thermal derating: at 55 °C or more, delivering 25 W or more under its setpoint for 25 s, the device is asked no more than it proves to manage plus 15 W
         if device.temp >= 55 and device.power_setpoint - device.power_actual > 25 and time.time() - device.power_since > 25:
