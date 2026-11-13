@@ -63,7 +63,7 @@ class FakeStick:
 
 # an HV inverter: 401.2 V, 63 %, charging 1500 W (raw -150), 2000 W PV, the grid -300 / 500 / 2000 W per phase, 25.3 °C, Zero Export To CT;
 # the high words say something else, so a test fails if they are ever read along
-HV = {0x024A: 1253, 0x024B: 4012, 0x024C: 63, 0x024E: -150 & 0xFFFF, 0x02A0: 120, 0x02A1: 80, 0x008E: 2, 0x026E: -300 & 0xFFFF, 0x026F: 500, 0x0270: 2000}
+HV = {0x0000: 0x0006, 0x024A: 1253, 0x024B: 4012, 0x024C: 63, 0x024E: -150 & 0xFFFF, 0x02A0: 120, 0x02A1: 80, 0x008E: 2, 0x026E: -300 & 0xFFFF, 0x026F: 500, 0x0270: 2000}
 HV |= {0x02AF + i: 1 for i in range(4)}
 
 
@@ -118,9 +118,57 @@ def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
 
 def test_poll_reads_an_lv_inverter_with_its_own_scales(monkeypatch) -> None:
     async def scenario() -> None:
-        d, stick, _driver, _distribution = await start(monkeypatch, {0x024B: 5230, 0x024C: 80, 0x024E: 800, 0x02A0: 300}, product="LV")
+        d, stick, _driver, _distribution = await start(monkeypatch, {0x0000: 0x0005, 0x024B: 5230, 0x024C: 80, 0x024E: 800, 0x02A0: 300}, product="LV")
         assert await wait_for(lambda: d.state == DeviceState.CONTROLLER)
         assert (value(d, "battery_voltage"), value(d, "battery_output"), value(d, "battery_input"), value(d, "pv_power"), d.power_actual) == (52.3, 800, 0, 300, 800)
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_lv_packs_become_devices_and_give_the_kwh(monkeypatch) -> None:
+    async def scenario() -> None:
+        # two packs of 100 Ah behind the BMS, the energy counters in 0.1 kWh (totals low word first), the grid port at 230.1 V and 50.02 Hz
+        packs = {0x2712: 2}
+        for n, sn in enumerate(("PACK0001", "PACK0002")):
+            base = 0x2730 + n * 0x26
+            packs |= {base + i: ord(sn[2 * i]) << 8 | ord(sn[2 * i + 1]) for i in range(4)} | {base + 0x08: 530, base + 0x09: -58 & 0xFFFF, base + 0x0F: 978, base + 0x12: 1000, base + 0x16: 3315, base + 0x18: 504}
+        energy = {0x0208: 355, 0x0209: 58, 0x020A: 12377, 0x020C: 3985, 0x0211: 54, 0x0216: 4270, 0x0256: 2301, 0x0261: 5002}
+        d, stick, _driver, _distribution = await start(monkeypatch, {0x0000: 0x0005, 0x024B: 5230} | packs | energy, product="")
+        assert await wait_for(lambda: len(d.packs) == 2 and d.kwh == 10.24)
+        pack = d.packs["PACK0001"]
+        assert (value(pack, "voltage"), value(pack, "current"), value(pack, "soc"), value(pack, "capacity"), value(pack, "cell_max"), value(pack, "cycles")) == (53.0, -5.8, 97.8, 100.0, 3.315, 504)
+        assert [value(d.meter, k) for k in ("import_today", "export_today", "import_total", "export_total", "voltage_l1", "frequency")] == [35.5, 5.8, 1237.7, 398.5, 230.1, 50.02]
+        assert (value(d, "pv_today"), value(d, "pv_total"), d.model) == (5.4, 427.0, "LV")
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_an_hv_added_as_lv_takes_the_hv_scales(monkeypatch) -> None:
+    async def scenario() -> None:
+        # the device type says HV: the model and the scales follow at the first poll
+        d, stick, _driver, _distribution = await start(monkeypatch, HV, product="LV")
+        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER)
+        assert (d.model, value(d, "battery_voltage")) == ("HV", 401.2)
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_another_deye_family_is_left_alone(monkeypatch) -> None:
+    async def scenario() -> None:
+        # a single-phase hybrid (type 3) has other registers: one notification, out of the fleet, never written to, only the type read
+        notes = []
+        monkeypatch.setattr(inverter_module.persistent_notification, "async_create", lambda hass, message, *a: notes.append(message))
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {0x0000: 0x0003})
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and notes)
+        d.power(1500, DistributionMode.INDIVIDUAL)
+        await asyncio.sleep(0.2)
+        assert {f for f, _ in stick.requests} == {0x03} and len(notes) == 1 and "0x0003" in notes[0]
         d.unload()
         stick.server.close()
 

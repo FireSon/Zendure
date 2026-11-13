@@ -6,17 +6,19 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
+from homeassistant.components import persistent_notification
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
 from ..config import IDENTITY, ConfigField
-from ..const import DOMAIN
+from ..const import DOMAIN, PANEL_TITLE
 from ..device import DeviceState, DistributionDevice, ProfileCharge, ProfileDischarge
 from ..distribution import DistributionMode
 from ..entity import EntityDevice
-from ..modbus import decode
+from ..modbus import decode, text
 from ..sensor import HaSensor
-from .logger import PORT, Logger, Refused
+from .battery import DeyeBattery
+from .logger import MODBUS_PORT, PORT, Logger, ModbusTcp, Refused
 
 if TYPE_CHECKING:
     from .driver import DeyeDriver, Product
@@ -41,7 +43,16 @@ WRITES = (CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, WORK_MODE, SELL_POW
 CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (WORK_MODE, 5), (POWERS[0], 24))  # the blocks that hold them
 ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
 RATED = 0x0014  # the inverter's rated AC power, 0.1 W in two words, low word first
-SLOW = ((TEMP, 1), (WORK_MODE, 1), (CHARGE_A, 2), (RATED, 2))  # temperature, work mode, its own maximum charge and discharge current, its rated power
+ENERGY = (0x0208, 0x0218 - 0x0208)  # the grid import and export and the production, today and in total
+SLOW = ((TEMP, 1), (WORK_MODE, 1), (CHARGE_A, 2), (RATED, 2), ENERGY)  # temperature, work mode, its own maximum charge and discharge current, its rated power, the energy counters
+
+# the device type, as ha-solarman tells the families apart: only the three-phase hybrids of the deye_p3 profile are read and steered
+DEVICE = 0x0000
+TYPES = {0x0005: "LV", 0x0500: "LV", 0x0006: "HV", 0x0007: "HV", 0x0008: "HV", 0x0600: "HV", 0x0601: "HV"}
+
+# the packs behind the BMS: their number, then one block of registers each from its serial on
+PACKS, PACK, PACK_SIZE = 0x2712, 0x2730, 0x26
+LV_NOMINAL_V = 51.2  # an LV pack's nominal voltage: its Ah times this is its capacity
 
 
 # the grid meter of a Deye as its own device: chosen as P1 it carries the grid entities only
@@ -51,6 +62,14 @@ class DeyeMeter(EntityDevice):
         HaSensor(self, "grid_power", uom="W", device_class="power", state_class="measurement")
         for key, _address in GRID:
             HaSensor(self, key, uom="W", device_class="power", state_class="measurement")
+
+        # the voltages and frequency at the grid port, and the import and export the inverter counts
+        for n in (1, 2, 3):
+            HaSensor(self, f"voltage_l{n}", uom="V", device_class="voltage", state_class="measurement", precision=1)
+        HaSensor(self, "frequency", uom="Hz", device_class="frequency", state_class="measurement", precision=2)
+        for key in ("import", "export"):
+            HaSensor(self, f"{key}_today", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
+            HaSensor(self, f"{key}_total", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
 
 
 class DeyeInverter(DistributionDevice):
@@ -69,7 +88,7 @@ class DeyeInverter(DistributionDevice):
     def __init__(self, hass: HomeAssistant, driver: DeyeDriver, subentry_id: str | None, name: str, data: dict[str, Any], product: Product) -> None:
         self.driver = driver
         self.sn: str = str(data["sn"])  # the identity: the serial printed on the logger stick, letters allowed
-        self.model: str = data["product"]  # the battery type: LV or HV
+        self.model: str = data.get("product") or "LV"  # the battery type: LV or HV, read from the inverter at its first poll
         self.product = product
         self.ip: str = data["ip"]
         self.port = int(data.get("port") or PORT)
@@ -78,15 +97,18 @@ class DeyeInverter(DistributionDevice):
         # the registry entry first: the entities find their device there; the power profile follows from its own maximum currents at the first poll
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, self.sn)}, name=name, manufacturer=driver.manufacturer, model=f"Hybrid ({self.model})")
         DistributionDevice.__init__(self, hass, self.sn, [ProfileDischarge(0), ProfileCharge(0)], name, subentry_id)
-        self.kwhsensor.update_value(float(data["kwh"]))
+        self.kwhsensor.update_value(float(data.get("kwh") or 0))  # an LV battery gets it from its packs at the first slow poll
 
         # the grid meter as its own device in the same subentry, so it goes with it
         dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, f"{self.sn}_meter")}, name=f"{name}_meter", manufacturer=driver.manufacturer, model="Meter")
         self.meter = DeyeMeter(hass, f"{self.sn}_meter", f"{name}_meter", subentry_id)
 
-        self.logger = Logger(self.ip, int(self.sn) if self.sn.isdigit() else 0, self.port)  # a printed serial with letters is no V5 number: 0 lets the stick tell its own in its first answer
+        # 502 is a stick with plain Modbus TCP, any other port a V5 stick; a printed serial with letters is no V5 number: 0 lets the stick tell its own in its first answer
+        self.logger = ModbusTcp(self.ip, self.port) if self.port == MODBUS_PORT else Logger(self.ip, int(self.sn) if self.sn.isdigit() else 0, self.port)
         self._silent = 0
         self._polls = 0
+        self.supported: bool | None = None  # the device type, read once: None until then
+        self.packs: dict[str, DeyeBattery] = {}  # the packs behind the BMS, by their serial
 
         # the control: the inverter's own settings while we steer it (in the subentry, so a crash keeps them), what we wrote, the request and the last one sent
         self.battery_voltage = 0.0  # V, the entity writes it: a grid charge current is W over this
@@ -135,14 +157,16 @@ class DeyeInverter(DistributionDevice):
         HaSensor(self, "temp", uom="°C", device_class="temperature", state_class="measurement", precision=1)
         HaSensor(self, "work_mode")
         self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
+        HaSensor(self, "pv_today", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
+        HaSensor(self, "pv_total", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
 
     async def device_loop(self) -> None:
         while True:
             try:
-                # hand back or a new request first, then the poll
+                # hand back or a new request first, then the poll; a Deye of another family is never written to
                 if self.request is None and self.saved:
                     await self.restore()
-                elif self.request not in (None, self.sent):
+                elif self.request not in (None, self.sent) and self.supported:
                     await self.send(*self.request)
                 await self.poll()
             except Exception:
@@ -214,12 +238,19 @@ class DeyeInverter(DistributionDevice):
             _LOGGER.warning("Deye %s: register 0x%04X refused (%s)", self.name, address, err)
 
     async def poll(self) -> None:
-        # the fast set every round in two reads; temperature and work mode now and then
+        # the fast set every round in two reads; temperature, work mode, counters and packs now and then
         self._polls += 1
         try:
+            # the device type once: a Deye of another family has other registers and is left alone
+            if self.supported is None:
+                self.check_type((await self.logger.read(DEVICE, 1))[0])
+            if not self.supported:
+                return
             values: dict[int, int] = {}
             for start, count in FAST + (SLOW if self._polls % SLOW_EVERY == 1 else ()):
                 values.update(zip(range(start, start + count), await self.logger.read(start, count)))
+            if self._polls % SLOW_EVERY == 1:
+                await self.poll_packs()
         except OSError as err:
             self._silent += 1
             _LOGGER.debug("Deye %s: poll failed (%s)", self.name, err)
@@ -230,6 +261,47 @@ class DeyeInverter(DistributionDevice):
             return
         self._silent = 0
         self.update_status(values)
+        self.update_meter(values)
+
+    def check_type(self, kind: int) -> None:
+        # LV or HV as ha-solarman tells them apart; another family is left out of the fleet with one notification
+        self.supported = (model := TYPES.get(kind)) is not None
+        if not self.supported:
+            self.set_state(DeviceState.EXTERNAL)
+            persistent_notification.async_create(self.hass, f"Deye {self.name}: device type 0x{kind:04X} is not supported, only the three-phase hybrids", PANEL_TITLE, f"{DOMAIN}_deye_{self.sn}")
+        elif model != self.model:
+            self.model, self.product = model, self.driver.PRODUCTS[model]
+            self.config_changed()
+
+    async def poll_packs(self) -> None:
+        # every pack behind the BMS: their number, then one block each; a pack seen for the first time becomes its own device
+        for n in range((await self.logger.read(PACKS, 1))[0]):
+            r = await self.logger.read(PACK + n * PACK_SIZE, PACK_SIZE)
+            if sn := text(r[:8]):
+                (self.packs.get(sn) or self.packs.setdefault(sn, DeyeBattery(self.hass, self, sn))).update(r)
+
+        # the capacity of an LV battery from its packs; an HV battery keeps the kWh it was added with
+        if self.model == "LV" and self.packs and (kwh := round(sum(p.ah for p in self.packs.values()) * LV_NOMINAL_V / 1000, 2)) != self.kwh:
+            self.kwhsensor.update_value(kwh)
+            self.config_changed()
+            if self.on_invalidate is not None:
+                self.on_invalidate()
+
+    def update_meter(self, r: dict[int, int]) -> None:
+        # the voltages and frequency at the grid port, inside the fast block
+        for n, address in enumerate((0x0256, 0x0257, 0x0258), 1):
+            self.meter.entity_update(f"voltage_l{n}", r[address] / 10)
+        self.meter.entity_update("frequency", r[0x0261] / 100)
+
+        # the counters the inverter keeps: today in one word, a total in two words low word first, all in 0.1 kWh
+        if ENERGY[0] in r:
+            total = lambda a: (r[a + 1] << 16 | r[a]) / 10
+            self.meter.entity_update("import_today", r[0x0208] / 10)
+            self.meter.entity_update("export_today", r[0x0209] / 10)
+            self.meter.entity_update("import_total", total(0x020A))
+            self.meter.entity_update("export_total", total(0x020C))
+            self.entity_update("pv_today", r[0x0211] / 10)
+            self.entity_update("pv_total", total(0x0216))
 
     def update_status(self, r: dict[int, int]) -> None:
         # the battery; its power positive for discharge, as ha-solarman's battery state reads it

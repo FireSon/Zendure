@@ -5,7 +5,11 @@ from __future__ import annotations
 import asyncio
 import struct
 
+from pymodbus.client import AsyncModbusTcpClient
+from pymodbus.exceptions import ModbusException
+
 PORT = 8899  # the Solarman V5 port of the logger stick
+MODBUS_PORT = 502  # a stick that speaks plain Modbus TCP
 SLAVE = 1  # the inverter's Modbus address behind the stick
 TIMEOUT_S = 10.0  # a stick answers slowly
 
@@ -93,3 +97,33 @@ class Logger:
         if frame[-1] != 0x15 or sum(frame[1:-2]) & 0xFF != frame[-2]:
             raise OSError(f"bad V5 frame: {frame.hex()}")
         return frame
+
+
+class ModbusTcp:
+    """The same read and write as Logger, for a stick that only speaks Modbus TCP."""
+
+    def __init__(self, ip: str, port: int) -> None:
+        self.client = AsyncModbusTcpClient(ip, port=port, timeout=TIMEOUT_S)
+
+    def close(self) -> None:
+        self.client.close()
+
+    async def read(self, start: int, count: int) -> list[int]:
+        # function 3, holding registers, unit 1 like the V5 path
+        return (await self.call(self.client.read_holding_registers(start, count=count))).registers
+
+    async def write(self, address: int, value: int) -> None:
+        # function 16 with one register: a Deye takes its settings only this way
+        await self.call(self.client.write_registers(address, [value & 0xFFFF]))
+
+    async def call(self, request):
+        # connected on first use; a refused register is Refused, anything else an OSError, as on the V5 path
+        try:
+            if not self.client.connected:
+                await self.client.connect()
+            result = await request
+        except ModbusException as err:
+            raise OSError(f"modbus {err!r}") from err
+        if result.isError():
+            raise Refused(str(result))
+        return result

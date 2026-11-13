@@ -36,6 +36,13 @@ def device_by_identifier(hass: HomeAssistant, identifier: str) -> dr.DeviceEntry
     return registry.async_get_device(identifiers={(DOMAIN, identifier)})
 
 
+def via_device(hass: HomeAssistant, identifier: str) -> dict[str, Any]:
+    # the link to a parent device: via_device_id from HA 2026.8 on, which deprecates the via_device identifier
+    if "via_device_id" not in DeviceInfo.__optional_keys__:
+        return {"via_device": (DOMAIN, identifier)}
+    return {"via_device_id": p.id} if (p := device_by_identifier(hass, identifier)) is not None else {}
+
+
 def unique_name(family: str, sn: str, taken: set[str]) -> str:
     # the shortest serial tail (from 2 characters) that is free in the fleet; a newcomer never renames an existing device
     return next((f"{family}_{sn[-i:]}" for i in range(2, len(sn) + 1) if f"{family}_{sn[-i:]}" not in taken), f"{family}_{sn}")

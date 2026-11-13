@@ -6,10 +6,9 @@ from typing import Any
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from ..const import DOMAIN
-from ..entity import EntityDevice, device_by_identifier, unique_name
+from ..entity import EntityDevice, unique_name, via_device
 from ..sensor import HaSensor
 from .device import centi_convert, deci_convert, temp_convert
 
@@ -55,11 +54,8 @@ class ZendureBattery(EntityDevice):
                 parent.config_changed()
 
         if driver := getattr(parent, "driver", None):
-            # HA >= 2026.8 deprecates the via_device identifier for via_device_id; the parent is registered in ZendureDevice.__init__, so its id is known here
-            via: dict[str, Any] = {"via_device": (DOMAIN, parent.device_id)}
-            if "via_device_id" in DeviceInfo.__optional_keys__:
-                via = {"via_device_id": p.id} if (p := device_by_identifier(hass, parent.device_id)) is not None else {}
-            dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=parent.subentry_id, identifiers={(DOMAIN, device_id)}, name=name, manufacturer=driver.manufacturer, model=self.model, **via)
+            # the parent is registered in ZendureDevice.__init__, so its id is known here
+            dr.async_get(hass).async_get_or_create(config_entry_id=driver.entry_id, config_subentry_id=parent.subentry_id, identifiers={(DOMAIN, device_id)}, name=name, manufacturer=driver.manufacturer, model=self.model, **via_device(hass, parent.device_id))
         super().__init__(hass, device_id, name, getattr(parent, "subentry_id", None))
 
     def entity_create(self) -> None:

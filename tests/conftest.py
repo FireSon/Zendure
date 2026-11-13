@@ -87,6 +87,9 @@ import homeassistant.helpers.device_registry as _dr  # noqa: E402
 
 _dr.async_get = lambda hass: types.SimpleNamespace(async_get_or_create=lambda **kwargs: types.SimpleNamespace(id="dev", config_entries_subentries={}), async_update_device=lambda *args, **kwargs: None, async_get_device=lambda **kwargs: None)
 
+# a child device asks DeviceInfo which parent link this HA knows; the stub answers like an HA before 2026.8
+_dr.DeviceInfo.__optional_keys__ = frozenset()
+
 
 # a real subentry carries an id of its own; the coordinator creates one for the manager and then keys on it
 import homeassistant.config_entries as _ce  # noqa: E402
