@@ -784,6 +784,13 @@ def test_individual_is_not_stopped_by_update_order() -> None:
     assert d1.power_setpoint == -2000
 
 
+def test_a_device_without_a_pack_runs_as_a_plain_inverter() -> None:
+    # issue #35: a Hyper without a pack reports socLimit 2 all the time; it still gets its rated output, while one with a pack that says empty gets nothing
+    bare, pack = FakeDevice("bare", 0.0, power=1200, kwh=0.0), FakeDevice("pack", 50.0, power=1200)
+    bare.soc_limit = pack.soc_limit = 2
+    assert (bare.clamp(1200), pack.clamp(1200)) == (1200, 0)
+
+
 def test_individual_stops_a_battery_that_cannot_help_its_limited_phase() -> None:
     # d1 charges on L1 by plan; the house alone draws 7000 W on L1, over its limit, so delivering is needed and d1, empty, cannot: it stops, d2 on L2 keeps its plan
     d1, d2 = FakeDevice("d1", 50.0), FakeDevice("d2", 50.0)
