@@ -73,7 +73,7 @@ class DeyeMeter(EntityDevice):
 
 
 class DeyeInverter(DistributionDevice):
-    """A Deye with its battery behind one logger stick; it regulates itself (CONTROLLER) until we steer it through its settings."""
+    """A Deye with its battery behind one logger stick; it regulates itself until we steer it through its settings: EXTERNAL when it may be steered, else CONTROLLER."""
 
     CONFIG = [
         *IDENTITY,
@@ -146,7 +146,7 @@ class DeyeInverter(DistributionDevice):
         self.request = None
         self.power_setpoint = 0
         if self.state != DeviceState.OFFLINE:
-            self.set_state(DeviceState.CONTROLLER)
+            self.set_state(DeviceState.EXTERNAL if self.allow_control else DeviceState.CONTROLLER)  # one we may steer stays in the plan
 
     def entity_create(self) -> None:
         HaSensor(self, "soc", uom="%", device_class="battery", state_class="measurement")
@@ -266,10 +266,10 @@ class DeyeInverter(DistributionDevice):
         self.update_meter(values)
 
     def check_type(self, kind: int) -> None:
-        # LV or HV as ha-solarman tells them apart; another family is left out of the fleet with one notification
+        # LV or HV as ha-solarman tells them apart; another family regulates itself, out of every plan, with one notification
         self.supported = (model := TYPES.get(kind)) is not None
         if not self.supported:
-            self.set_state(DeviceState.EXTERNAL)
+            self.set_state(DeviceState.CONTROLLER)
             persistent_notification.async_create(self.hass, f"Deye {self.name}: device type 0x{kind:04X} is not supported, only the three-phase hybrids", PANEL_TITLE, f"{DOMAIN}_deye_{self.sn}")
         elif model != self.model:
             self.model, self.product = model, self.driver.PRODUCTS[model]
@@ -337,7 +337,7 @@ class DeyeInverter(DistributionDevice):
             if changed and self.on_invalidate is not None:
                 self.on_invalidate()
 
-        # it regulates itself while we do not steer it
+        # it regulates itself while we do not steer it; one we may steer counts in the plan as external, so a fleet of Deyes alone can start
         self.power_actual = battery
         if not self.saved:
-            self.set_state(DeviceState.CONTROLLER)
+            self.set_state(DeviceState.EXTERNAL if self.allow_control else DeviceState.CONTROLLER)
