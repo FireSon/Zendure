@@ -229,26 +229,26 @@ def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None
     asyncio.run(scenario())
 
 
-def test_individual_goes_through_every_tou_program(monkeypatch) -> None:
+def test_individual_steers_the_battery_currents(monkeypatch) -> None:
     async def scenario() -> None:
-        # newer firmware: the Sell bit in every charge source, max sell power 1000 W, rated 12 kW (120000 in 0.1 W); programs 4-6 refuse a write over Modbus
-        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, SELL_POWER: 100, RATED: 54464, RATED + 1: 1} | dict.fromkeys(SOURCES, 0x20))
+        # newer firmware: the Sell bit in every charge source, max sell power 1000 W, its own program powers 300 W (30 at the HV scale), rated 12 kW (120000 in 0.1 W); programs 4-6 refuse a write over Modbus
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, SELL_POWER: 100, RATED: 54464, RATED + 1: 1} | dict.fromkeys(SOURCES, 0x20) | dict.fromkeys(POWERS, 30))
         stick.refused = set(POWERS[3:])
         assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
 
         # its power profile: 120 A and 100 A at 401.2 V would give 48100 and 40100 W, its rated 12 kW caps both
         assert (d.power_profile[0].power, d.power_profile[1].power) == (12000, -12000)
 
-        # discharge 1500 W: programs 1-3 150 at the HV scale of 10 (4-6 refused, the rest still goes), the SOC floor, the Sell bit kept, max sell power up to the setpoint
+        # discharge 1500 W: on its own CT, the discharge current 1500 W over 401.2 V is 4 A, the program powers and max sell power its own, the SOC floor, the Sell bit kept
         d.power(1500, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
-        assert [stick.registers.get(a, 0) for a in POWERS] == [150] * 3 + [0] * 3 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
-        assert (stick.registers[WORK_MODE], stick.registers[TOU], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (0, 0x00FF, 0, 150)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (2, 4, 100, 0, 100)
+        assert [stick.registers[a] for a in POWERS] == [30] * 6 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
 
-        # charge 2000 W from the grid: 2000 W over 401.2 V is 5 A, the SOC target, the grid bit next to the Sell bit
+        # charge 2000 W from the grid: 2000 W over 401.2 V is 5 A, no discharge, the SOC target, the grid bit next to the Sell bit
         d.power(-2000, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.sent == (-2000, DistributionMode.INDIVIDUAL)) and stick.registers[GRID_CHARGE_A] == 5
-        assert stick.registers[GRID_CHARGE] == 1 and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
+        assert (stick.registers[GRID_CHARGE], stick.registers[DISCHARGE_A]) == (1, 0) and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
         d.power_off()
         d.unload()
         stick.server.close()

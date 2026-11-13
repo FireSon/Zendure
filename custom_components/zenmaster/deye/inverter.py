@@ -41,7 +41,7 @@ SELL_POWER = 0x008F  # max sell power, W at the TOU scale: caps what goes to the
 POWERS, SOCS, SOURCES = range(0x009A, 0x00A0), range(0x00A6, 0x00AC), range(0x00AC, 0x00B2)  # per TOU program: discharge power, SOC floor or target, charge source (1 = grid)
 WRITES = (CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, WORK_MODE, SELL_POWER, SOLAR_SELL, TOU, *POWERS, *SOCS, *SOURCES)  # every register we may change, put back on hand back
 CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (WORK_MODE, 5), (POWERS[0], 24))  # the blocks that hold them
-ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
+ZERO_EXPORT_CT, TOU_WEEK = 2, 0x00FF
 RATED = 0x0014  # the inverter's rated AC power, 0.1 W in two words, low word first
 ENERGY = (0x0202, 0x0218 - 0x0202)  # the battery charge and discharge, the grid import and export and the production, today and in total
 SLOW = ((TEMP, 1), (WORK_MODE, 1), (CHARGE_A, 2), (RATED, 2), ENERGY)  # temperature, work mode, its own maximum charge and discharge current, its rated power, the energy counters
@@ -188,17 +188,18 @@ class DeyeInverter(DistributionDevice):
                 self.saved = saved
                 self.config_changed()
 
-            # per mode what it wants: a setpoint through every TOU program, at rest both currents closed, SMART_* on its own CT with one current closed
+            # per mode what it wants: a setpoint through the battery currents on its own CT (the TOU power is no hard limit), at rest both currents closed, SMART_* on its own CT with one current closed
             setpoint = mode in (DistributionMode.INDIVIDUAL, DistributionMode.MANUAL)
             charge, discharge = self.saved[CHARGE_A], self.saved[DISCHARGE_A]  # open: the inverter's own limits
             if setpoint and watts:
-                amps = round(-watts / self.battery_voltage) if watts < 0 and self.battery_voltage else 0
+                # the setpoint as a current at the battery voltage: discharging at most that, or charging that much from the grid up to soc_max
+                amps = round(abs(watts) / self.battery_voltage) if self.battery_voltage else 0
                 wanted = {
-                    WORK_MODE: EXPORT_FIRST, TOU: TOU_WEEK, GRID_CHARGE: int(watts < 0), GRID_CHARGE_A: amps, CHARGE_A: charge, DISCHARGE_A: discharge,
-                    SELL_POWER: max(self.saved[SELL_POWER], max(0, watts) // self.product.power_scale),
+                    WORK_MODE: ZERO_EXPORT_CT, TOU: TOU_WEEK, GRID_CHARGE: int(watts < 0), GRID_CHARGE_A: amps if watts < 0 else 0,
+                    CHARGE_A: charge, DISCHARGE_A: amps if watts > 0 else 0, SELL_POWER: self.saved[SELL_POWER],
                 }
                 wanted |= (
-                    dict.fromkeys(POWERS, max(0, watts) // self.product.power_scale) | dict.fromkeys(SOCS, int(self.soc_min if watts > 0 else self.soc_max))
+                    {a: self.saved[a] for a in POWERS} | dict.fromkeys(SOCS, int(self.soc_min if watts > 0 else self.soc_max))
                     | {a: self.saved[a] & ~1 | int(watts < 0) for a in SOURCES}  # only the grid bit; the other bits (Sell on newer firmware) stay the inverter's
                 )
             elif setpoint or mode == DistributionMode.OFF:
