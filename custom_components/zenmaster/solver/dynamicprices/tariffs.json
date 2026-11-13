@@ -38,7 +38,7 @@
     }
   },
   "FR": {
-    "energy_tax": 0.03062,
+    "energy_tax": 0.03035,
     "vat": 20.0,
     "wholesale_zone": "FR",
     "publish": "13:00",
@@ -48,7 +48,7 @@
     "providers": {
       "wholesale": {},
       "sobry": {"import_markup": 0.010, "fixed_cost_per_day": 0.6523},
-      "frank_fr": {"import_markup": 0.019, "fixed_cost_per_day": 0.5734}
+      "frank_fr": {"import_markup": 0.019, "fixed_cost_per_day": 0.5843}
     }
   },
   "AT": {
