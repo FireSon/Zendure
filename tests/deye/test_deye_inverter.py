@@ -5,10 +5,12 @@ import struct
 import time
 import types
 
+import pytest
+
 import custom_components.zenmaster.deye.inverter as inverter_module
 from custom_components.zenmaster.deye.driver import DeyeDriver
 from custom_components.zenmaster.deye.inverter import CHARGE_A, DISCHARGE_A, GRID_CHARGE, GRID_CHARGE_A, POWERS, RATED, SELL_POWER, SOCS, SOURCES, TOU, WORK_MODE
-from custom_components.zenmaster.deye.logger import crc16
+from custom_components.zenmaster.deye.logger import ModbusTcp, crc16
 from custom_components.zenmaster.device import DeviceState
 from custom_components.zenmaster.distribution import DistributionMode
 from custom_components.zenmaster.sensor import HaSensor
@@ -32,6 +34,7 @@ class FakeStick:
         self.registers = registers
         self.requests: list[tuple[int, int]] = []
         self.refused: set[int] = set()  # registers it answers with a Modbus exception
+        self.ignored: set[int] = set()  # registers whose write it acknowledges but does not take, like an inverter that does not apply it (yet)
 
     async def start(self) -> int:
         self.server = await asyncio.start_server(self.serve, "127.0.0.1", 0)
@@ -50,7 +53,8 @@ class FakeStick:
                 if address in self.refused:
                     answer = bytes([1, func | 0x80, 2])
                 elif func == 0x10:
-                    self.registers[address] = struct.unpack(">H", rtu[7:9])[0]
+                    if address not in self.ignored:
+                        self.registers[address] = struct.unpack(">H", rtu[7:9])[0]
                     answer = bytes([1, 0x10]) + struct.pack(">HH", address, count)
                 else:
                     answer = bytes([1, 0x03, 2 * count]) + struct.pack(f">{count}H", *(self.registers.get(address + i, 0) for i in range(count)))
@@ -63,11 +67,11 @@ class FakeStick:
 
 # an HV inverter: 401.2 V, 63 %, charging 1500 W (raw -150), 2000 W PV, the grid -300 / 500 / 2000 W per phase, 25.3 °C, Zero Export To CT;
 # the high words say something else, so a test fails if they are ever read along
-HV = {0x024A: 1253, 0x024B: 4012, 0x024C: 63, 0x024E: -150 & 0xFFFF, 0x02A0: 120, 0x02A1: 80, 0x008E: 2, 0x026E: -300 & 0xFFFF, 0x026F: 500, 0x0270: 2000}
+HV = {0x0000: 0x0006, 0x024A: 1253, 0x024B: 4012, 0x024C: 63, 0x024E: -150 & 0xFFFF, 0x02A0: 120, 0x02A1: 80, 0x008E: 2, 0x026E: -300 & 0xFFFF, 0x026F: 500, 0x0270: 2000}
 HV |= {0x02AF + i: 1 for i in range(4)}
 
 
-async def start(monkeypatch, registers: dict[int, int], product: str = "HV", port: int | None = None):
+async def start(monkeypatch, registers: dict[int, int], product: str = "HV", port: int | None = None, allow_control: bool = True):
     # the fake stick on a free port, one inverter aimed at it; the pause shrunk so a test runs in tenths of a second
     monkeypatch.setattr(inverter_module, "POLL_S", 0.01)
     stick = FakeStick(registers)
@@ -76,7 +80,7 @@ async def start(monkeypatch, registers: dict[int, int], product: str = "HV", por
     hass.async_create_task = asyncio.get_running_loop().create_task  # unload hands back on a task of its own
     distribution = types.SimpleNamespace(devices=[], on_invalidate=lambda: None)
     driver = DeyeDriver(hass, "entry", [], distribution)
-    d = driver.init_device("sub1", "Deye_5678", {"sn": str(SERIAL), "product": product, "ip": "127.0.0.1", "port": port or stick_port, "kwh": 10.24, "allow_control": True})
+    d = driver.init_device("sub1", "Deye_5678", {"sn": str(SERIAL), "product": product, "ip": "127.0.0.1", "port": port or stick_port, "kwh": 10.24, "allow_control": allow_control})
     for e in d.entities.values():
         if e is not None:
             e.hass = None
@@ -99,15 +103,17 @@ def value(d, key: str):
 def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
     async def scenario() -> None:
         d, stick, _driver, distribution = await start(monkeypatch, HV)
-        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER)
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
 
         # the HV scales: 0.1 V and 10 W per raw unit; each phase from its signed low word, the total their sum
         assert (d.soc, d.kwh, d.temp, d.power_actual) == (63, 10.24, 25.3, -1500)
         assert (value(d, "battery_voltage"), value(d, "battery_input"), value(d, "battery_output"), value(d, "pv_power")) == (401.2, 1500, 0, 2000)
+        # the same entities on the keys the panel reads for every battery
+        assert (value(d, "home_input"), value(d, "home_output"), value(d, "solar")) == (1500, 0, 2000) and d.entities["home_input_aggr"] is d.entities["battery_input_aggr"]
         assert [value(d.meter, key) for key in ("phase1_power", "phase2_power", "phase3_power", "grid_power")] == [-300, 500, 2000, 2200]
         assert value(d, "work_mode") == 2
 
-        # reads only, every one with the stick's serial; in the fleet as a controller, which counts in no plan or regulation
+        # reads only, every one with the stick's serial; in the fleet as external, so it counts in the plan and a mode can start on it
         assert {f for f, _ in stick.requests} == {0x03} and {s for _, s in stick.requests} == {SERIAL}
         assert distribution.devices == [d] and d.subentry_data() == {"product": "HV", "sn": str(SERIAL), "ip": "127.0.0.1", "port": d.port, "kwh": 10.24, "saved": {}, "allow_control": True}
         d.unload()
@@ -118,9 +124,69 @@ def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
 
 def test_poll_reads_an_lv_inverter_with_its_own_scales(monkeypatch) -> None:
     async def scenario() -> None:
-        d, stick, _driver, _distribution = await start(monkeypatch, {0x024B: 5230, 0x024C: 80, 0x024E: 800, 0x02A0: 300}, product="LV")
-        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER)
+        d, stick, _driver, _distribution = await start(monkeypatch, {0x0000: 0x0005, 0x024B: 5230, 0x024C: 80, 0x024E: 800, 0x02A0: 300}, product="LV")
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
         assert (value(d, "battery_voltage"), value(d, "battery_output"), value(d, "battery_input"), value(d, "pv_power"), d.power_actual) == (52.3, 800, 0, 300, 800)
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_lv_packs_become_devices_and_give_the_kwh(monkeypatch) -> None:
+    async def scenario() -> None:
+        # two packs of 100 Ah behind the BMS, the energy counters in 0.1 kWh (totals low word first), the grid port at 230.1 V and 50.02 Hz
+        packs = {0x2712: 2}
+        for n, sn in enumerate(("PACK0001", "PACK0002")):
+            base = 0x2730 + n * 0x26
+            packs |= {base + i: ord(sn[2 * i]) << 8 | ord(sn[2 * i + 1]) for i in range(4)} | {base + 0x08: 530, base + 0x09: -58 & 0xFFFF, base + 0x0A: 1135, base + 0x0F: 978, base + 0x12: 1000, base + 0x16: 3315, base + 0x18: 504}
+        energy = {0x0204: 46000, 0x0205: 1, 0x0206: 41000, 0x0208: 355, 0x0209: 58, 0x020A: 12377, 0x020C: 3985, 0x0211: 54, 0x0216: 4270, 0x0256: 2301, 0x0261: 5002}
+        d, stick, _driver, _distribution = await start(monkeypatch, {0x0000: 0x0005, 0x024B: 5230} | packs | energy, product="")
+        assert await wait_for(lambda: len(d.packs) == 2 and d.kwh == 10.24)
+        pack = d.packs["PACK0001"]
+        assert (value(pack, "voltage"), value(pack, "current"), value(pack, "temp"), value(pack, "soc"), value(pack, "capacity"), value(pack, "cell_max"), value(pack, "cycles")) == (53.0, -5.8, 13.5, 97.8, 100.0, 3.315, 504)
+        assert [value(d.meter, k) for k in ("import_today", "export_today", "import_total", "export_total", "voltage_l1", "frequency")] == [35.5, 5.8, 1237.7, 398.5, 230.1, 50.02]
+        assert (value(d, "pv_today"), value(d, "pv_total"), d.model) == (5.4, 427.0, "LV")
+        assert (value(d, "battery_charge_total"), value(d, "battery_discharge_total")) == (11153.6, 4100.0)  # 65536 + 46000 tenths, low word first
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_an_hv_added_as_lv_takes_the_hv_scales(monkeypatch) -> None:
+    async def scenario() -> None:
+        # the device type says HV: the model and the scales follow at the first poll
+        d, stick, _driver, _distribution = await start(monkeypatch, HV, product="LV")
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
+        assert (d.model, value(d, "battery_voltage")) == ("HV", 401.2)
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_a_deye_we_may_not_steer_stays_a_controller(monkeypatch) -> None:
+    async def scenario() -> None:
+        # control off: out of the fleet and regulating itself, so it counts in no plan
+        d, stick, _driver, distribution = await start(monkeypatch, HV, allow_control=False)
+        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER) and distribution.devices == []
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_another_deye_family_is_left_alone(monkeypatch) -> None:
+    async def scenario() -> None:
+        # a single-phase hybrid (type 3) has other registers: one notification, regulating itself out of every plan, never written to, only the type read
+        notes = []
+        monkeypatch.setattr(inverter_module.persistent_notification, "async_create", lambda hass, message, *a: notes.append(message))
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {0x0000: 0x0003})
+        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER and notes)
+        d.power(1500, DistributionMode.INDIVIDUAL)
+        await asyncio.sleep(0.2)
+        assert {f for f, _ in stick.requests} == {0x03} and len(notes) == 1 and "0x0003" in notes[0]
         d.unload()
         stick.server.close()
 
@@ -143,11 +209,11 @@ def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None
     async def scenario() -> None:
         # its own settings: 100 A charge, 120 A discharge, Zero Export To Load
         d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, WORK_MODE: 1})
-        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER)
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
 
         # SMART_CHARGING: Zero Export To CT, the discharge current closed, the charge current its own; it regulates itself on our settings
         d.power(0, DistributionMode.SMART_CHARGING)
-        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
+        assert await wait_for(lambda: d.sent == (0, DistributionMode.SMART_CHARGING))
         assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[TOU]) == (2, 0, 100, 0)
 
         # the next slow poll reads the closed discharge current, the profile keeps its own
@@ -155,37 +221,62 @@ def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None
         assert await wait_for(lambda: d._polls > polls + inverter_module.SLOW_EVERY)
         assert d.power_profile[0].power == 48100
 
-        # hand back: its own settings again, and it regulates itself
+        # hand back: its own settings again, and it regulates itself, still in the plan
         d.power_off()
         assert await wait_for(lambda: not d.saved)
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], d.state) == (1, 120, DeviceState.CONTROLLER)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], d.state) == (1, 120, DeviceState.EXTERNAL)
         d.unload()
         stick.server.close()
 
     asyncio.run(scenario())
 
 
-def test_individual_goes_through_every_tou_program(monkeypatch) -> None:
+def test_individual_steers_the_battery_currents(monkeypatch) -> None:
     async def scenario() -> None:
-        # newer firmware: the Sell bit in every charge source, max sell power 1000 W, rated 12 kW (120000 in 0.1 W); programs 4-6 refuse a write over Modbus
-        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, SELL_POWER: 100, RATED: 54464, RATED + 1: 1} | dict.fromkeys(SOURCES, 0x20))
+        # newer firmware: the Sell bit in every charge source, max sell power 1000 W, its own program powers 300 W (30 at the HV scale), rated 12 kW (120000 in 0.1 W); programs 4-6 refuse a write over Modbus
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, SELL_POWER: 100, RATED: 54464, RATED + 1: 1} | dict.fromkeys(SOURCES, 0x20) | dict.fromkeys(POWERS, 30))
         stick.refused = set(POWERS[3:])
-        assert await wait_for(lambda: d.state == DeviceState.CONTROLLER and d.battery_voltage)
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
 
         # its power profile: 120 A and 100 A at 401.2 V would give 48100 and 40100 W, its rated 12 kW caps both
         assert (d.power_profile[0].power, d.power_profile[1].power) == (12000, -12000)
 
-        # discharge 1500 W: programs 1-3 150 at the HV scale of 10 (4-6 refused, the rest still goes), the SOC floor, the Sell bit kept, max sell power up to the setpoint
+        # discharge 1500 W: Export First, the discharge current 1500 W over 401.2 V is 4 A, max sell power and the program powers up to the setpoint (150 at the HV scale; 4-6 refuse and keep their own 30), the SOC floor, the Sell bit kept
         d.power(1500, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
-        assert [stick.registers.get(a, 0) for a in POWERS] == [150] * 3 + [0] * 3 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
-        assert (stick.registers[WORK_MODE], stick.registers[TOU], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (0, 0x00FF, 0, 150)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (0, 4, 100, 0, 150)
+        assert [stick.registers[a] for a in POWERS] == [150] * 3 + [30] * 3 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
 
-        # charge 2000 W from the grid: 2000 W over 401.2 V is 5 A, the SOC target, the grid bit next to the Sell bit
+        # charge 2000 W from the grid: on its own CT, 2000 W over 401.2 V is 5 A, no discharge, the SOC target, the grid bit next to the Sell bit
         d.power(-2000, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.sent == (-2000, DistributionMode.INDIVIDUAL)) and stick.registers[GRID_CHARGE_A] == 5
-        assert stick.registers[GRID_CHARGE] == 1 and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
+        assert (stick.registers[WORK_MODE], stick.registers[GRID_CHARGE], stick.registers[DISCHARGE_A]) == (2, 1, 0) and [stick.registers[a] for a in SOCS] == [90] * 6 and [stick.registers[a] for a in SOURCES] == [0x21] * 6
         d.power_off()
+        d.unload()
+        stick.server.close()
+
+    asyncio.run(scenario())
+
+
+def test_a_hand_back_the_inverter_does_not_take_keeps_its_saved_settings(monkeypatch) -> None:
+    async def scenario() -> None:
+        # its own settings: Zero Export To Load, 120 A discharge; programs 4-6 refuse a write over Modbus, so they never hold a hand back up
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, WORK_MODE: 1})
+        stick.refused = set(POWERS[3:])
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
+        d.power(1500, DistributionMode.INDIVIDUAL)
+        assert await wait_for(lambda: d.sent == (1500, DistributionMode.INDIVIDUAL)) and stick.registers[WORK_MODE] == 0
+
+        # the hand back is acknowledged but the work mode does not take it: what we saved stays, so a next control cannot save our own values
+        stick.ignored = {WORK_MODE}
+        d.power_off()
+        await asyncio.sleep(0.3)
+        assert d.saved[WORK_MODE] == 1 and stick.registers[WORK_MODE] == 0
+
+        # once it takes it, the hand back is done and the saved settings go
+        stick.ignored = set()
+        assert await wait_for(lambda: not d.saved)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A]) == (1, 120)
         d.unload()
         stick.server.close()
 
@@ -227,5 +318,24 @@ def test_coordinator_builds_a_deye_in_the_fleet() -> None:
         coord.hass.async_create_task = asyncio.get_running_loop().create_task  # unload hands back on a task of its own
         entry.subentries = {sid: s for sid, s in entry.subentries.items() if sid != sub.subentry_id}
         assert coord.sync_devices() is True and not coord.drivers["deye"].devices and d not in coord.devices
+
+    asyncio.run(scenario())
+
+
+def test_modbus_tcp_reads_and_an_unreachable_stick_is_an_oserror() -> None:
+    # a stick with plain Modbus TCP: an MBAP header, unit 1, function 3; nobody on the port gives an OSError like the V5 path
+    async def scenario() -> None:
+        async def handle(reader, writer):
+            tid, _pid, _length, unit, _fc, address, count = struct.unpack(">HHHBBHH", await reader.readexactly(12))
+            data = struct.pack(f">{count}H", *(0x0005 + address + i for i in range(count)))
+            writer.write(struct.pack(">HHHBBB", tid, 0, 3 + len(data), unit, 3, len(data)) + data)
+            await writer.drain()
+
+        server = await asyncio.start_server(handle, "127.0.0.1", 0)
+        port = server.sockets[0].getsockname()[1]
+        assert await ModbusTcp("127.0.0.1", port).read(0x0000, 2) == [0x0005, 0x0006]
+        server.close()
+        with pytest.raises(OSError):
+            await ModbusTcp("127.0.0.1", 1).read(0x0000, 1)
 
     asyncio.run(scenario())

@@ -76,6 +76,7 @@ sys.meta_path.insert(0, _Finder())
 import homeassistant.helpers.entity_registry as _er  # noqa: E402
 
 _er.async_entries_for_device = lambda *args, **kwargs: []
+_er.async_entries_for_config_entry = lambda *args, **kwargs: []
 
 # selector() returns an HA Selector object; voluptuous only accepts a callable validator, so the stub passes the value through
 import homeassistant.helpers.selector as _selector  # noqa: E402
@@ -86,6 +87,9 @@ _selector.selector = lambda config: (lambda value: value)
 import homeassistant.helpers.device_registry as _dr  # noqa: E402
 
 _dr.async_get = lambda hass: types.SimpleNamespace(async_get_or_create=lambda **kwargs: types.SimpleNamespace(id="dev", config_entries_subentries={}), async_update_device=lambda *args, **kwargs: None, async_get_device=lambda **kwargs: None)
+
+# a child device asks DeviceInfo which parent link this HA knows; the stub answers like an HA before 2026.8
+_dr.DeviceInfo.__optional_keys__ = frozenset()
 
 
 # a real subentry carries an id of its own; the coordinator creates one for the manager and then keys on it

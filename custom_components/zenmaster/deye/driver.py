@@ -30,10 +30,14 @@ class DeyeDriver(Driver):
     LOGO = "solarman"  # Deye has none of its own, its logger stick is a Solarman
     PRODUCTS = PRODUCTS
     DEVICE = DeyeInverter
-    ADD = [  # the battery type picks the scales, the serial printed on the stick is the identity, the capacity is the battery's: the inverter does not know it
-        ConfigField("product", {"select": {"options": list(PRODUCTS)}}, cast=str),
+
+    @classmethod
+    def product_row(cls, data):
+        # a new Deye starts as LV; its first poll reads the device type and corrects it
+        return cls.PRODUCTS.get(str(data.get("product") or "LV"))
+    ADD = [  # the serial printed on the stick is the identity; the battery type comes from the inverter, an LV battery's capacity from its packs, an HV one's is entered here
         ConfigField("sn", {"text": {}}, cast=str),
-        ConfigField("kwh", {"number": {"min": 0.1, "step": 0.1, "unit_of_measurement": "kWh", "mode": "box"}}, cast=float),
+        ConfigField("kwh", {"number": {"min": 0.1, "step": 0.1, "unit_of_measurement": "kWh", "mode": "box"}}, cast=float, required=False),
         ConfigField("ip", {"text": {}}, cast=str),
         ConfigField("port", {"number": {"min": 1, "max": 65535, "mode": "box"}}, cast=int, required=False),
     ]
