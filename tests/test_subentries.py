@@ -215,3 +215,31 @@ def test_field_values_holds_only_the_persisted_fields() -> None:
     assert values["armed_at"] == 5.0 and values["kind"] == "custom" and values["armed"] is False
     for absent in ("id", "state", "detect_phase", "phase", "manage", "name"):
         assert absent not in values
+
+
+def test_an_old_install_moves_to_zenmaster(monkeypatch) -> None:
+    # the manager subentry still titled EnergyManager and entities on the split name zen_master: title, ids and stored states move to ZenMaster
+    import custom_components.zenmaster.coordinator as coordinator_module
+
+    updates = []
+    old = [SimpleNamespace(entity_id="sensor.zen_master_charge_power_aggr", unique_id="zen_master_charge_power_aggr"), SimpleNamespace(entity_id="sensor.deye_d0_soc", unique_id="deye_d0_soc")]
+    monkeypatch.setattr(coordinator_module.er, "async_get", lambda hass: SimpleNamespace(async_update_entity=lambda entity_id, **kw: updates.append((entity_id, kw))))
+    monkeypatch.setattr(coordinator_module.er, "async_entries_for_config_entry", lambda registry, entry_id: old)
+    manager = SimpleNamespace(subentry_id="01M", subentry_type="energy_manager", title="EnergyManager", data=MappingProxyType({}), unique_id="energy_manager")
+    coord, entry = _coord(manager)
+    assert entry.subentries["01M"].title == "ZenMaster"
+    assert updates == [("sensor.zen_master_charge_power_aggr", {"new_unique_id": "zenmaster_charge_power_aggr", "new_entity_id": "sensor.zenmaster_charge_power_aggr"})]
+    assert coord.distribution.entities["charge_power"]._attr_unique_id == "zenmaster_charge_power"
+
+    # a stored state under the old unique id is found back under the new one
+    section = {"zen_master_charge_power_aggr": 12.5}
+    coord.config.section = lambda *a: section
+    async def load() -> None: pass
+    coord.config.load = load
+    coord.config.deserialize = lambda *a: None
+    coord.drivers = {}
+    try:
+        asyncio.run(coord.async_setup())
+    except Exception:
+        pass  # the rest of the setup needs more of HA than the stub has; the stored states are moved before it
+    assert section == {"zenmaster_charge_power_aggr": 12.5}

@@ -83,7 +83,7 @@ class Distribution(EntityDevice):
 
     def __init__(self, hass: HomeAssistant, entry_id: str, subentry_id: str | None = None) -> None:
         dr.async_get(hass).async_get_or_create(config_entry_id=entry_id, config_subentry_id=subentry_id, identifiers={(DOMAIN, PANEL_TITLE)}, name="Distribution")  # display name only; ids stay on PANEL_TITLE
-        EntityDevice.__init__(self, hass, PANEL_TITLE, subentry_id=subentry_id)
+        EntityDevice.__init__(self, hass, PANEL_TITLE, DOMAIN, subentry_id=subentry_id)  # ids on "zenmaster", not the split "zen_master"
         self.p1_device: str = ""
         self.on_save: Callable | None = None  # set by the coordinator: persists the store
         self.on_capacity: Callable | None = None  # set by the coordinator: solves the plan again when a battery joins or leaves

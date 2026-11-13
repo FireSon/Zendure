@@ -102,9 +102,18 @@ class Coordinator:
         # the manager lives in its own subentry, so its device and the solar groups sit on one card; created once for entries that predate it
         sub = next((s for s in entry.subentries.values() if s.subentry_type == MANAGER), None) if entry else None
         if entry is not None and sub is None:
-            sub = ConfigSubentry(data=MappingProxyType({}), subentry_type=MANAGER, title="EnergyManager", unique_id=MANAGER)
+            sub = ConfigSubentry(data=MappingProxyType({}), subentry_type=MANAGER, title=PANEL_TITLE, unique_id=MANAGER)
             hass.config_entries.async_add_subentry(entry, sub)
+        # an entry from before carries the old title, and HA names the device after it
+        elif sub is not None and sub.title == "EnergyManager":
+            hass.config_entries.async_update_subentry(entry, sub, title=PANEL_TITLE)
         self.manager_id = sub.subentry_id if sub else ""
+
+        # entities from before carry the split name zen_master: unique id and entity id move to zenmaster, HA moves their history along
+        registry = er.async_get(hass)
+        for e in er.async_entries_for_config_entry(registry, self.entry_id) if entry else ():
+            if e.unique_id.startswith("zen_master_"):
+                registry.async_update_entity(e.entity_id, new_unique_id=e.unique_id.replace("zen_master_", "zenmaster_", 1), new_entity_id=e.entity_id.replace(".zen_master_", ".zenmaster_", 1))
         self.distribution = Distribution(hass, self.entry_id, self.manager_id or None)
         self.distribution.id = "distribution"  # the key the card and the payload address it by
         self.distribution.on_save = self._store_save
@@ -139,7 +148,11 @@ class Coordinator:
         self.devices.clear()
         self.devices.append(self.distribution)
         await self.config.load()
-        self.distribution.device_load(self.config.section("devices", self.distribution.device_id))
+        # the stored states move along with their unique ids
+        section = self.config.section("devices", self.distribution.device_id)
+        for key in [k for k in section if k.startswith("zen_master_")]:
+            section[key.replace("zen_master_", "zenmaster_", 1)] = section.pop(key)
+        self.distribution.device_load(section)
         self.battery.load(self.config.section("devices", "solver"))
         self.config.deserialize(self.distribution, Distribution.CONFIG)
         for driver in self.drivers.values():
