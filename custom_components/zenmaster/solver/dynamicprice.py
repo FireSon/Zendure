@@ -49,7 +49,7 @@ def _optional_float(v) -> float | None:
 
 
 # the providers whose price is wholesale spot plus a tariff offset; the manual offset overrides only apply to these
-_SPOT_PROVIDERS = ["EnergyChartsProvider", "NextEnergyProvider", "wholesale", "anwb", "vandebron", "eneco", "enbw", "ebem", "octaplus", "eneco_be", "sobry", "frank_fr", "awattar", "smartenergy"]
+_SPOT_PROVIDERS = ["EnergyChartsProvider", "NordPoolProvider", "NextEnergyProvider", "wholesale", "anwb", "vandebron", "eneco", "enbw", "ebem", "octaplus", "eneco_be", "sobry", "frank_fr", "awattar", "smartenergy"]
 
 
 class DynamicPrice(SolverEntry):
@@ -61,6 +61,7 @@ class DynamicPrice(SolverEntry):
             {"value": "TibberProvider", "label": "Tibber"},
             {"value": "ZonneplanProvider", "label": "Zonneplan"},
             {"value": "EnergyChartsProvider", "label": "Energy-Charts (spot)"},
+            {"value": "NordPoolProvider", "label": "Nord Pool (spot)"},
             {"value": "NextEnergyProvider", "label": "NextEnergy"},
             {"value": "wholesale", "label": "Groothandel (spot, kaal)"},
             {"value": "anwb", "label": "ANWB Energie"},
@@ -393,6 +394,28 @@ class Provider:
         # the buy tail already carries the level the provider derived; give it its own fitted shape
         self.extend_tail(buy, tail, base_ts, "buy")
 
+    def fill_spot(self, buy: np.ndarray, sell: np.ndarray, now: datetime, points) -> tuple[np.ndarray, np.ndarray]:
+        # the day-ahead points (start in unix s, quarters long, EUR/MWh) into buy and sell, then the forecast tail behind them
+        markup, vat = self.import_markup + self.energy_tax, 1 + self.vat / 100.0
+        base = int(now.timestamp()) // 900 * 900 - 12 * 900  # slot 12 = the quarter containing now
+        tail = 12
+        for ts, step, p in points:
+            if p is None:
+                continue
+            w = float(p) / 1000.0  # EUR/MWh -> EUR/kWh
+            for slot in range((int(ts) - base) // 900, (int(ts) - base) // 900 + step):
+                if 0 <= slot < buy.size:
+                    buy[slot] = (w * self.import_factor + markup + self.tou[slot]) * vat
+                    sell[slot] = w
+                    tail = max(tail, slot + 1)
+
+        # forecast tail beyond the day-ahead window (real day's intraday shape); slots 0..11 untouched
+        self.extend_tail(sell, tail, base, "sell")
+        buy[tail:] = (sell[tail:] * self.import_factor + markup + self.tou[tail:]) * vat
+        sell[12:] = sell[12:] * self.export_factor + self.export_markup  # the feed-in price; buy above was built on the bare spot
+        self.extend_buy(buy, sell, tail, base)
+        return buy, sell
+
     async def fetch(self, dynamic_price: DynamicPrice, now: datetime):
         # read the tariff information for this provider
         tariffs_path = os.path.join(os.path.dirname(__file__), "dynamicprices", "tariffs.json")
@@ -458,4 +481,4 @@ class ProviderError(Exception):
 
 
 # import the provider implementations so they register as Provider subclasses (used in entry_config)
-from .dynamicprices import energycharts, frank, tibber, zonneplan, nextenergy  # noqa: E402,F401
+from .dynamicprices import energycharts, frank, tibber, zonneplan, nextenergy, nordpool  # noqa: E402,F401
