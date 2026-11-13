@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -35,10 +36,10 @@ class Appliance(SolverEntry, ConsumerDevice):
         ConfigField("kind", {"select": {"options": [{"value": "dishwasher", "label": "Vaatwasser"}, {"value": "dryer", "label": "Droger"}, {"value": "washingmachine", "label": "Wasmachine"}, {"value": "custom", "label": "Overig"}]}}, cast=str, readonly=True),
         ConfigField("armed", {"boolean": {}}, cast=bool, hidden=True),
         ConfigField("armed_at", {"number": {}}, cast=float, required=False, hidden=True),
-        ConfigField("switch_type", {"select": {"options": [{"value": "plug", "label": "Stekker"}, {"value": "pause", "label": "Pauze/hervat"}, {"value": "automation", "label": "Automation"}]}}, cast=str, section_key="link"),
-        ConfigField("switch_entity", {"entity": {}}, cast=str, section_key="link", visible_when={"switch_type": ["plug", "pause"]}),
+        ConfigField("switch_type", {"select": {"options": [{"value": "plug", "label": "Stekker"}, {"value": "pause", "label": "Pauze/hervat"}, {"value": "remote", "label": "Starten op afstand"}, {"value": "automation", "label": "Automation"}]}}, cast=str, section_key="link"),
+        ConfigField("switch_entity", {"entity": {}}, cast=str, section_key="link", visible_when={"switch_type": ["plug", "pause", "remote"]}),
         ConfigField("pause_entity", {"entity": {"domain": "button"}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
-        ConfigField("status_entity", {"entity": {}}, cast=str, required=False, section_key="link", visible_when={"switch_type": "pause"}),
+        ConfigField("status_entity", {"entity": {}}, cast=str, required=False, section_key="link", visible_when={"switch_type": ["pause", "remote"]}),
         ConfigField("power_entity", {"entity": {}}, cast=str, section_key="link"),
         ConfigField("duration_entity", {"entity": {"domain": "sensor", "device_class": "duration"}}, cast=str, required=False, section_key="link"),
         MANAGE,
@@ -61,9 +62,9 @@ class Appliance(SolverEntry, ConsumerDevice):
         self.id = ""
         self.kind = "custom"
         self.switch_entity = ""
-        self.switch_type = "plug"  # how a cycle is held and let run: the plug, the appliance's pause and resume buttons, or an automation
+        self.switch_type = "plug"  # how a cycle is held and let run: the plug, the appliance's pause and resume buttons, its start button once remote start is allowed, or an automation
         self.pause_entity = ""
-        self.status_entity = ""  # the appliance's own operation state: a program held in pause arms it
+        self.status_entity = ""  # the appliance's own state that arms it: its operation state in pause, or its remote start allowed
         self.duration_entity = ""  # the appliance's own estimate of the selected program's length, read at planning
         self.power_rating = 0.0
         self.cycle_duration_slots = 0
@@ -95,8 +96,8 @@ class Appliance(SolverEntry, ConsumerDevice):
             await self.on_action(self, "start")
 
     def release(self) -> None:
-        # hands off: nothing waits for a cheap window any more, and a switch the arming cut goes back on
-        if self.armed and self._switched and self.hass is not None:
+        # hands off: nothing waits for a cheap window any more, and a switch the arming cut goes back on; remote start cut nothing, it is not started
+        if self.armed and self._switched and self.switch_type != "remote" and self.hass is not None:
             self.hass.async_create_task(self._switch(self.hass, True))
         self.armed = False
 
@@ -106,7 +107,9 @@ class Appliance(SolverEntry, ConsumerDevice):
         return self.switch_type != "automation" and bool(self.switch_entity) and (self.switch_type != "pause" or bool(self.pause_entity))
 
     def _switch(self, hass, on: bool):
-        # off holds the cycle, on lets it run: the plug, or the appliance's own pause and resume buttons
+        # off holds the cycle, on lets it run: the plug, the appliance's own pause and resume buttons, or its start button
+        if self.switch_type == "remote":
+            return hass.services.async_call("button", "press", {"entity_id": self.switch_entity}, blocking=False) if on else asyncio.sleep(0)  # it waits by itself: nothing to hold
         if self.switch_type == "pause":
             return hass.services.async_call("button", "press", {"entity_id": self.switch_entity if on else self.pause_entity}, blocking=False)
         return hass.services.async_call("homeassistant", "turn_on" if on else "turn_off", {"entity_id": self.switch_entity}, blocking=False)
@@ -152,10 +155,10 @@ class Appliance(SolverEntry, ConsumerDevice):
             return
         if rested >= self._quiet_s:  # below -> above after a real rest: witnessed start
             self._running_since = now
-        if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S or now < self._direct_until or not any(self.cycle()):
+        if not self.manage or self.busy or self._running_since is None or now - self._running_since > _INTERRUPT_WINDOW_S or now < self._direct_until or not any(self.cycle()) or self.switch_type == "remote":
             if self.status is EntryStatus.none:
                 self.status = EntryStatus.running  # it draws while we plan nothing: say so instead of "off"
-            return  # hands off / busy / a pause inside a cycle / past the 2-min window / a cycle of unknown size
+            return  # hands off / busy / a pause inside a cycle / past the 2-min window / a cycle of unknown size / remote start cannot hold what runs
         self.armed = True
         self.armed_at = now
         self.status = EntryStatus.armed
@@ -206,8 +209,8 @@ class Appliance(SolverEntry, ConsumerDevice):
             if not self.busy:
                 self.status = EntryStatus.none
 
-        # pause/resume: a program the appliance holds in pause is armed, as a witnessed start would be
-        if self.switch_type == "pause" and self.manage and not self.armed and not self.busy and (s := lp.hass.states.get(self.status_entity) if self.status_entity and lp.hass is not None else None) is not None and s.state == "pause":
+        # pause/resume: a program the appliance holds in pause is armed, as a witnessed start would be; remote start: a program waiting with remote start allowed
+        if self.switch_type in ("pause", "remote") and self.manage and not self.armed and not self.busy and (s := lp.hass.states.get(self.status_entity) if self.status_entity and lp.hass is not None else None) is not None and s.state == ("pause" if self.switch_type == "pause" else "on"):
             self.armed, self.armed_at, self.status = True, time.time(), EntryStatus.armed
 
         # armed without its status, as after a restart where the status starts at none: show it as armed again
@@ -238,7 +241,7 @@ class Appliance(SolverEntry, ConsumerDevice):
                 self.data.data[12 + start : 12 + start + len(profile)] = profile
         # the plan wants it on now: keep asking until the appliance actually draws, so a command lost while the
         # switch was unavailable is simply sent again. busy follows the measurement, in on_power.
-        if self.manage and self.armed and not self.busy and self.data.data[12] > 0 and (switch == "off" or self.switch_type == "pause" or not self._switched):
+        if self.manage and self.armed and not self.busy and self.data.data[12] > 0 and (switch == "off" or self.switch_type in ("pause", "remote") or not self._switched):
             self.status = EntryStatus.planned  # running only once power is actually measured, in on_power
             if self._switched:
                 await self._switch(lp.hass, True)

@@ -99,6 +99,7 @@ An appliance is armed when it starts drawing power after a rest. The switch type
 
 - **Plug**: the smart plug is switched off at arming and on again in the cheapest window. The appliance has to resume after a power cut.
 - **Pause/resume**: the appliance's own pause button is pressed at arming, its resume button in the cheapest window (for example Miele, or Home Connect washers and dryers).
+- **Remote start**: for an appliance that waits with remote start allowed (for example Home Connect washers and dryers). It is armed when its remote start allowed sensor turns on, and its start button is pressed in the cheapest window. A cycle that is already running cannot be held, so a start without a plan is only shown as running.
 - **Automation**: ZenMaster switches nothing and only publishes the status on `sensor.<appliance>_state`; your own automation holds the cycle on `armed` and lets it run on the change from `armed` to `planned` or `running` (the latter covers a direct start):
 
 ```yaml
@@ -113,7 +114,7 @@ actions:
       entity_id: button.vaatwasser_resume   # the appliance's own resume or start
 ```
 
-An appliance that waits without drawing power, such as one set to remote start, is armed by pressing `button.<appliance>_arm`, for example from an automation on its remote start sensor. With a program duration sensor (for example Home Connect's estimated total program time) the learned cycle is stretched or shortened to the selected program's length.
+With another switch type, an appliance that waits without drawing power is armed by pressing `button.<appliance>_arm`, for example from an automation. With a program duration sensor (for example Home Connect's estimated total program time) the learned cycle is stretched or shortened to the selected program's length.
 
 ### Prices, solar and base load
 

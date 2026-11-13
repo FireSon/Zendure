@@ -777,6 +777,7 @@
       "switch_type": {
         "plug": "Stekker",
         "pause": "Pauze/hervat",
+        "remote": "Starten op afstand",
         "automation": "Automation"
       }
     },

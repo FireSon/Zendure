@@ -777,6 +777,7 @@
       "switch_type": {
         "plug": "Stecker",
         "pause": "Pause/Fortsetzen",
+        "remote": "Fernstart",
         "automation": "Automatisierung"
       }
     },

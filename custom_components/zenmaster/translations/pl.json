@@ -777,6 +777,7 @@
       "switch_type": {
         "plug": "Gniazdko",
         "pause": "Pauza/wznowienie",
+        "remote": "Zdalny start",
         "automation": "Automatyzacja"
       }
     },

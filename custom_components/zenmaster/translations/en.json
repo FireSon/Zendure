@@ -777,6 +777,7 @@
       "switch_type": {
         "plug": "Plug",
         "pause": "Pause/resume",
+        "remote": "Remote start",
         "automation": "Automation"
       }
     },
