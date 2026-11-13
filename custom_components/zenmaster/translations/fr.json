@@ -777,6 +777,7 @@
       "switch_type": {
         "plug": "Prise",
         "pause": "Pause/reprise",
+        "remote": "Démarrage à distance",
         "automation": "Automatisation"
       }
     },

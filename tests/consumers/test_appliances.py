@@ -422,6 +422,26 @@ def test_with_a_pause_button_the_start_is_paused_and_resumed() -> None:
     assert h.turned_off[-1] == ("press", "button.dw_resume")
 
 
+def test_with_remote_start_the_start_button_is_pressed_in_its_window() -> None:
+    # remote start allowed arms the waiting program, the planned moment presses Start; a rise in power arms nothing and hands off presses nothing
+    d, h = _dw()
+    d.switch_type, d.switch_entity, d.status_entity = "remote", "button.dw_start", "binary_sensor.dw_remote_start_allowed"
+    d.on_power(0.0, now=1000.0)
+    d.on_power(200.0, now=1000.0 + _QUIET_S)
+    assert d.armed is False and h.turned_off == []
+    d.busy = False
+
+    # remote start allowed: armed, planned now and Start pressed
+    lp, now = _planned_now(d, h)
+    h.states = SimpleNamespace(get=lambda eid: SimpleNamespace(state="on"))
+    asyncio.run(d.entry_prerun(lp, now))
+    assert d.armed is True and d.status.name == "planned" and h.turned_off == [("press", "button.dw_start")]
+
+    # hands off while armed: nothing is pressed
+    d.release()
+    assert d.armed is False and h.turned_off == [("press", "button.dw_start")]
+
+
 def test_with_an_automation_nothing_is_switched() -> None:
     # the automation acts on the status: armed, then planned; ZenMaster calls nothing, also with a switch still filled in
     d, h = _dw()
