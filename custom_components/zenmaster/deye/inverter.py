@@ -198,7 +198,8 @@ class DeyeInverter(DistributionDevice):
                     CHARGE_A: charge, DISCHARGE_A: amps if watts > 0 else 0, SELL_POWER: max(self.saved[SELL_POWER], max(0, watts) // self.product.power_scale),
                 }
                 wanted |= (
-                    {a: self.saved[a] for a in POWERS} | dict.fromkeys(SOCS, int(self.soc_min if watts > 0 else self.soc_max))
+                    {a: max(self.saved[a], abs(watts) // self.product.power_scale) for a in POWERS}  # the active program's power limits too: never under the setpoint
+                    | dict.fromkeys(SOCS, int(self.soc_min if watts > 0 else self.soc_max))
                     | {a: self.saved[a] & ~1 | int(watts < 0) for a in SOURCES}  # only the grid bit; the other bits (Sell on newer firmware) stay the inverter's
                 )
             elif setpoint or mode == DistributionMode.OFF:
