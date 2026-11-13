@@ -62,14 +62,21 @@ Under the chart each battery and each consumer has its own lane with its plan pe
 - The plan charges when power is cheap or solar is left over and discharges when it is expensive, within the phase limits of the connection.
 - The phase of each battery and consumer is detected from its power jumps in the recorder history.
 
+#### Deye
+
+- Three-phase hybrid inverters (SG04LP3 / SG05LP3 family and the HV models) with an LV or HV battery, through their logger stick: plain Modbus TCP on port 502, or the Solarman V5 protocol on any other port. Tested on a real installation.
+- Added by hand with the logger's serial number and IP address; ZenMaster reads the device type and picks LV or HV itself. A Deye from another family (single-phase, string, micro) is left alone with a notification.
+- Every battery pack behind the BMS appears as a device of its own (SoC, voltage, current, temperature, SOH, capacity, cycles, cell voltages); an LV battery's capacity follows from its packs. Its grid meter is a device that can be picked as the P1 meter, with phase voltages, frequency and import and export; PV production and the battery's charge and discharge totals are ready for the energy dashboard.
+- Steered through its own settings: a discharge setpoint on Export First with the discharge current and the time-of-use program powers, a grid charge through the grid charge current. Its own settings are put back, and only forgotten once a read back shows it took them. Control is opt-in per device (Allow control) and off by default; without it the device only reports.
+- A logger stick on Modbus TCP serves one client at a time, and the Deye cloud's automatic control (such as Deye Copilot) rewrites the time-of-use programs: switch it off.
+
 #### Experimental brands
 
-Every brand other than Zendure is experimental: written against the vendor's register maps and documentation and tested against simulated devices, but not yet proven on real hardware. Feedback from owners is welcome.
+Every brand other than Zendure and Deye is experimental: written against the vendor's register maps and documentation and tested against simulated devices, but not yet proven on real hardware. Feedback from owners is welcome.
 
 - **Marstek** Venus E, A and D over Modbus TCP, directly or through an RS485 gateway. Added by hand with its register generation (v2, v3, A or D), its IP address and port. Steered with RS485 control mode and a charge or discharge setpoint; handed back to the work mode it had before. Control is opt-in per device (Allow control) and off by default; without it the device only reports.
 - **Anker SOLIX** Solarbank Max AC, XE AC and Solarbank 4 E5000 Pro over Modbus TCP. Found over mDNS or added by hand with its IP address. Steered in Third-Party Control with one signed setpoint; handed back to the operating mode it had before.
 - **Sessy** 5 kWh and 10 kWh over the dongle's local HTTP API. Added by hand with its IP address and the username and password on its sticker. Steered with the API power strategy and a setpoint; handed back to the strategy it had before.
-- **Deye** three-phase hybrid inverters with an LV or HV battery, through their Solarman logger stick. Added by hand with the battery type, the logger's serial number, the battery capacity and the logger's IP address. Its grid meter appears as a device of its own that can be picked as the P1 meter. Steered per mode through its own settings (time-of-use programs, charge and discharge current, work mode, grid charging); its own settings are put back when ZenMaster hands it back. Control is opt-in per device (Allow control) and off by default; without it the device only reports.
 
 ### Heat pump for space heating
 
