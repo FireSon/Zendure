@@ -28,6 +28,7 @@ export class ZmApp extends LitElement {
   @state() private _schema: Schema | null = null;
   @state() private _actions: Record<string, any[]> = {};
   @state() private _tiles: Record<string, string[]> = {};
+  @state() private _version = '';
   @state() private _add: any[] = [];  // the tiles of the add dialog
   @state() private _status: 'loading' | 'ok' | 'error' = 'loading';
   @state() private _error = '';
@@ -100,6 +101,7 @@ export class ZmApp extends LitElement {
     this._actions = bundle.actions ?? {};
     this._tiles = bundle.tiles ?? {};
     this._add = bundle.add ?? [];
+    this._version = bundle.version ?? '';
     try { await refetchLive(); this._reslice(); } catch { /* no plan */ }
   }
 
@@ -217,9 +219,9 @@ export class ZmApp extends LitElement {
 
   private _content() {
     switch (this._tab) {
-      case 'dashboard': return html`<zm-overview view="plan" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles} .add=${this._add}></zm-overview>`;
+      case 'dashboard': return html`<zm-overview view="plan" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles} .add=${this._add} .version=${this._version}></zm-overview>`;
       case 'cijfers': return html`<zm-cijfers .d=${this._d} .theme=${this._theme}></zm-cijfers>`;
-      case 'devices': return html`<zm-overview view="tiles" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles} .add=${this._add}></zm-overview>`;
+      case 'devices': return html`<zm-overview view="tiles" .d=${this._d} .theme=${this._theme} .config=${this._config} .schema=${this._schema} .hass=${this.hass} .actions=${this._actions} .tiles=${this._tiles} .add=${this._add} .version=${this._version}></zm-overview>`;
       case 'settings': return html`<zm-settings .schema=${this._schema} .config=${this._config} .hass=${this.hass} ></zm-settings>`;
       case 'solar': return html`<zm-forecast .d=${this._d} .theme=${this._theme} .schema=${this._schema} .config=${this._config} .hass=${this.hass} .add=${this._add}></zm-forecast>`;
     }

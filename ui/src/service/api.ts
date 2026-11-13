@@ -50,6 +50,7 @@ export interface SchemaBundle {
   actions?: Record<string, RowAction[]>;  // the row buttons each consumer offers, in backend order
   tiles?: Record<string, string[]>;  // the entity fields each consumer shows as tiles on its row
   add?: any[];  // the tiles of the add dialog: consumer types, drivers and the solar group, each with its form
+  version?: string;  // the integration's manifest version, shown on the Controls card
 }
 
 export const api = {

@@ -47,6 +47,7 @@ export class ZmOverview extends LitElement {
   @property({ attribute: false }) actions: Record<string, any[]> = {};
   @property({ attribute: false }) tiles: Record<string, string[]> = {};
   @property({ attribute: false }) add: any[] = [];  // the tile catalog of the add dialog
+  @property() version = '';  // the integration's version, shown on the Controls card
 
   @state() private _pendingMode: string | null = null;  // the option just picked, until the entity confirms it
   @state() private _activeOnly = localStorage.getItem('zm-active-only') === '1';  // the device rows: all, or only the ones that are not offline; kept per browser like the tab
@@ -347,7 +348,7 @@ export class ZmOverview extends LitElement {
     };
     return html`
       <div class="ctl ${inline ? 'inline' : ''}">
-        <div class="h"><span class="i"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg></span>${t('ui.devices.controls', 'Controls')}<span class="s">${t('ui.devices.steering', 'sturing')}</span></div>
+        <div class="h"><span class="i"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg></span>${t('ui.devices.controls', 'Controls')}<span class="s">${this.version ? `v${this.version}` : t('ui.devices.steering', 'sturing')}</span></div>
         <div class="grid">
           <label class="fld"><span>${t('ui.devices.mode', 'Modus')}</span><div class="box"><select .value=${live(this._pendingMode ?? mode?.state ?? '')} ?disabled=${!mode} @change=${pick}>${(mode?.attributes?.options ?? []).map((o: string) => html`<option value=${o} ?selected=${o === mode.state}>${this.hass?.formatEntityState?.(mode, o) ?? o}</option>`)}</select></div></label>
           <label class="fld"><span>${t('ui.devices.manual', 'Handmatig')}</span><div class="box"><input type="number" .value=${String(mp?.state ?? '')} ?disabled=${!mp} @change=${setNum(e.manual_power)} /><em>W</em></div></label>

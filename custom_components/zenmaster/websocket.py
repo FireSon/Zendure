@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.loader import async_get_integration
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN, OPEN_METEO_URL, SchemaAction, stat_to_time, watt_factor
@@ -93,7 +94,8 @@ async def ws_get_schema(hass, connection, msg):
     add += [{"id": d.id, "group": "device", "type": d.id, "label": d.manufacturer, "logo": d.LOGO, "fields": _form(d.ADD)} for d in coord.drivers.values()]
     add.append({"id": "solar_panel", "group": "solar", "type": "solar_panel", "fields": fields})
 
-    connection.send_result(msg["id"], {"schema": schema, "config": config, "actions": actions, "tiles": tiles, "add": add})
+    version = (await async_get_integration(hass, DOMAIN)).version  # the manifest version, shown on the panel
+    connection.send_result(msg["id"], {"schema": schema, "config": config, "actions": actions, "tiles": tiles, "add": add, "version": str(version) if version else ""})
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/get_plan"})
