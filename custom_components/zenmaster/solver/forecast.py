@@ -15,7 +15,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .solver import LpSolver, SolverEntry
 from ..config import ConfigField
-from ..const import OPEN_METEO_URL, stat_to_time, watt_factor
+from ..const import OPEN_METEO_MODEL, OPEN_METEO_URL, stat_to_time, watt_factor
 
 _LOGGER = logging.getLogger(__name__)
 _HTTP_TIMEOUT = ClientTimeout(total=15)
@@ -89,6 +89,7 @@ class Forecast(SolverEntry):
         params = {
             "latitude": self.lat,
             "longitude": self.lon,
+            "models": OPEN_METEO_MODEL,
             "minutely_15": "direct_normal_irradiance,diffuse_radiation,shortwave_radiation,temperature_2m,wind_speed_10m",
             "wind_speed_unit": "ms",
             "timezone": "UTC",
@@ -109,7 +110,7 @@ class Forecast(SolverEntry):
         for t in range(self.solar.data.size - 12):
             s = 12 + t
             i = offset + t
-            if i >= len(m15["time"]):
+            if i >= len(m15["time"]) or m15["direct_normal_irradiance"][i] is None or m15["temperature_2m"][i] is None:
                 break
             self.temp.data[s] = m15["temperature_2m"][i]
             self.wind.data[s] = m15["wind_speed_10m"][i]
@@ -147,6 +148,7 @@ class Forecast(SolverEntry):
         params = {
             "latitude": self.lat,
             "longitude": self.lon,
+            "models": OPEN_METEO_MODEL,
             "minutely_15": "direct_normal_irradiance,diffuse_radiation",
             "timezone": "UTC",
             "start_date": (now - timedelta(days=_CAL_DAYS)).date().isoformat(),
