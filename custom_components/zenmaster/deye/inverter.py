@@ -41,7 +41,8 @@ FAST = ((VOLTAGE, 0x0271 - VOLTAGE), (PV[0], len(PV)))  # battery up to the grid
 CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, SOLAR_SELL, TOU = 0x006C, 0x006D, 0x0080, 0x0082, 0x0091, 0x0092
 SELL_POWER = 0x008F  # max sell power, W at the TOU scale: caps what goes to the grid
 POWERS, SOCS, SOURCES = range(0x009A, 0x00A0), range(0x00A6, 0x00AC), range(0x00AC, 0x00B2)  # per TOU program: discharge power, SOC floor or target, charge source (1 = grid)
-CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (WORK_MODE, 5), (POWERS[0], 24))  # the blocks that hold them
+ENERGY_PATTERN, LOAD_FIRST = 0x008D, 1  # PV first to the house, then to the battery
+CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (ENERGY_PATTERN, 6), (POWERS[0], 24))  # the blocks that hold them
 ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
 RATED = 0x0014  # the inverter's rated AC power, 0.1 W in two words, low word first
 ENERGY = (0x0202, 0x0218 - 0x0202)  # the battery charge and discharge, the grid import and export and the production, today and in total
@@ -116,6 +117,7 @@ class DeyeInverter(DistributionDevice):
         self.battery_voltage = 0.0  # V, the entity writes it: a grid charge current is W over this
         self.control = self.allow_control
         self.charge_a = self.discharge_a = 0  # A: half the packs' Ah (Deye's advice for lithium), never above what the BMS allows
+        self.rated = 0  # W: its rated AC power, read at the first slow poll
         self.refused: set[int] = set()  # registers this inverter refuses to write: they keep its own value, a hand back does not wait for them
         self.request: tuple[int, DistributionMode] | None = None
         self.sent: tuple[int, DistributionMode] | None = None
@@ -219,11 +221,19 @@ class DeyeInverter(DistributionDevice):
             elif setpoint or mode == DistributionMode.OFF:
                 wanted = {CHARGE_A: 0, DISCHARGE_A: 0, SOLAR_SELL: 1}
             else:
+                # on its own CT: Load First, and Time of Use on, since with the grid present the battery only discharges under it (Deye manual);
+                # every program without grid charge, its SOC the floor and its power the rated power
                 bypass = mode == DistributionMode.SMART_DISCHARGING
                 wanted = {
-                    WORK_MODE: ZERO_EXPORT_CT, TOU: 0, GRID_CHARGE: 0, SOLAR_SELL: 1 if bypass else held[SOLAR_SELL],
+                    ENERGY_PATTERN: LOAD_FIRST, WORK_MODE: ZERO_EXPORT_CT, TOU: TOU_WEEK, GRID_CHARGE: 0, SOLAR_SELL: 1 if bypass else held[SOLAR_SELL],
                     CHARGE_A: 0 if bypass else charge, DISCHARGE_A: 0 if mode in (DistributionMode.SMART_CHARGING, DistributionMode.STORE_SOLAR) else discharge,
                 }
+                wanted |= (
+                    dict.fromkeys(POWERS, self.rated // self.product.power_scale) if self.rated else {}
+                ) | dict.fromkeys(SOCS, int(self.soc_min)) | {a: held[a] & ~1 for a in SOURCES}
+            # at rest and on its own CT the max sell power is its rated power again, so a 0 left by a charge setpoint does not keep the sun from the grid
+            if not (setpoint and watts) and self.rated:
+                wanted[SELL_POWER] = self.rated // self.product.power_scale
 
             for address, value in wanted.items():
                 if held[address] != value and address not in self.refused:
@@ -364,6 +374,7 @@ class DeyeInverter(DistributionDevice):
         # its limits without its own settings: half the packs' Ah (Deye's advice for lithium) and what the BMS allows, at the battery voltage, never above its rated power
         if BMS[0] in r:
             ah, rated, changed = sum(p.ah for p in self.packs.values()) * 0.5, (r[RATED + 1] << 16 | r[RATED]) // 10, False
+            self.rated = rated
             self.charge_a, self.discharge_a = (int(min(ah, r[a]) if ah else r[a]) for a in (0x00D4, 0x00D5))
             for profile, amps, sign in ((self.power_profile[0], self.discharge_a, 1), (self.power_profile[1], self.charge_a, -1)):
                 by_current = round(amps * self.battery_voltage, -2)
