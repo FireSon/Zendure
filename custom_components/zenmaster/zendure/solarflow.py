@@ -60,6 +60,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         ConfigField("sn", {"text": {}}, cast=str, readonly=True),
         ConfigField("ip", {"text": {}}, cast=str, required=False),
         ConfigField("blemac", {"text": {}}, cast=str, required=False),
+        ConfigField("allow_control", {"boolean": {}}, cast=bool),
         ConfigField("ble_name", {"text": {}}, cast=str, visible_when={"name": "-"}, readonly=True),
         *FLEET,
         *(ConfigField(k, {"entity": {}}, readonly=True) for k in ("bypass", "grid_state", "solar", "temp")),
@@ -70,6 +71,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         ZendureDevice.__init__(self, hass, driver, subentry_id, name, data, model)
         DistributionDevice.__init__(self, hass, data["sn"], [ProfileDischarge(pwr_max), ProfileCharge(pwr_min)], name, subentry_id)
         self.connection = ConnectionType.OFFLINE
+        self.allow_control: bool = data.get("allow_control", True)  # on by default: off, the device only reports and stays out of the fleet
         self.entities["output_limit"].update_range(0, abs(pwr_max))
         self.entities["input_limit"].update_range(0, abs(pwr_min))
         self.entities["charge_max_power"].update_range(0, abs(pwr_min))
@@ -94,7 +96,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         self._ble_close()
 
     def subentry_data(self) -> dict[str, Any]:
-        return {**ZendureDevice.subentry_data(self), "batteries": self.battery_names}
+        return {**ZendureDevice.subentry_data(self), "batteries": self.battery_names, "allow_control": self.allow_control}
 
     # only created on the first report: which of these a device sends depends on its model and its wiring
     SENSORS: dict[str, tuple[type[HaEntity], str, dict[str, Any]]] = {
@@ -165,9 +167,9 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         HaSensor(self, "battery_input", "outputPackPower", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "battery_output", "packInputPower", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "temp", "hyperTmp", uom="°C", device_class="temperature", state_class="measurement", convert=temp_convert)
-        HaSensor(self, "remaining_time", "remainingTime", uom="h", device_class="duration", state_class="measurement")
         HaSensor(self, "power_max", "inverseMaxPower", uom="W", device_class="power", state_class="measurement")
         self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
+        self.setpoint.update_value(0)  # no command sent yet
         HaSelect(self, "power_phase", PhaseModi, on_changed=self.update_phase, restore=True)
 
         HaBinarySensor(self, "bypass", "pass")
@@ -294,6 +296,7 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
         timeout = 2
         state = self.state  # the status at the end of the previous round
         while True:
+            cmd = Command.TIMEOUT  # nothing taken off the queue yet this round
             try:
                 # get next item from queue
                 try:
@@ -348,6 +351,10 @@ class ZendureSolarFlow(ZendureDevice, DistributionDevice):
             except Exception:
                 # the task must never die
                 _LOGGER.exception("device task %s", self.device_id)
+            finally:
+                # a command taken off the queue is done, so an unload can wait for the last ones
+                if cmd != Command.TIMEOUT:
+                    self.device_queue.task_done()
 
     async def cmd_zensdk(self, payload: Any) -> None:
         try:

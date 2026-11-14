@@ -543,7 +543,7 @@
     "field": {
       "allow_control": {
         "name": "Zezwól na sterowanie",
-        "description": "Eksperymentalne: ZenMaster może sterować tym urządzeniem. Sterowanie nie zostało jeszcze potwierdzone na prawdziwym sprzęcie; wyłączone, urządzenie tylko raportuje pomiary."
+        "description": "ZenMaster może sterować tym urządzeniem; wyłączone, urządzenie tylko raportuje i pozostaje poza flotą. W przypadku Deye i Marstek sterowanie jest nadal eksperymentalne: jeszcze niepotwierdzone na prawdziwym sprzęcie."
       },
       "temp_entity": {
         "name": "Czujnik temperatury",
