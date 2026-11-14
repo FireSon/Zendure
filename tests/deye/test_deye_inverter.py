@@ -214,7 +214,7 @@ def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None
         # SMART_CHARGING: Zero Export To CT, the discharge current closed, the charge current its own; it regulates itself on our settings
         d.power(0, DistributionMode.SMART_CHARGING)
         assert await wait_for(lambda: d.sent == (0, DistributionMode.SMART_CHARGING))
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[TOU]) == (2, 0, 100, 0)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers.get(TOU, 0)) == (2, 0, 100, 0)
 
         # the next slow poll reads the closed discharge current, the profile keeps its own
         polls = d._polls
@@ -244,7 +244,7 @@ def test_individual_steers_the_battery_currents(monkeypatch) -> None:
         # discharge 1500 W: Export First, the discharge current 1500 W over 401.2 V is 4 A, max sell power and the program powers up to the setpoint (150 at the HV scale; 4-6 refuse and keep their own 30), the SOC floor, the Sell bit kept
         d.power(1500, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (0, 4, 100, 0, 150)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers.get(GRID_CHARGE, 0), stick.registers[SELL_POWER]) == (0, 4, 100, 0, 150)
         assert [stick.registers[a] for a in POWERS] == [150] * 3 + [30] * 3 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
 
         # charge 2000 W from the grid: on its own CT, 2000 W over 401.2 V is 5 A, no discharge, the SOC target, the grid bit next to the Sell bit

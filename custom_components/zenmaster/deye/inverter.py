@@ -45,7 +45,8 @@ CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (WORK_MODE, 5), (POWERS[0], 24))  
 ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
 RATED = 0x0014  # the inverter's rated AC power, 0.1 W in two words, low word first
 ENERGY = (0x0202, 0x0218 - 0x0202)  # the battery charge and discharge, the grid import and export and the production, today and in total
-SLOW = ((TEMP, 1), (WORK_MODE, 1), (CHARGE_A, 2), (RATED, 2), ENERGY)  # temperature, work mode, its own maximum charge and discharge current, its rated power, the energy counters
+BMS = (0x00D4, 0x00DC - 0x00D4)  # the BMS: its charge and discharge current, then its max charge and discharge current (0x00DA, 0x00DB)
+SLOW = ((TEMP, 1), (WORK_MODE, 1), (CHARGE_A, 2), (RATED, 2), ENERGY, BMS)  # temperature, work mode, its own maximum charge and discharge current, its rated power, the energy counters, the BMS current limits
 
 # the device type, as ha-solarman tells the families apart: only the three-phase hybrids of the deye_p3 profile are read and steered
 DEVICE = 0x0000
@@ -164,6 +165,9 @@ class DeyeInverter(DistributionDevice):
         HaSensor(self, "pv_power", "solar", uom="W", device_class="power", state_class="measurement")
         self.entities["home_input_aggr"], self.entities["home_output_aggr"] = self.entities["battery_input_aggr"], self.entities["battery_output_aggr"]
         HaSensor(self, "temp", uom="°C", device_class="temperature", state_class="measurement", precision=1)
+        # the BMS current limits, so a cap on what the battery delivers shows next to what we ask
+        for key in ("bms_charge_a", "bms_discharge_a", "bms_max_charge_a", "bms_max_discharge_a"):
+            HaSensor(self, key, uom="A", device_class="current", state_class="measurement")
         HaSensor(self, "work_mode")
         self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)
         HaSensor(self, "pv_today", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
@@ -218,15 +222,19 @@ class DeyeInverter(DistributionDevice):
                     CHARGE_A: 0 if bypass else charge, DISCHARGE_A: 0 if mode in (DistributionMode.SMART_CHARGING, DistributionMode.STORE_SOLAR) else discharge,
                 }
 
-            # only what differs from what we wrote goes to the inverter
+            # only what differs from what the inverter holds goes to it
+            held = await self.read_control()
             for address, value in wanted.items():
-                if self.written.get(address) != value:
+                if held[address] != value and address not in self.refused:
                     await self.write(address, value)
-                    self.written[address] = value
 
             # what the inverter holds now next to what we asked, so a test compares both with what it does
             held = await self.read_control()
             _LOGGER.info("Deye %s: %s %d W, asked %s, holds %s", self.name, mode.name, watts, wanted, {a: held[a] for a in wanted})
+            # a setting it does not hold yet is sent again next round
+            if missing := [a for a in wanted if a not in self.refused and held[a] != wanted[a]]:
+                _LOGGER.warning("Deye %s: not held yet %s, again next round", self.name, ", ".join(f"0x{a:04X}" for a in missing))
+                return
         except OSError as err:
             _LOGGER.warning("Deye %s: settings not written (%s)", self.name, err)
             return
@@ -351,6 +359,8 @@ class DeyeInverter(DistributionDevice):
         if TEMP in r:
             self.entity_update("temp", round((r[TEMP] - 1000) * 0.1, 1))
             self.entity_update("work_mode", r[WORK_MODE])
+            for key, address in (("bms_charge_a", 0x00D4), ("bms_discharge_a", 0x00D5), ("bms_max_charge_a", 0x00DA), ("bms_max_discharge_a", 0x00DB)):
+                self.entity_update(key, r[address])
 
         # its power limits: its own maximum currents at the battery voltage, never above its rated power; while we steer it the saved currents, since we close them ourselves
         if CHARGE_A in r:
