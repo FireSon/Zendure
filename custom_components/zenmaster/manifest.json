@@ -10,6 +10,6 @@
   "issue_tracker": "https://github.com/FireSon/ZenMaster/issues",
   "requirements": ["paho-mqtt", "bleak-retry-connector>=3.9.0", "highspy", "numpy", "pymodbus>=3.8.0", "pynordpool>=0.4.0"],
   "single_config_entry": true,
-  "version": "0.1.9",
+  "version": "0.1.10",
   "zeroconf": [{"type": "_http._tcp.local.", "name": "zendure-*"}, {"type": "_zendure._tcp.local.", "name": "zendure-*"}]
 }
