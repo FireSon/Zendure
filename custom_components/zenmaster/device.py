@@ -203,6 +203,7 @@ class PolledDevice(DistributionDevice):
         HaSensor(self, "battery_input", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "battery_output", uom="W", device_class="power", state_class="measurement", aggr=True)
         self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
+        self.setpoint.update_value(0)  # no command sent yet
         HaSelect(self, "power_phase", PhaseModi, on_changed=self.update_phase, restore=True)
 
         self.kwhsensor = HaSensor(self, "kwh", uom="kWh", device_class="energy", restore=True)

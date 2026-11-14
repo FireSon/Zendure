@@ -543,7 +543,7 @@
     "field": {
       "allow_control": {
         "name": "Steuerung erlauben",
-        "description": "Experimentell: ZenMaster darf dieses Gerät steuern. Die Steuerung ist noch nicht an echter Hardware bestätigt; aus, meldet das Gerät nur Messwerte."
+        "description": "ZenMaster darf dieses Gerät steuern; aus, meldet das Gerät nur und bleibt außerhalb der Flotte. Bei Deye und Marstek ist die Steuerung noch experimentell: noch nicht an echter Hardware bestätigt."
       },
       "temp_entity": {
         "name": "Temperatursensor",

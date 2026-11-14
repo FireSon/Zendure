@@ -543,7 +543,7 @@
     "field": {
       "allow_control": {
         "name": "Sturing toestaan",
-        "description": "Experimenteel: ZenMaster mag dit apparaat sturen. De sturing is nog niet op echte hardware bevestigd; uit meet het apparaat alleen."
+        "description": "ZenMaster mag dit apparaat sturen; uit meet het apparaat alleen en blijft buiten de vloot. Bij Deye en Marstek is de sturing nog experimenteel: nog niet op echte hardware bevestigd."
       },
       "temp_entity": {
         "name": "Temperatuursensor",

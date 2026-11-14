@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 from collections.abc import Callable
+from contextlib import suppress
 from datetime import timedelta
 from functools import partial
 from types import MappingProxyType
@@ -444,6 +445,10 @@ class Coordinator:
         # stop the fleet and hand HEMS back, so no device keeps running on our last setpoint once we are gone
         for d in self.distribution.devices:
             d.power_off()
+        # wait up to 5 s for the queued 0 W and HEMS release on zenSDK and BLE, before the device loops are cancelled
+        with suppress(TimeoutError):
+            async with asyncio.timeout(5):
+                await asyncio.gather(*(d.device_queue.join() for d in self.distribution.devices if hasattr(d, "device_queue")))
         for d in self.devices:
             d.unload()
         for driver in self.drivers.values():

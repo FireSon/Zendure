@@ -543,7 +543,7 @@
     "field": {
       "allow_control": {
         "name": "Allow control",
-        "description": "Experimental: ZenMaster may steer this device. Its control is not yet confirmed on real hardware; off, the device only reports."
+        "description": "ZenMaster may steer this device; off, the device only reports and stays out of the fleet. For Deye and Marstek this control is still experimental: not yet confirmed on real hardware."
       },
       "temp_entity": {
         "name": "Temperature sensor",
