@@ -18,7 +18,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^12.1.0",
     "@types/web-bluetooth": "^0.0.21",
-    "rollup": "^4.21.0",
+    "rollup": "^4.68.2",
     "tslib": "^2.7.0",
     "typescript": "^5.5.4"
   }
