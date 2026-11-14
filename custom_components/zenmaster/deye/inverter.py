@@ -140,12 +140,14 @@ class DeyeInverter(DistributionDevice):
         if self.state != DeviceState.OFFLINE:
             self.request = (watts, mode)
             self.power_setpoint = watts if mode in (DistributionMode.INDIVIDUAL, DistributionMode.MANUAL) else 0
+            self.setpoint.update_value(self.power_setpoint)
         return self.power_actual
 
     def power_off(self) -> None:
         # hand back: without a request the loop puts the inverter's own settings back
         self.request = None
         self.power_setpoint = 0
+        self.setpoint.update_value(0)
         if self.state != DeviceState.OFFLINE:
             self.set_state(DeviceState.EXTERNAL if self.allow_control else DeviceState.CONTROLLER)  # one we may steer stays in the plan
 
@@ -155,6 +157,9 @@ class DeyeInverter(DistributionDevice):
         # the panel reads every battery on the same keys: the battery power is this inverter's home side, its PV its solar
         HaSensor(self, "battery_input", "home_input", uom="W", device_class="power", state_class="measurement", aggr=True)
         HaSensor(self, "battery_output", "home_output", uom="W", device_class="power", state_class="measurement", aggr=True)
+        # what ZenMaster asks the inverter, so the command side is visible next to what it does
+        self.setpoint = HaSensor(self, "power_setpoint", uom="W", device_class="power", state_class="measurement")
+        self.setpoint.update_value(0)  # no command sent yet
         HaSensor(self, "pv_power", "solar", uom="W", device_class="power", state_class="measurement")
         self.entities["home_input_aggr"], self.entities["home_output_aggr"] = self.entities["battery_input_aggr"], self.entities["battery_output_aggr"]
         HaSensor(self, "temp", uom="°C", device_class="temperature", state_class="measurement", precision=1)
