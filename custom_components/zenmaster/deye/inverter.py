@@ -41,7 +41,6 @@ FAST = ((VOLTAGE, 0x0271 - VOLTAGE), (PV[0], len(PV)))  # battery up to the grid
 CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, SOLAR_SELL, TOU = 0x006C, 0x006D, 0x0080, 0x0082, 0x0091, 0x0092
 SELL_POWER = 0x008F  # max sell power, W at the TOU scale: caps what goes to the grid
 POWERS, SOCS, SOURCES = range(0x009A, 0x00A0), range(0x00A6, 0x00AC), range(0x00AC, 0x00B2)  # per TOU program: discharge power, SOC floor or target, charge source (1 = grid)
-WRITES = (CHARGE_A, DISCHARGE_A, GRID_CHARGE_A, GRID_CHARGE, WORK_MODE, SELL_POWER, SOLAR_SELL, TOU, *POWERS, *SOCS, *SOURCES)  # every register we may change, put back on hand back
 CONTROL = ((CHARGE_A, 2), (GRID_CHARGE_A, 3), (WORK_MODE, 5), (POWERS[0], 24))  # the blocks that hold them
 ZERO_EXPORT_CT, EXPORT_FIRST, TOU_WEEK = 2, 0, 0x00FF
 RATED = 0x0014  # the inverter's rated AC power, 0.1 W in two words, low word first
@@ -113,10 +112,10 @@ class DeyeInverter(DistributionDevice):
         self.supported: bool | None = None  # the device type, read once: None until then
         self.packs: dict[str, DeyeBattery] = {}  # the packs behind the BMS, by their serial
 
-        # the control: the inverter's own settings while we steer it (in the subentry, so a crash keeps them), what we wrote, the request and the last one sent
+        # the control: whether we steer it, its current limits, the request and the last one sent; after a start it may still hold our last command, so one we may steer is put at rest first
         self.battery_voltage = 0.0  # V, the entity writes it: a grid charge current is W over this
-        self.saved: dict[int, int] = {int(address): value for address, value in data.get("saved", {}).items()}
-        self.written: dict[int, int] = {}
+        self.control = self.allow_control
+        self.charge_a = self.discharge_a = 0  # A: half the packs' Ah (Deye's advice for lithium), never above what the BMS allows
         self.refused: set[int] = set()  # registers this inverter refuses to write: they keep its own value, a hand back does not wait for them
         self.request: tuple[int, DistributionMode] | None = None
         self.sent: tuple[int, DistributionMode] | None = None
@@ -133,13 +132,13 @@ class DeyeInverter(DistributionDevice):
         try:
             # the loop may still be inside a send: wait until it has stopped, so it cannot write over the hand back
             await asyncio.wait({self.device_task}, timeout=STOP_S)
-            if self.saved:
+            if self.control and self.supported:
                 await self.restore()
         finally:
             self.logger.close()
 
     def subentry_data(self) -> dict[str, Any]:
-        return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "kwh": self.kwh, "saved": self.saved, "allow_control": self.allow_control}
+        return {"product": self.model, "sn": self.sn, "ip": self.ip, "port": self.port, "kwh": self.kwh, "allow_control": self.allow_control}
 
     def power(self, watts: int, mode: DistributionMode) -> int:
         watts = self.clamp(watts)
@@ -151,7 +150,7 @@ class DeyeInverter(DistributionDevice):
         return self.power_actual
 
     def power_off(self) -> None:
-        # hand back: without a request the loop puts the inverter's own settings back
+        # hand back: without a request the loop puts the inverter at rest
         self.request = None
         self.power_setpoint = 0
         self.setpoint.update_value(0)
@@ -184,7 +183,7 @@ class DeyeInverter(DistributionDevice):
         while not self.stopped:
             try:
                 # hand back or a new request first, then the poll; a Deye of another family is never written to
-                if self.request is None and self.saved:
+                if self.request is None and self.control and self.supported:
                     await self.restore()
                 elif self.request not in (None, self.sent) and self.supported:
                     await self.send(*self.request)
@@ -196,14 +195,13 @@ class DeyeInverter(DistributionDevice):
 
     async def send(self, watts: int, mode: DistributionMode) -> None:
         try:
-            # the inverter's own settings, read once before the first write
-            if not self.saved:
-                self.saved = await self.read_control()
-                self.config_changed()
+            # what it holds now: the charge sources keep their other bits, and only what differs goes to it
+            self.control = True
+            held = await self.read_control()
 
             # per mode what it wants: a setpoint through the battery currents (the TOU power is no hard limit), at rest both currents closed, SMART_* on its own CT with one current closed
             setpoint = mode in (DistributionMode.INDIVIDUAL, DistributionMode.MANUAL)
-            charge, discharge = self.saved[CHARGE_A], self.saved[DISCHARGE_A]  # open: the inverter's own limits
+            charge, discharge = self.charge_a, self.discharge_a  # open: its limits
             if setpoint and watts:
                 # the setpoint as a current at the battery voltage: discharging exactly that with Export First, what the house does not take goes to the grid;
                 # or charging that much from the grid up to soc_max on its own CT
@@ -211,24 +209,22 @@ class DeyeInverter(DistributionDevice):
                 amps = max(round(MIN_W / self.battery_voltage), round(abs(watts) / self.battery_voltage)) if self.battery_voltage else 0
                 wanted = {
                     WORK_MODE: EXPORT_FIRST if watts > 0 else ZERO_EXPORT_CT, TOU: TOU_WEEK, GRID_CHARGE: int(watts < 0), GRID_CHARGE_A: amps if watts < 0 else 0,
-                    CHARGE_A: charge, DISCHARGE_A: amps if watts > 0 else 0, SELL_POWER: max(self.saved[SELL_POWER], max(0, watts) // self.product.power_scale),
+                    CHARGE_A: charge, DISCHARGE_A: amps if watts > 0 else 0, SELL_POWER: max(0, watts) // self.product.power_scale,
                 }
                 wanted |= (
-                    {a: max(self.saved[a], abs(watts) // self.product.power_scale) for a in POWERS}  # the active program's power limits too: never under the setpoint
+                    dict.fromkeys(POWERS, abs(watts) // self.product.power_scale)  # the active program's power limits too: the setpoint
                     | dict.fromkeys(SOCS, int(self.soc_min if watts > 0 else self.soc_max))
-                    | {a: self.saved[a] & ~1 | int(watts < 0) for a in SOURCES}  # only the grid bit; the other bits (Sell on newer firmware) stay the inverter's
+                    | {a: held[a] & ~1 | int(watts < 0) for a in SOURCES}  # only the grid bit; the other bits (Sell on newer firmware) stay the inverter's
                 )
             elif setpoint or mode == DistributionMode.OFF:
                 wanted = {CHARGE_A: 0, DISCHARGE_A: 0, SOLAR_SELL: 1}
             else:
                 bypass = mode == DistributionMode.SMART_DISCHARGING
                 wanted = {
-                    WORK_MODE: ZERO_EXPORT_CT, TOU: 0, GRID_CHARGE: 0, SOLAR_SELL: 1 if bypass else self.saved[SOLAR_SELL],
+                    WORK_MODE: ZERO_EXPORT_CT, TOU: 0, GRID_CHARGE: 0, SOLAR_SELL: 1 if bypass else held[SOLAR_SELL],
                     CHARGE_A: 0 if bypass else charge, DISCHARGE_A: 0 if mode in (DistributionMode.SMART_CHARGING, DistributionMode.STORE_SOLAR) else discharge,
                 }
 
-            # only what differs from what the inverter holds goes to it
-            held = await self.read_control()
             for address, value in wanted.items():
                 if held[address] != value and address not in self.refused:
                     await self.write(address, value)
@@ -249,20 +245,18 @@ class DeyeInverter(DistributionDevice):
         self.set_state(DeviceState.ACTIVE if setpoint or mode == DistributionMode.OFF else DeviceState.EXTERNAL)
 
     async def restore(self) -> None:
-        # hand back: every register we may have changed gets the inverter's own value again; only a read back that shows them all clears what we saved,
-        # else the next round tries again, so a new control can never take our own values for the inverter's
+        # hand back: both battery currents closed, so it neither charges nor discharges until we steer it again; only a read back that shows both ends the control
         try:
-            for address in WRITES:
-                await self.write(address, self.saved[address])
+            for address in (CHARGE_A, DISCHARGE_A):
+                await self.write(address, 0)
             back = await self.read_control()
         except OSError as err:
             _LOGGER.warning("Deye %s: hand back failed (%s)", self.name, err)
             return
-        if differ := [a for a in WRITES if a not in self.refused and back[a] != self.saved[a]]:
-            _LOGGER.warning("Deye %s: hand back not taken yet for %s, again next round", self.name, ", ".join(f"0x{a:04X}" for a in differ))
+        if back[CHARGE_A] or back[DISCHARGE_A]:
+            _LOGGER.warning("Deye %s: hand back not taken yet, again next round", self.name)
             return
-        self.saved, self.written, self.sent = {}, {}, None
-        self.config_changed()
+        self.control, self.sent = False, None
 
     async def read_control(self) -> dict[int, int]:
         # the blocks that hold every register we may change
@@ -367,11 +361,12 @@ class DeyeInverter(DistributionDevice):
             for key, address in (("bms_charge_a", 0x00D4), ("bms_discharge_a", 0x00D5), ("bms_max_charge_a", 0x00DA), ("bms_max_discharge_a", 0x00DB)):
                 self.entity_update(key, r[address])
 
-        # its power limits: its own maximum currents at the battery voltage, never above its rated power; while we steer it the saved currents, since we close them ourselves
-        if CHARGE_A in r:
-            currents, rated, changed = self.saved or r, (r[RATED + 1] << 16 | r[RATED]) // 10, False
-            for profile, address, sign in ((self.power_profile[0], DISCHARGE_A, 1), (self.power_profile[1], CHARGE_A, -1)):
-                by_current = round(currents[address] * self.battery_voltage, -2)
+        # its limits without its own settings: half the packs' Ah (Deye's advice for lithium) and what the BMS allows, at the battery voltage, never above its rated power
+        if BMS[0] in r:
+            ah, rated, changed = sum(p.ah for p in self.packs.values()) * 0.5, (r[RATED + 1] << 16 | r[RATED]) // 10, False
+            self.charge_a, self.discharge_a = (int(min(ah, r[a]) if ah else r[a]) for a in (0x00D4, 0x00D5))
+            for profile, amps, sign in ((self.power_profile[0], self.discharge_a, 1), (self.power_profile[1], self.charge_a, -1)):
+                by_current = round(amps * self.battery_voltage, -2)
                 if (limit := sign * int(min(by_current, rated) if rated else by_current)) != profile.power:
                     profile.power = limit
                     profile.__post_init__()  # floor and bands follow the new limit
@@ -381,5 +376,5 @@ class DeyeInverter(DistributionDevice):
 
         # it regulates itself while we do not steer it; one we may steer counts in the plan as external, so a fleet of Deyes alone can start
         self.power_actual = battery
-        if not self.saved:
+        if not self.control or self.sent is None:
             self.set_state(DeviceState.EXTERNAL if self.allow_control else DeviceState.CONTROLLER)
