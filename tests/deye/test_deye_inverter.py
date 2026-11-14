@@ -213,10 +213,10 @@ def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None
         d, stick, _driver, _distribution = await start(monkeypatch, HV | {BMS_CHARGE_A: 100, BMS_DISCHARGE_A: 120, WORK_MODE: 1})
         assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.charge_a and not d.control)
 
-        # SMART_CHARGING: Zero Export To CT, the discharge current closed, the charge current its limit; it regulates itself on our settings
+        # SMART_CHARGING: Load First, Zero Export To CT, Time of Use on, the discharge current closed, the charge current its limit; it regulates itself on our settings
         d.power(0, DistributionMode.SMART_CHARGING)
         assert await wait_for(lambda: d.sent == (0, DistributionMode.SMART_CHARGING))
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers.get(TOU, 0)) == (2, 0, 100, 0)
+        assert (stick.registers[0x008D], stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[TOU]) == (1, 2, 0, 100, 0x00FF)
 
         # the next slow poll reads the closed discharge current, the profile keeps the BMS limit
         polls = d._polls
