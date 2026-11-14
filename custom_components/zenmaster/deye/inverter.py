@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 POLL_S = 5.0  # the fast set every 5 s; to be set from the measured latency when the Deye becomes the P1 meter
+MIN_W = 260  # W: the smallest a setpoint gets as a current, 5 A on LV at 52 V, 1 A on HV at 400 V
 SLOW_EVERY = 12  # temperature and work mode once per this many polls
 OFFLINE_POLLS = 3  # failed polls before the inverter counts as offline
 
@@ -197,7 +198,8 @@ class DeyeInverter(DistributionDevice):
             if setpoint and watts:
                 # the setpoint as a current at the battery voltage: discharging exactly that with Export First, what the house does not take goes to the grid;
                 # or charging that much from the grid up to soc_max on its own CT
-                amps = round(abs(watts) / self.battery_voltage) if self.battery_voltage else 0
+                # at least MIN_W, so a start at RANGE_MIN shows in the battery power and the distribution counts it as running
+                amps = max(round(MIN_W / self.battery_voltage), round(abs(watts) / self.battery_voltage)) if self.battery_voltage else 0
                 wanted = {
                     WORK_MODE: EXPORT_FIRST if watts > 0 else ZERO_EXPORT_CT, TOU: TOU_WEEK, GRID_CHARGE: int(watts < 0), GRID_CHARGE_A: amps if watts < 0 else 0,
                     CHARGE_A: charge, DISCHARGE_A: amps if watts > 0 else 0, SELL_POWER: max(self.saved[SELL_POWER], max(0, watts) // self.product.power_scale),
