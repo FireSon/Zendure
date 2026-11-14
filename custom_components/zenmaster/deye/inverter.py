@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 POLL_S = 5.0  # the fast set every 5 s; to be set from the measured latency when the Deye becomes the P1 meter
+STOP_S = 10.0  # s the hand back on unload waits for the loop to stop
 MIN_W = 260  # W: the smallest a setpoint gets as a current, 5 A on LV at 52 V, 1 A on HV at 400 V
 SLOW_EVERY = 12  # temperature and work mode once per this many polls
 OFFLINE_POLLS = 3  # failed polls before the inverter counts as offline
@@ -119,15 +120,19 @@ class DeyeInverter(DistributionDevice):
         self.refused: set[int] = set()  # registers this inverter refuses to write: they keep its own value, a hand back does not wait for them
         self.request: tuple[int, DistributionMode] | None = None
         self.sent: tuple[int, DistributionMode] | None = None
+        self.stopped = False  # set on unload: the loop ends even when a request swallows the cancel
         self.device_task = asyncio.get_running_loop().create_task(self.device_loop())
 
     def unload(self) -> None:
         # the loop stops; an inverter under our control is handed back on its way out, then the connection closes
+        self.stopped = True
         self.device_task.cancel()
         self.hass.async_create_task(self.close())
 
     async def close(self) -> None:
         try:
+            # the loop may still be inside a send: wait until it has stopped, so it cannot write over the hand back
+            await asyncio.wait({self.device_task}, timeout=STOP_S)
             if self.saved:
                 await self.restore()
         finally:
@@ -176,7 +181,7 @@ class DeyeInverter(DistributionDevice):
         HaSensor(self, "battery_discharge_total", uom="kWh", device_class="energy", state_class="total_increasing", precision=1)
 
     async def device_loop(self) -> None:
-        while True:
+        while not self.stopped:
             try:
                 # hand back or a new request first, then the poll; a Deye of another family is never written to
                 if self.request is None and self.saved:
