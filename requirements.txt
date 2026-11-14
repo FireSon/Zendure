@@ -5,7 +5,7 @@ ruff==0.15.10
 aiohttp
 bleak-retry-connector>=3.9.0
 voluptuous
-paho.mqtt==2.1.0
+paho.mqtt==2.2.0
 highspy>=1.7.2
 numpy
 aiosqlite>=0.20.0
