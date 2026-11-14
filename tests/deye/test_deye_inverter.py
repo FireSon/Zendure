@@ -17,6 +17,8 @@ from custom_components.zenmaster.sensor import HaSensor
 from conftest import fake_hass
 from test_subentries import _coord
 
+BMS_CHARGE_A, BMS_DISCHARGE_A = 0x00D4, 0x00D5  # the BMS current limits the inverter reads its own from
+
 HaSensor.add = staticmethod(lambda *a, **k: None)  # no HA platform in tests
 
 SERIAL = 2712345678
@@ -103,7 +105,7 @@ def value(d, key: str):
 def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
     async def scenario() -> None:
         d, stick, _driver, distribution = await start(monkeypatch, HV)
-        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and not d.control)
 
         # the HV scales: 0.1 V and 10 W per raw unit; each phase from its signed low word, the total their sum
         assert (d.soc, d.kwh, d.temp, d.power_actual) == (63, 10.24, 25.3, -1500)
@@ -113,9 +115,9 @@ def test_poll_reads_an_hv_inverter_and_never_writes(monkeypatch) -> None:
         assert [value(d.meter, key) for key in ("phase1_power", "phase2_power", "phase3_power", "grid_power")] == [-300, 500, 2000, 2200]
         assert value(d, "work_mode") == 2
 
-        # reads only, every one with the stick's serial; in the fleet as external, so it counts in the plan and a mode can start on it
-        assert {f for f, _ in stick.requests} == {0x03} and {s for _, s in stick.requests} == {SERIAL}
-        assert distribution.devices == [d] and d.subentry_data() == {"product": "HV", "sn": str(SERIAL), "ip": "127.0.0.1", "port": d.port, "kwh": 10.24, "saved": {}, "allow_control": True}
+        # after the start only the hand back writes: both battery currents closed, every request with the stick's serial; in the fleet as external, so it counts in the plan and a mode can start on it
+        assert {f for f, _ in stick.requests} == {0x03, 0x10} and {s for _, s in stick.requests} == {SERIAL} and (stick.registers[CHARGE_A], stick.registers[DISCHARGE_A]) == (0, 0)
+        assert distribution.devices == [d] and d.subentry_data() == {"product": "HV", "sn": str(SERIAL), "ip": "127.0.0.1", "port": d.port, "kwh": 10.24, "allow_control": True}
         d.unload()
         stick.server.close()
 
@@ -207,24 +209,24 @@ def test_an_unreachable_stick_leaves_the_inverter_offline(monkeypatch) -> None:
 
 def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None:
     async def scenario() -> None:
-        # its own settings: 100 A charge, 120 A discharge, Zero Export To Load
-        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, WORK_MODE: 1})
-        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL)
+        # its BMS allows 100 A charge and 120 A discharge, it runs Zero Export To Load
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {BMS_CHARGE_A: 100, BMS_DISCHARGE_A: 120, WORK_MODE: 1})
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.charge_a and not d.control)
 
-        # SMART_CHARGING: Zero Export To CT, the discharge current closed, the charge current its own; it regulates itself on our settings
+        # SMART_CHARGING: Zero Export To CT, the discharge current closed, the charge current its limit; it regulates itself on our settings
         d.power(0, DistributionMode.SMART_CHARGING)
         assert await wait_for(lambda: d.sent == (0, DistributionMode.SMART_CHARGING))
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[TOU]) == (2, 0, 100, 0)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers.get(TOU, 0)) == (2, 0, 100, 0)
 
-        # the next slow poll reads the closed discharge current, the profile keeps its own
+        # the next slow poll reads the closed discharge current, the profile keeps the BMS limit
         polls = d._polls
         assert await wait_for(lambda: d._polls > polls + inverter_module.SLOW_EVERY)
         assert d.power_profile[0].power == 48100
 
-        # hand back: its own settings again, and it regulates itself, still in the plan
+        # hand back: both currents closed, so it neither charges nor discharges, still in the plan
         d.power_off()
-        assert await wait_for(lambda: not d.saved)
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], d.state) == (1, 120, DeviceState.EXTERNAL)
+        assert await wait_for(lambda: not d.control)
+        assert (stick.registers[CHARGE_A], stick.registers[DISCHARGE_A], d.state) == (0, 0, DeviceState.EXTERNAL)
         d.unload()
         stick.server.close()
 
@@ -234,17 +236,17 @@ def test_smart_charging_closes_the_discharge_and_hands_back(monkeypatch) -> None
 def test_individual_steers_the_battery_currents(monkeypatch) -> None:
     async def scenario() -> None:
         # newer firmware: the Sell bit in every charge source, max sell power 1000 W, its own program powers 300 W (30 at the HV scale), rated 12 kW (120000 in 0.1 W); programs 4-6 refuse a write over Modbus
-        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, SELL_POWER: 100, RATED: 54464, RATED + 1: 1} | dict.fromkeys(SOURCES, 0x20) | dict.fromkeys(POWERS, 30))
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {BMS_CHARGE_A: 100, BMS_DISCHARGE_A: 120, SELL_POWER: 100, RATED: 54464, RATED + 1: 1} | dict.fromkeys(SOURCES, 0x20) | dict.fromkeys(POWERS, 30))
         stick.refused = set(POWERS[3:])
-        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage and d.charge_a)
 
-        # its power profile: 120 A and 100 A at 401.2 V would give 48100 and 40100 W, its rated 12 kW caps both
+        # its power profile: the BMS's 120 A and 100 A at 401.2 V would give 48100 and 40100 W, its rated 12 kW caps both
         assert (d.power_profile[0].power, d.power_profile[1].power) == (12000, -12000)
 
         # discharge 1500 W: Export First, the discharge current 1500 W over 401.2 V is 4 A, max sell power and the program powers up to the setpoint (150 at the HV scale; 4-6 refuse and keep their own 30), the SOC floor, the Sell bit kept
         d.power(1500, DistributionMode.INDIVIDUAL)
         assert await wait_for(lambda: d.state == DeviceState.ACTIVE)
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers[GRID_CHARGE], stick.registers[SELL_POWER]) == (0, 4, 100, 0, 150)
+        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A], stick.registers[CHARGE_A], stick.registers.get(GRID_CHARGE, 0), stick.registers[SELL_POWER]) == (0, 4, 100, 0, 150)
         assert [stick.registers[a] for a in POWERS] == [150] * 3 + [30] * 3 and [stick.registers[a] for a in SOCS] == [10] * 6 and [stick.registers[a] for a in SOURCES] == [0x20] * 6
 
         # charge 2000 W from the grid: on its own CT, 2000 W over 401.2 V is 5 A, no discharge, the SOC target, the grid bit next to the Sell bit
@@ -258,25 +260,25 @@ def test_individual_steers_the_battery_currents(monkeypatch) -> None:
     asyncio.run(scenario())
 
 
-def test_a_hand_back_the_inverter_does_not_take_keeps_its_saved_settings(monkeypatch) -> None:
+def test_a_hand_back_the_inverter_does_not_take_is_sent_again(monkeypatch) -> None:
     async def scenario() -> None:
-        # its own settings: Zero Export To Load, 120 A discharge; programs 4-6 refuse a write over Modbus, so they never hold a hand back up
-        d, stick, _driver, _distribution = await start(monkeypatch, HV | {CHARGE_A: 100, DISCHARGE_A: 120, WORK_MODE: 1})
+        # its BMS allows 100 A charge and 120 A discharge; programs 4-6 refuse a write over Modbus
+        d, stick, _driver, _distribution = await start(monkeypatch, HV | {BMS_CHARGE_A: 100, BMS_DISCHARGE_A: 120, WORK_MODE: 1})
         stick.refused = set(POWERS[3:])
-        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage)
+        assert await wait_for(lambda: d.state == DeviceState.EXTERNAL and d.battery_voltage and d.charge_a)
         d.power(1500, DistributionMode.INDIVIDUAL)
-        assert await wait_for(lambda: d.sent == (1500, DistributionMode.INDIVIDUAL)) and stick.registers[WORK_MODE] == 0
+        assert await wait_for(lambda: d.sent == (1500, DistributionMode.INDIVIDUAL)) and stick.registers[DISCHARGE_A] == 4
 
-        # the hand back is acknowledged but the work mode does not take it: what we saved stays, so a next control cannot save our own values
-        stick.ignored = {WORK_MODE}
+        # the hand back is acknowledged but the discharge current does not take it: the control stays and the next round tries again
+        stick.ignored = {DISCHARGE_A}
         d.power_off()
         await asyncio.sleep(0.3)
-        assert d.saved[WORK_MODE] == 1 and stick.registers[WORK_MODE] == 0
+        assert d.control and stick.registers[DISCHARGE_A] == 4
 
-        # once it takes it, the hand back is done and the saved settings go
+        # once it takes it, both currents are closed and the control ends
         stick.ignored = set()
-        assert await wait_for(lambda: not d.saved)
-        assert (stick.registers[WORK_MODE], stick.registers[DISCHARGE_A]) == (1, 120)
+        assert await wait_for(lambda: not d.control)
+        assert (stick.registers[CHARGE_A], stick.registers[DISCHARGE_A]) == (0, 0)
         d.unload()
         stick.server.close()
 

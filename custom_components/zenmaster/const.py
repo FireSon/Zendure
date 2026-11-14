@@ -11,6 +11,7 @@ PANEL_TITLE = "ZenMaster"
 PANEL_ICON = "mdi:home-lightning-bolt"
 STATIC_URL = f"/{DOMAIN}_static"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+OPEN_METEO_MODEL = "icon_seamless"  # weather model of the solar forecast and its calibration: best_match takes KNMI HARMONIE in NL, which misses low cloud
 
 
 class Phase(IntEnum):

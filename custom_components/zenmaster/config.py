@@ -131,5 +131,6 @@ class Config:
                 continue
             value = getattr(obj, field.id, None)
             if value is None:
+                data.pop(field.id, None)  # an emptied field leaves the Store too, so the old value does not return on restart
                 continue
             data[field.id] = value

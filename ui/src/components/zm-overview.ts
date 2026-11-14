@@ -27,6 +27,7 @@ const LBL_NARROW = 160;  // px: the name column on the phone
 // ConnectionType from device.py: 0 offline, 1 local broker, 2 cloud, 3 zensdk (http), 4 ble
 const CONN_COLOR: Record<number, string> = { 0: '#e8645a', 1: '#4a90d9', 2: '#1fb89a', 3: '#3aa0c9', 4: '#4a90d9' };
 const CONTROLLER_COLOR = '#9b7bd4';  // regulates itself: online, not steered
+const NOGRID_COLOR = '#f2c94c';  // reachable, but no grid on its AC side
 const PHASE_ORDER = ['L1', 'L2', 'L3', 'L1-3', ''];  // the device rows by phase; an unknown phase last
 
 interface DevRow {
@@ -216,7 +217,7 @@ export class ZmOverview extends LitElement {
         kwhAvail: kwhCap > 0 ? kwhCap * socPct / 100 : null, kwhCap,
         inAggr: this._optNum(e.home_input_aggr), outAggr: this._optNum(e.home_output_aggr), rte: this._optNum(e.rte),
         solar: this._optNum(e.solar), temp, tempColor: temp != null && temp >= 58 ? '#e8645a' : temp != null && temp >= 50 ? '#f5a623' : 'var(--zm-text)',
-        dot: offline ? CONN_COLOR[0] : Number(e.state) === 1 ? CONTROLLER_COLOR : CONN_COLOR[Number(e.connection ?? 1)], online: !offline, phase: this._phase(e.power_phase),
+        dot: offline ? CONN_COLOR[0] : Number(e.state) === 1 ? CONTROLLER_COLOR : Number(e.state) === 2 ? NOGRID_COLOR : CONN_COLOR[Number(e.connection ?? 1)], online: !offline, phase: this._phase(e.power_phase),
       };
     }).sort((a, b) => PHASE_ORDER.indexOf(a.phase) - PHASE_ORDER.indexOf(b.phase));
   }
