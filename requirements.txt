@@ -9,6 +9,6 @@ paho.mqtt==2.1.0
 highspy>=1.7.2
 numpy
 aiosqlite>=0.20.0
-tzdata>=2024.1
+tzdata>=2026.6
 pvlib>=0.15.0
 pynordpool==0.4.0
